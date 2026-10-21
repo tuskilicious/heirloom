@@ -125,7 +125,7 @@ def validate_files(base_path: str, filelist: list[tuple], hash_type='sha1',
                 # enable progress indicator and go to new line
                 stdout.write('\n')
                 show_progress = True
-                interval = (_size / (1024 * 1024)) // 100
+                interval = max(1, int(_size / (1024 * 1024)) // 100)
                 start_time = perf_counter()
 
             with open(full_path, 'rb') as f:

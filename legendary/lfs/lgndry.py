@@ -372,7 +372,7 @@ class LGDLFS:
         if app_name in self._installed:
             del self._installed[app_name]
         else:
-            self.log.warning('Trying to remove non-installed game:', app_name)
+            self.log.warning(f'Trying to remove non-installed game: {app_name}')
             return
 
         json.dump(self._installed, open(os.path.join(self.path, 'installed.json'), 'w'),

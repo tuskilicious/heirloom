@@ -489,11 +489,9 @@ class LegendaryCore:
         return self.lgd.assets[platform]
 
     def get_asset(self, app_name, platform='Windows', update=False) -> GameAsset:
-        if update or platform not in self.lgd.assets:
-            self.get_assets(update_assets=True, platform=platform)
-
+        assets = self.get_assets(update_assets=update, platform=platform)
         try:
-            return next(i for i in self.lgd.assets[platform] if i.app_name == app_name)
+            return next(i for i in assets if i.app_name == app_name)
         except StopIteration as e:
             raise ValueError from e
 
