@@ -12,7 +12,7 @@ from typing import Any
 from filelock import FileLock
 
 from legendary.models.config import LGDConf
-from legendary.models.game import Game, GameAsset, InstalledGame
+from legendary.models.game import Game, GameAsset, InstalledGame, PlaytimeSession
 from legendary.utils.aliasing import generate_aliases
 from legendary.utils.env import is_windows_mac_or_pyi
 
@@ -387,6 +387,20 @@ class LGDLFS:
 
         with self.config_path.open('w') as cf:
             self.config.write(cf)
+
+    def add_playtime_session(self, app_name: str, session: PlaytimeSession) -> None:
+        # locked, since several "legendary launch" processes may finish at the same time
+        with LockedJSONData(self.path / 'playtime.json') as lock:
+            data = lock.data or {}
+            data.setdefault(app_name, []).append(session.to_json())
+            lock.data = data
+
+    def get_playtime(self) -> dict[str, list[PlaytimeSession]]:
+        try:
+            data = self._load_json('playtime.json')
+        except FileNotFoundError:
+            return {}
+        return {app_name: [PlaytimeSession.from_json(s) for s in sessions] for app_name, sessions in data.items()}
 
     def get_dir_size(self) -> int:
         return sum(f.stat().st_size for f in self.path.glob('**/*') if f.is_file())

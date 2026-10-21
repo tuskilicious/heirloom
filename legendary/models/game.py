@@ -1,6 +1,6 @@
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import Optional
 
@@ -276,6 +276,36 @@ class SaveGameFile:
     filename: str
     manifest_name: str
     datetime: Optional[datetime] = None
+
+
+@dataclass
+class PlaytimeSession:
+    """
+    One play session recorded by "legendary launch"
+    """
+    start: datetime
+    end: datetime
+    # None when legendary stopped watching before the game exited
+    exit_code: Optional[int] = None
+
+    @property
+    def duration(self) -> timedelta:
+        return self.end - self.start
+
+    @property
+    def result(self) -> str:
+        """Session outcome, using the same names as the Epic Games Launcher"""
+        if self.exit_code is None:
+            return 'unobservable'
+        return 'exited' if self.exit_code == 0 else 'crashed'
+
+    @classmethod
+    def from_json(cls, json):
+        return cls(start=datetime.fromisoformat(json['start']), end=datetime.fromisoformat(json['end']),
+                   exit_code=json.get('exit_code'))
+
+    def to_json(self) -> dict:
+        return dict(start=self.start.isoformat(), end=self.end.isoformat(), exit_code=self.exit_code)
 
 
 class SaveGameStatus(Enum):

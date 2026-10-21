@@ -10,6 +10,7 @@ import subprocess
 import time
 import webbrowser
 from collections import defaultdict, namedtuple
+from datetime import datetime, timezone
 from logging.handlers import QueueListener
 from multiprocessing import Queue as MPQueue
 from multiprocessing import freeze_support
@@ -40,8 +41,9 @@ from legendary.lfs.wine_helpers import (
     read_registry,
 )
 from legendary.models.exceptions import InvalidCredentialsError
-from legendary.models.game import Game, SaveGameStatus, VerifyResult
+from legendary.models.game import Game, PlaytimeSession, SaveGameStatus, VerifyResult
 from legendary.utils.cli import (
+    format_duration,
     get_boolean_choice,
     get_int_choice,
     sdl_prompt,
@@ -741,7 +743,69 @@ class LegendaryCLI:
             if params.environment:
                 logger.debug('Environment overrides: {}'.format(', '.join(
                     f'{k}={v}' for k, v in params.environment.items())))
-            subprocess.Popen(full_params, cwd=params.working_directory, env=full_env, shell=os.name == 'nt')
+            started = datetime.now(timezone.utc)
+            game_process = subprocess.Popen(full_params, cwd=params.working_directory, env=full_env,
+                                            shell=os.name == 'nt')
+            if not args.no_wait and not self.core.lgd.config.getboolean('Legendary', 'disable_playtime_tracking',
+                                                                         fallback=False):
+                self._track_playtime(app_name, game_process, started)
+
+    def _track_playtime(self, app_name: str, game_process: subprocess.Popen, started: datetime) -> None:
+        # Only the launched process is watched, so games whose own launcher exits right after starting
+        # the real game get a too-short session (the EGL can't observe some of those either).
+        logger.info('Waiting for the game to exit to record playtime (use --no-wait to return immediately)...')
+        try:
+            exit_code = game_process.wait()
+        except KeyboardInterrupt:
+            exit_code = None
+
+        session = PlaytimeSession(start=started, end=datetime.now(timezone.utc), exit_code=exit_code)
+        self.core.lgd.add_playtime_session(app_name, session)
+
+        played = format_duration(session.duration.total_seconds())
+        if exit_code is None:
+            logger.info(f'Stopped watching {app_name} after {played}, it may still be running.')
+        elif exit_code:
+            logger.warning(f'{app_name} crashed after {played} (exit code {exit_code & 0xFFFFFFFF:#010x}).')
+        else:
+            logger.info(f'{app_name} exited after {played}.')
+
+    def playtime(self, args):
+        sessions_by_app = self.core.lgd.get_playtime()
+        if args.app_name:
+            app_name = self._resolve_aliases(args.app_name)
+            sessions_by_app = {app_name: sessions_by_app.get(app_name, [])}
+
+        summary = []
+        for app_name, sessions in sessions_by_app.items():
+            if not sessions:
+                continue
+            game = self.core.get_game(app_name)
+            summary.append(dict(
+                app_name=app_name, title=game.app_title if game else app_name,
+                total_seconds=int(sum(s.duration.total_seconds() for s in sessions)),
+                sessions=len(sessions), last_played=max(s.end for s in sessions),
+            ))
+        summary.sort(key=lambda s: s['last_played'], reverse=True)
+
+        if args.json:
+            return self._print_json([s | dict(last_played=s['last_played'].isoformat()) for s in summary],
+                                    args.pretty_json)
+
+        if not summary:
+            print('No playtime recorded yet. Playtime is recorded for games started with "legendary launch".')
+            return
+
+        print('\nPlaytime recorded by "legendary launch":')
+        for s in summary:
+            print(f' * {s["title"]} ({s["app_name"]}) | {format_duration(s["total_seconds"])} | '
+                  f'{s["sessions"]} session(s) | last played {s["last_played"].astimezone():%Y-%m-%d %H:%M}')
+
+        if args.app_name:
+            print('\nSessions:')
+            for session in sessions_by_app[summary[0]['app_name']]:
+                print(f'  - {session.start.astimezone():%Y-%m-%d %H:%M} for '
+                      f'{format_duration(session.duration.total_seconds())} ({session.result})')
 
     def _launch_third_party(self, args):
         game = self.core.get_game(app_name=args.app_name)
@@ -2756,6 +2820,7 @@ def main():
     list_installed_parser = subparsers.add_parser('list-installed', help='List installed games')
     list_saves_parser = subparsers.add_parser('list-saves', help='List available cloud saves')
     move_parser = subparsers.add_parser('move', help='Move specified app name to a new location')
+    playtime_parser = subparsers.add_parser('playtime', help='Show playtime recorded by "legendary launch"')
     status_parser = subparsers.add_parser('status', help='Show legendary status information')
     sync_saves_parser = subparsers.add_parser('sync-saves', help='Sync cloud saves')
     uninstall_parser = subparsers.add_parser('uninstall', help='Uninstall (delete) a game')
@@ -2895,6 +2960,9 @@ def main():
                                help='Override username used when launching the game (only works with some titles)')
     launch_parser.add_argument('--dry-run', dest='dry_run', action='store_true',
                                help='Print the command line that would have been used to launch the game and exit')
+    launch_parser.add_argument('--no-wait', dest='no_wait', action='store_true',
+                               help='Return right after starting the game instead of waiting for it to exit '
+                                    '(playtime will not be recorded)')
     launch_parser.add_argument('--language', dest='language', action='store', metavar='<two letter language code>',
                                help='Override language for game launch (defaults to system locale)')
     launch_parser.add_argument('--wrapper', dest='wrapper', action='store', metavar='<wrapper command>',
@@ -3097,6 +3165,11 @@ def main():
     move_parser.add_argument('--skip-move', dest='skip_move', action='store_true',
                              help='Only change legendary database, do not move files (e.g. if already moved)')
 
+    playtime_parser.add_argument('app_name', nargs='?', metavar='<App Name>',
+                                 help='Only show this app, including its individual sessions')
+    playtime_parser.add_argument('--json', dest='json', action='store_true',
+                                 help='Output information in JSON format')
+
     achievements_parser.add_argument('app_name', metavar='<App Name>', help='Name of the app')
     achievements_parser.add_argument('--hidden', dest='show_hidden', action='store_true',
                                      help='Show undiscovered achievements (may contain spoilers)')
@@ -3205,6 +3278,8 @@ def main():
             cli.move(args)
         elif args.subparser_name == 'achievements':
             cli.achievements(args)
+        elif args.subparser_name == 'playtime':
+            cli.playtime(args)
     except KeyboardInterrupt:
         logger.info('Command was aborted via KeyboardInterrupt, cleaning up...')
 
