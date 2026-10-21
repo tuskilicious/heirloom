@@ -1,10 +1,10 @@
 import logging
-import os
+import sys
 from pathlib import Path
 
 from legendary.models.game import Game
 
-if os.name == 'nt':
+if sys.platform == 'win32':
     from legendary.lfs.windows_helpers import (
         HKEY_CURRENT_USER,
         HKEY_LOCAL_MACHINE,
@@ -44,7 +44,7 @@ def _read_user_reg(prefix: str) -> list[str]:
 
 
 def query_registry_entries(prefix=None):
-    if os.name == 'nt':
+    if sys.platform == 'win32':
         # Overlay location for the EOS SDK to load
         overlay_path = query_registry_value(HKEY_CURRENT_USER, EOS_OVERLAY_KEY, EOS_OVERLAY_VALUE)
         # Vulkan Layers
@@ -87,7 +87,7 @@ def query_registry_entries(prefix=None):
 
 
 def add_registry_entries(overlay_path, prefix=None):
-    if os.name == 'nt':
+    if sys.platform == 'win32':
         logger.debug(f'Settings HKCU EOS Overlay Path: {overlay_path}')
         set_registry_value(HKEY_CURRENT_USER, EOS_OVERLAY_KEY, EOS_OVERLAY_VALUE,
                            overlay_path.replace('\\', '/'), TYPE_STRING)
@@ -131,7 +131,7 @@ def add_registry_entries(overlay_path, prefix=None):
 def remove_registry_entries(prefix=None):
     entries = query_registry_entries(prefix)
 
-    if os.name == 'nt':
+    if sys.platform == 'win32':
         if entries['overlay_path']:
             logger.debug('Removing HKCU EOS OverlayPath')
             remove_registry_value(HKEY_CURRENT_USER, EOS_OVERLAY_KEY, EOS_OVERLAY_VALUE)

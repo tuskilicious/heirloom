@@ -12,7 +12,6 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from hashlib import sha1
-from locale import getdefaultlocale
 from multiprocessing import Queue
 from pathlib import Path
 from platform import system
@@ -65,7 +64,7 @@ from legendary.models.game import (
 from legendary.models.json_manifest import JSONManifest
 from legendary.models.manifest import Manifest
 from legendary.utils.egl_crypt import decrypt_epic_data
-from legendary.utils.env import is_windows_mac_or_pyi
+from legendary.utils.env import get_system_locale, is_windows_mac_or_pyi
 from legendary.utils.game_workarounds import (
     get_exe_override,
     is_opt_enabled,
@@ -107,7 +106,7 @@ class LegendaryCore:
         self.language_code, self.country_code = ('en', 'US')
 
         if locale := self.lgd.config.get('Legendary', 'locale',
-                                         fallback=getdefaultlocale(('LANG', 'LANGUAGE', 'LC_ALL', 'LC_CTYPE'))[0]):
+                                         fallback=get_system_locale()):
             try:
                 self.language_code, self.country_code = locale.split('-' if '-' in locale else '_')
                 self.log.debug(f'Set locale to {self.language_code}-{self.country_code}')
@@ -221,8 +220,8 @@ class LegendaryCore:
         if not lock.data:
             raise ValueError('No saved credentials')
         elif self.logged_in and lock.data['expires_at']:
-            dt_exp = datetime.fromisoformat(lock.data['expires_at'][:-1])
-            dt_now = datetime.utcnow()
+            dt_exp = datetime.fromisoformat(lock.data['expires_at'][:-1]).replace(tzinfo=timezone.utc)
+            dt_now = datetime.now(timezone.utc)
             td = dt_now - dt_exp
 
             # if session still has at least 10 minutes left we can re-use it.
@@ -248,8 +247,8 @@ class LegendaryCore:
                 self.log.warning(f'Checking for EOS Overlay updates failed: {e!r}')
 
         if lock.data['expires_at'] and not force_refresh:
-            dt_exp = datetime.fromisoformat(lock.data['expires_at'][:-1])
-            dt_now = datetime.utcnow()
+            dt_exp = datetime.fromisoformat(lock.data['expires_at'][:-1]).replace(tzinfo=timezone.utc)
+            dt_now = datetime.now(timezone.utc)
             td = dt_now - dt_exp
 
             # if session still has at least 10 minutes left we can re-use it.

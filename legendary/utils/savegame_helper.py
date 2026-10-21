@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from fnmatch import fnmatch
 from hashlib import sha1
 from io import BytesIO
@@ -79,7 +79,7 @@ class SaveGameHelper:
         # create metadata for savegame
         m.meta.app_name = f'{app_name}{epic_id}'
         if not manifest_dt:
-            manifest_dt = datetime.utcnow()
+            manifest_dt = datetime.now(timezone.utc)
         m.meta.build_version = manifest_dt.strftime('%Y.%m.%d-%H.%M.%S')
         m.custom_fields['CloudSaveFolder'] = cloud_folder
         if cloud_folder_mac:

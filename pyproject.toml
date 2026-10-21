@@ -66,6 +66,8 @@ quote-style = "single"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# fail on deprecated stdlib calls in our own code before they are removed
+filterwarnings = ["error::DeprecationWarning:legendary.*"]
 
 [tool.mypy]
 python_version = "3.10"

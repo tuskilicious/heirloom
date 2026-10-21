@@ -1,3 +1,7 @@
+import locale
+import sys
+import warnings
+
 import pytest
 
 from legendary.lfs.utils import clean_filename
@@ -8,7 +12,34 @@ from legendary.utils.cli import (
     sdl_prompt,
     strtobool,
 )
+from legendary.utils.env import get_system_locale
 from legendary.utils.selective_dl import get_sdl_appname
+
+
+@pytest.mark.parametrize(('env', 'expected'), [
+    ({'LANG': 'de_DE.UTF-8'}, 'de_DE'),
+    ({'LANG': 'de_DE@euro'}, 'de_DE'),
+    ({'LANGUAGE': 'fr_FR:en_US'}, 'fr_FR'),
+    ({'LANG': 'en_GB', 'LC_ALL': 'ja_JP.UTF-8'}, 'en_GB'),
+    ({'LC_CTYPE': 'pt_BR'}, 'pt_BR'),
+    ({'LANG': 'C'}, None),
+    ({'LANG': 'POSIX'}, None),
+    ({}, None),
+])
+def test_system_locale_posix(monkeypatch, env, expected):
+    monkeypatch.setattr(sys, 'platform', 'linux')
+    for var in ('LANG', 'LANGUAGE', 'LC_ALL', 'LC_CTYPE'):
+        monkeypatch.delenv(var, raising=False)
+    for var, value in env.items():
+        monkeypatch.setenv(var, value)
+    assert get_system_locale() == expected
+
+
+@pytest.mark.skipif(sys.platform != 'win32' or sys.version_info >= (3, 15), reason='compares to the removed stdlib call')
+def test_system_locale_matches_getdefaultlocale_on_windows():
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', DeprecationWarning)
+        assert get_system_locale() == locale.getdefaultlocale()[0]
 
 
 def test_aliases_include_initialisms_and_roman_numerals():
