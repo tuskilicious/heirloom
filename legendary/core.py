@@ -1,4 +1,6 @@
 
+from __future__ import annotations
+
 import contextlib
 import json
 import logging
@@ -15,6 +17,7 @@ from multiprocessing import Queue
 from pathlib import Path
 from platform import system
 from sys import platform as sys_platform
+from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlparse
 from uuid import uuid4
 
@@ -60,7 +63,7 @@ from legendary.models.game import (
     Sidecar,
 )
 from legendary.models.json_manifest import JSONManifest
-from legendary.models.manifest import Manifest, ManifestMeta
+from legendary.models.manifest import Manifest
 from legendary.utils.egl_crypt import decrypt_epic_data
 from legendary.utils.env import is_windows_mac_or_pyi
 from legendary.utils.game_workarounds import (
@@ -357,8 +360,8 @@ class LegendaryCore:
 
         return self.lgd.achievements[namespace]
 
-    def get_achievements(self, game: Game, update: bool = False):
-        if not game.achievements.achievements:
+    def get_achievements(self, game: Game, update: bool = False) -> dict[str, Any] | None:
+        if not game.achievements or not game.achievements.achievements:
             return None
 
         user_achievements = self.get_user_achievements(game.namespace, update)
@@ -369,7 +372,7 @@ class LegendaryCore:
                 user_achievements['playerAchievements']
             }
 
-        achievements = {
+        achievements: dict[str, Any] = {
             'total_achievements': game.achievements.total_achievements,
             'total_product_xp': game.achievements.total_product_xp,
             'achievement_sets': game.achievements.achievement_sets,
@@ -521,8 +524,8 @@ class LegendaryCore:
 
     def get_game_and_dlc_list(self, update_assets=True, platform='Windows',
                               force_refresh=False, skip_ue=True) -> tuple[list[Game], dict[str, list[Game]]]:
-        _ret = []
-        _dlc = defaultdict(list)
+        _ret: list[Game] = []
+        _dlc: defaultdict[str, list[Game]] = defaultdict(list)
         meta_updated = False
 
         # fetch asset information for Windows, all installed platforms, and the specified one
@@ -536,7 +539,7 @@ class LegendaryCore:
         if not self.lgd.assets:
             return _ret, _dlc
 
-        assets = {}
+        assets: dict[str, dict[str, GameAsset]] = {}
         for _platform, _assets in self.lgd.assets.items():
             for _asset in _assets:
                 if _asset.app_name in assets:
@@ -734,7 +737,7 @@ class LegendaryCore:
 
     def get_app_environment(self, app_name, wine_pfx=None, cx_bottle=None, disable_wine=False) -> dict:
         # get environment overrides from config
-        env = dict()
+        env: dict[str, str] = dict()
         if 'default.env' in self.lgd.config:
             env |= {
                 k: v
@@ -827,14 +830,14 @@ class LegendaryCore:
         return pre_launch_command, pre_launch_wait
 
     def get_launch_parameters(self, app_name: str, offline: bool = False,
-                              user: str = None, extra_args: list = None,
-                              wine_bin: str = None, wine_pfx: str = None,
-                              language: str = None, wrapper: str = None,
+                              user: str | None = None, extra_args: list | None = None,
+                              wine_bin: str | None = None, wine_pfx: str | None = None,
+                              language: str | None = None, wrapper: str | None = None,
                               disable_wine: bool = False,
-                              executable_override: str = None,
-                              crossover_app: str = None,
-                              crossover_bottle: str = None,
-                              addon_app_name: str = None) -> LaunchParameters:
+                              executable_override: str | None = None,
+                              crossover_app: str | None = None,
+                              crossover_bottle: str | None = None,
+                              addon_app_name: str | None = None) -> LaunchParameters:
         install = self.lgd.get_installed_game(app_name)
         game = self.lgd.get_game_meta(addon_app_name if addon_app_name else app_name)
 
@@ -1111,7 +1114,7 @@ class LegendaryCore:
         return str(absolute_path)
 
     def check_savegame_state(self, path: str, save: SaveGameFile) -> tuple[SaveGameStatus, tuple[datetime | None, datetime | None]]:
-        latest = 0
+        latest = 0.0
         for f in Path(path).rglob('*'):
             if f.is_file():
                 latest = max(latest, f.stat().st_mtime)
@@ -1139,7 +1142,7 @@ class LegendaryCore:
         else:
             return SaveGameStatus.REMOTE_NEWER, (dt_local, dt_remote)
 
-    def upload_save(self, app_name, save_dir, local_dt: datetime = None,
+    def upload_save(self, app_name, save_dir, local_dt: datetime | None = None,
                     disable_filtering: bool = False):
         game = self.lgd.get_game_meta(app_name)
         custom_attr = game.metadata['customAttributes']
@@ -1464,18 +1467,18 @@ class LegendaryCore:
         r = self.egs.unauth_session.get(f'{base_url}/Deltas/{new_build_id}/{old_build_id}.delta')
         return r.content if r.status_code == 200 else None
 
-    def prepare_download(self, game: Game, base_game: Game = None, base_path: str = '',
-                         status_q: Queue = None, max_shm: int = 0, max_workers: int = 0,
+    def prepare_download(self, game: Game, base_game: Game | None = None, base_path: str = '',
+                         status_q: Queue | None = None, max_shm: int = 0, max_workers: int = 0,
                          force: bool = False, disable_patching: bool = False,
                          game_folder: str = '', override_manifest: str = '',
                          override_old_manifest: str = '', override_base_url: str = '',
-                         platform: str = 'Windows', file_prefix_filter: list = None,
-                         file_exclude_filter: list = None, file_install_tag: list = None,
+                         platform: str = 'Windows', file_prefix_filter: list | None = None,
+                         file_exclude_filter: list | None = None, file_install_tag: list | None = None,
                          dl_optimizations: bool = False, dl_timeout: int = 10,
                          repair: bool = False, repair_use_latest: bool = False,
                          disable_delta: bool = False, override_delta_manifest: str = '',
-                         egl_guid: str = '', preferred_cdn: str = None,
-                         disable_https: bool = False, bind_ip: str = None) -> (DLManager, AnalysisResult, ManifestMeta):
+                         egl_guid: str = '', preferred_cdn: str | None = None,
+                         disable_https: bool = False, bind_ip: str | None = None) -> tuple[DLManager, AnalysisResult, InstalledGame]:
         # load old manifest
         old_manifest = None
 
@@ -1527,7 +1530,7 @@ class LegendaryCore:
                                platform=platform)
 
         # check if we should use a delta manifest or not
-        disable_delta = disable_delta or ((override_old_manifest or override_manifest) and not override_delta_manifest)
+        disable_delta = disable_delta or bool((override_old_manifest or override_manifest) and not override_delta_manifest)
         if old_manifest and new_manifest:
             disable_delta = disable_delta or (old_manifest.meta.build_id == new_manifest.meta.build_id)
         if old_manifest and new_manifest and not disable_delta:
@@ -1556,6 +1559,8 @@ class LegendaryCore:
         else:
             if not game_folder:
                 if game.is_dlc:
+                    if not base_game:
+                        raise ValueError(f'Metadata for the base game of DLC "{game.app_name}" is missing')
                     game_folder = base_game.metadata.get('customAttributes', {}). \
                         get('FolderName', {}).get('value', base_game.app_name)
                 else:
@@ -1696,7 +1701,7 @@ class LegendaryCore:
                                       game: Game,
                                       updating: bool = False,
                                       ignore_space_req: bool = False) -> ConditionCheckResult:
-        results = ConditionCheckResult(failures=set(), warnings=set())
+        results = ConditionCheckResult()
 
         # if on linux, check for eac in the files
         if os.name != 'nt':
@@ -1877,7 +1882,7 @@ class LegendaryCore:
         igame.prereq_info['installed'] = True
         self.lgd.set_installed_game(app_name, igame)
 
-    def import_game(self, game: Game, app_path: str, egl_guid='', platform='Windows') -> (Manifest, InstalledGame):
+    def import_game(self, game: Game, app_path: str, egl_guid='', platform='Windows') -> tuple[Manifest, InstalledGame]:
         needs_verify = True
         manifest_data = None
 

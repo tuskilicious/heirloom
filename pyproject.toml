@@ -66,3 +66,29 @@ quote-style = "single"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["legendary"]
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+[[tool.mypy.overrides]]
+module = ["webview", "webview.*"]
+ignore_missing_imports = true
+
+# Ratchet: these still set attributes to None and fill them in later, which mypy can't
+# follow inside unannotated functions. Remove a module from this list once it passes.
+[[tool.mypy.overrides]]
+module = [
+    "legendary.api.egs",
+    "legendary.cli",
+    "legendary.core",
+    "legendary.downloader.mp.workers",
+    "legendary.models.chunk",
+    "legendary.models.egl",
+    "legendary.models.manifest",
+    "legendary.utils.webview_login",
+]
+check_untyped_defs = false

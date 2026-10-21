@@ -19,6 +19,7 @@ from legendary.models.downloading import (
     AnalysisResult,
     ChunkTask,
     DownloaderTask,
+    DownloaderTaskResult,
     FileTask,
     SharedMemorySegment,
     TaskFlags,
@@ -26,7 +27,7 @@ from legendary.models.downloading import (
     UIUpdate,
     WriterTask,
 )
-from legendary.models.manifest import Manifest, ManifestComparison
+from legendary.models.manifest import CDL, Manifest, ManifestComparison
 
 
 class DLManager(Process):
@@ -43,11 +44,12 @@ class DLManager(Process):
         self.manifest_secrets = manifest_secrets
 
         # All the queues!
-        self.logging_queue = None
-        self.dl_worker_queue = None
-        self.writer_queue = None
-        self.dl_result_q = None
-        self.writer_result_q = None
+        self.logging_queue: MPQueue | None = None
+        # created in run_real(), inside the manager process
+        self.dl_worker_queue: MPQueue
+        self.writer_queue: MPQueue
+        self.dl_result_q: MPQueue
+        self.writer_result_q: MPQueue
 
         # Worker stuff
         self.max_workers = max_workers or min(cpu_count() * 2, 16)
@@ -56,15 +58,15 @@ class DLManager(Process):
         self.case_insensitive = case_insensitive
 
         # Analysis stuff
-        self.analysis = None
-        self.tasks = deque()
-        self.chunks_to_dl = deque()
-        self.chunk_data_list = None
+        self.analysis: AnalysisResult | None = None
+        self.tasks: deque[FileTask | ChunkTask] = deque()
+        self.chunks_to_dl: deque[int] = deque()
+        self.chunk_data_list = CDL()
 
         # shared memory stuff
         self.max_shared_memory = max_shared_memory  # 1 GiB by default
-        self.sms = deque()
-        self.shared_memory = None
+        self.sms: deque[SharedMemorySegment] = deque()
+        self.shared_memory: SharedMemory
 
         # Interval for log updates and pushing updates to the queue
         self.update_interval = update_interval
@@ -72,14 +74,14 @@ class DLManager(Process):
 
         # Resume file stuff
         self.resume_file = resume_file
-        self.hash_map = dict()
+        self.hash_map: dict[str, str] = dict()
 
         # cross-thread runtime information
         self.running = True
         self.active_tasks = 0
-        self.children = []
-        self.threads = []
-        self.conditions = []
+        self.children: list[Process] = []
+        self.threads: list[Thread] = []
+        self.conditions: list[Condition] = []
         # bytes downloaded and decompressed since last report
         self.bytes_downloaded_since_last = 0
         self.bytes_decompressed_since_last = 0
@@ -91,7 +93,7 @@ class DLManager(Process):
         self.num_processed_since_last = 0
         self.num_tasks_processed_since_last = 0
 
-    def run_analysis(self, manifest: Manifest, old_manifest: Manifest = None,
+    def run_analysis(self, manifest: Manifest, old_manifest: Manifest | None = None,
                      patch=True, resume=True, file_prefix_filter=None,
                      file_exclude_filter=None, file_install_tag=None,
                      processing_optimization=False) -> AnalysisResult:
@@ -236,7 +238,7 @@ class DLManager(Process):
             self.log.info('Processing order optimization is enabled, analysis may take a few seconds longer...')
 
         # count references to chunks for determining runtime cache size later
-        references = Counter()
+        references: Counter[int] = Counter()
         fmlist = sorted(manifest.file_manifest_list.elements,
                         key=lambda a: a.filename.lower())
 
@@ -257,7 +259,7 @@ class DLManager(Process):
                 # if the file was added, it just adds to the delta
                 current_tmp_size += fm.file_size
                 analysis_res.disk_space_delta = max(current_tmp_size, analysis_res.disk_space_delta)
-            elif fm.filename in mc.changed:
+            elif old_manifest and fm.filename in mc.changed:
                 # if the file was changed, we need temporary space equal to the full size,
                 # but then subtract the size of the old file as it's deleted on write completion.
                 current_tmp_size += fm.file_size
@@ -306,22 +308,22 @@ class DLManager(Process):
             self.log.debug(f'Processing optimizations took {opt_delta:.01f} seconds.')
 
         # determine reusable chunks and prepare lookup table for reusable ones
-        re_usable = defaultdict(dict)
+        re_usable: defaultdict[str, dict[tuple[int, int, int], int]] = defaultdict(dict)
         if old_manifest and mc.changed and patch:
             self.log.debug('Analyzing manifests for re-usable chunks...')
             for changed in mc.changed:
                 old_file = old_manifest.file_manifest_list.get_file_by_path(changed)
                 new_file = manifest.file_manifest_list.get_file_by_path(changed)
 
-                existing_chunks = defaultdict(list)
+                old_parts: defaultdict[int, list[tuple[int, int, int]]] = defaultdict(list)
                 off = 0
                 for cp in old_file.chunk_parts:
-                    existing_chunks[cp.guid_num].append((off, cp.offset, cp.offset + cp.size))
+                    old_parts[cp.guid_num].append((off, cp.offset, cp.offset + cp.size))
                     off += cp.size
 
                 for cp in new_file.chunk_parts:
                     key = (cp.guid_num, cp.offset, cp.size)
-                    for file_o, cp_o, cp_end_o in existing_chunks[cp.guid_num]:
+                    for file_o, cp_o, cp_end_o in old_parts[cp.guid_num]:
                         # check if new chunk part is wholly contained in the old chunk part
                         if cp_o <= cp.offset and (cp.offset + cp.size) <= cp_end_o:
                             references[cp.guid_num] -= 1
@@ -331,7 +333,7 @@ class DLManager(Process):
 
         last_cache_size = current_cache_size = 0
         # set to determine whether a file is currently cached or not
-        cached = set()
+        cached: set[int] = set()
         # Using this secondary set is orders of magnitude faster than checking the deque.
         chunks_in_dl_list = set()
         # This is just used to count all unique guids that have been cached
@@ -487,9 +489,9 @@ class DLManager(Process):
         self.log.debug('Download Job Manager quitting...')
 
     def dl_results_handler(self, task_cond: Condition):
-        in_buffer = dict()
+        in_buffer: dict[int, DownloaderTaskResult] = dict()
 
-        task = self.tasks.popleft()
+        task: FileTask | ChunkTask | None = self.tasks.popleft()
         current_file = ''
 
         while task and self.running:
@@ -655,6 +657,7 @@ class DLManager(Process):
                     q.join_thread()
 
     def run_real(self):
+        assert self.analysis is not None
         self.shared_memory = SharedMemory(create=True, size=self.max_shared_memory)
         self.log.debug(f'Created shared memory of size: {self.shared_memory.size / 1024 / 1024:.02f} MiB')
 
@@ -818,7 +821,6 @@ class DLManager(Process):
         # close up shared memory
         self.shared_memory.close()
         self.shared_memory.unlink()
-        self.shared_memory = None
 
         self.log.info('All done! Download manager quitting...')
         # finally, exit the process.

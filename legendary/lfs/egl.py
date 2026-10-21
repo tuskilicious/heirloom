@@ -10,9 +10,11 @@ from legendary.models.egl import EGLManifest
 class EPCLFS:
     # Known encryption key(s) for JSON user data
     # Data is encrypted using AES-256-ECB mode
-    data_keys = []
+    data_keys: list[str] = []
 
     def __init__(self):
+        self.appdata_path: str | None = None
+        self.programdata_path: str | None = None
         if os.name == 'nt':
             self.appdata_path = os.path.expandvars(
                 r'%LOCALAPPDATA%\EpicGamesLauncher\Saved\Config\Windows'
@@ -20,11 +22,9 @@ class EPCLFS:
             self.programdata_path = os.path.expandvars(
                 r'%PROGRAMDATA%\Epic\EpicGamesLauncher\Data\Manifests'
             )
-        else:
-            self.appdata_path = self.programdata_path = None
 
         self.config = configparser.ConfigParser(strict=False)
-        self.config.optionxform = lambda option: option
+        self.config.optionxform = str  # type: ignore[assignment,method-assign]
 
         self.manifests = dict()
 
@@ -87,6 +87,8 @@ class EPCLFS:
             json.dumps(manifest_data, indent=4, sort_keys=True), encoding='utf-8')
 
     def delete_manifest(self, app_name):
+        if not self.programdata_path:
+            raise ValueError('EGS ProgramData path is not set')
         if not self.manifests:
             self.read_manifests()
         if app_name not in self.manifests:

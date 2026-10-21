@@ -9,14 +9,10 @@ from tempfile import TemporaryFile
 from legendary.lfs.utils import StrPath
 from legendary.models.chunk import Chunk
 from legendary.models.manifest import (
-    CDL,
-    FML,
     ChunkInfo,
     ChunkPart,
-    CustomFields,
     FileManifest,
     Manifest,
-    ManifestMeta,
 )
 
 
@@ -48,7 +44,8 @@ class SaveGameHelper:
         self.files = dict()
         self.log = logging.getLogger('SGH')
 
-    def finalize_chunk(self, chunk: Chunk):
+    def finalize_chunk(self, chunk: Chunk) -> ChunkInfo:
+        assert chunk.sha_hash is not None, 'chunk data must be set before finalizing'
         ci = ChunkInfo()
         ci.guid = chunk.guid
         ci.hash = chunk.hash
@@ -64,9 +61,9 @@ class SaveGameHelper:
 
     def package_savegame(self, input_folder: str, app_name: str = '', epic_id: str = '',
                          cloud_folder: str = '', cloud_folder_mac: str = '',
-                         include_filter: list = None,
-                         exclude_filter: list = None,
-                         manifest_dt: datetime = None):
+                         include_filter: list | None = None,
+                         exclude_filter: list | None = None,
+                         manifest_dt: datetime | None = None):
         """
         :param input_folder: Folder to be packaged into chunks/manifest
         :param app_name: App name for savegame being stored
@@ -79,10 +76,6 @@ class SaveGameHelper:
         :return:
         """
         m = Manifest()
-        m.meta = ManifestMeta()
-        m.chunk_data_list = CDL()
-        m.file_manifest_list = FML()
-        m.custom_fields = CustomFields()
         # create metadata for savegame
         m.meta.app_name = f'{app_name}{epic_id}'
         if not manifest_dt:
@@ -100,8 +93,8 @@ class SaveGameHelper:
             return self.files
 
         chunk_num = 0
-        cur_chunk = None
-        cur_buffer = None
+        cur_chunk: Chunk | None = None
+        cur_buffer = BytesIO()
 
         for _file, f_rel in sorted(files, key=lambda f: str(f[0]).casefold()):
             s = _file.stat()
@@ -115,8 +108,6 @@ class SaveGameHelper:
                 while remaining := s.st_size - cf.tell():
                     if not cur_chunk:  # create new chunk
                         cur_chunk = Chunk()
-                        if cur_buffer:
-                            cur_buffer.close()
                         cur_buffer = BytesIO()
                         chunk_num += 1
 

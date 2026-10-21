@@ -81,10 +81,10 @@ class Manifest:
         self.data = b''
 
         # remainder
-        self.meta: ManifestMeta | None = None
-        self.chunk_data_list: CDL | None = None
-        self.file_manifest_list: FML | None = None
-        self.custom_fields: CustomFields | None = None
+        self.meta = ManifestMeta()
+        self.chunk_data_list = CDL()
+        self.file_manifest_list = FML()
+        self.custom_fields = CustomFields()
         self.encrypted_data: EncryptedData | None = None
 
     @property
@@ -995,10 +995,10 @@ class EncryptedDataHeader:
 
 class ManifestComparison:
     def __init__(self):
-        self.added = set()
-        self.removed = set()
-        self.changed = set()
-        self.unchanged = set()
+        self.added: set[str] = set()
+        self.removed: set[str] = set()
+        self.changed: set[str] = set()
+        self.unchanged: set[str] = set()
 
     @classmethod
     def create(cls, manifest, old_manifest=None):
