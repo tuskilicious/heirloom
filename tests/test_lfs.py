@@ -97,21 +97,32 @@ def test_locked_json_data(tmp_path):
     assert not path.exists()
 
 
-@pytest.mark.skipif(sys.platform == 'win32', reason='no-op on case-insensitive Windows filesystems')
+def _is_case_sensitive(folder):
+    (folder / 'CaseProbe').touch()
+    return not (folder / 'caseprobe').exists()
+
+
 def test_case_insensitive_file_search(tmp_path):
     (tmp_path / 'Game' / 'Binaries').mkdir(parents=True)
     (tmp_path / 'Game' / 'Binaries' / 'Run.EXE').write_bytes(b'')
     found = case_insensitive_file_search(str(tmp_path / 'game' / 'binaries' / 'run.exe'))
-    assert found == tmp_path / 'Game' / 'Binaries' / 'Run.EXE'
     missing = case_insensitive_file_search(str(tmp_path / 'game' / 'nothere' / 'x'))
-    assert missing == tmp_path / 'Game' / 'nothere' / 'x'
+
+    assert found.is_file()
+    # on case-insensitive filesystems (Windows, default macOS) the given path already works as-is
+    if _is_case_sensitive(tmp_path):
+        assert found == tmp_path / 'Game' / 'Binaries' / 'Run.EXE'
+        assert missing == tmp_path / 'Game' / 'nothere' / 'x'
 
 
 @pytest.mark.skipif(sys.platform == 'win32', reason='resolves POSIX-style absolute paths')
 def test_case_insensitive_path_search(tmp_path):
     (tmp_path / 'Saves' / 'Slot1').mkdir(parents=True)
     found = case_insensitive_path_search(str(tmp_path / 'saves' / 'SLOT1' / 'new'))
-    assert found == (tmp_path / 'Saves' / 'Slot1' / 'new').resolve()
+
+    assert found.parent.is_dir()
+    if _is_case_sensitive(tmp_path):
+        assert found == (tmp_path / 'Saves' / 'Slot1' / 'new').resolve()
 
 
 def test_wine_registry_shell_folders(tmp_path):
