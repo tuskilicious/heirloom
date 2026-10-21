@@ -9,6 +9,7 @@ from logging.handlers import QueueHandler
 from multiprocessing import Process, cpu_count
 from multiprocessing import Queue as MPQueue
 from multiprocessing.shared_memory import SharedMemory
+from pathlib import Path
 from queue import Empty
 from sys import exit
 from threading import Condition, Thread
@@ -38,7 +39,7 @@ class DLManager(Process):
 
         self.base_url = base_url
         self.dl_dir = download_dir
-        self.cache_dir = cache_dir or os.path.join(download_dir, '.cache')
+        self.cache_dir = cache_dir or str(Path(download_dir, '.cache'))
         self.manifest_secrets = manifest_secrets
 
         # All the queues!
@@ -120,17 +121,17 @@ class DLManager(Process):
         mc = ManifestComparison.create(manifest, old_manifest)
         analysis_res.manifest_comparison = mc
 
-        if resume and self.resume_file and os.path.exists(self.resume_file):
+        if resume and self.resume_file and Path(self.resume_file).exists():
             self.log.info('Found previously interrupted download. Download will be resumed if possible.')
             try:
                 missing = 0
                 mismatch = 0
                 completed_files = set()
 
-                for line in open(self.resume_file, encoding='utf-8').readlines():
+                for line in Path(self.resume_file).read_text(encoding='utf-8').splitlines():
                     file_hash, _, filename = line.strip().partition(':')
-                    _p = os.path.join(self.dl_dir, filename)
-                    if not os.path.exists(_p):
+                    _p = Path(self.dl_dir, filename)
+                    if not _p.exists():
                         self.log.debug(f'File does not exist but is in resume file: "{_p}"')
                         missing += 1
                     elif file_hash != manifest.file_manifest_list.get_file_by_path(filename).sha_hash.hex():
@@ -160,8 +161,7 @@ class DLManager(Process):
                 if fm.filename in mc.added:
                     continue
 
-                local_path = os.path.join(self.dl_dir, fm.filename)
-                if not os.path.exists(local_path):
+                if not Path(self.dl_dir, fm.filename).exists():
                     missing_files.add(fm.filename)
 
             self.log.info(f'Found {len(missing_files)} missing files.')
@@ -582,7 +582,7 @@ class DLManager(Process):
 
                     file_hash = self.hash_map[res.filename]
                     # write last completed file to super simple resume file
-                    with open(self.resume_file, 'a', encoding='utf-8') as rf:
+                    with Path(self.resume_file).open('a', encoding='utf-8') as rf:
                         rf.write(f'{file_hash}:{res.filename}\n')
 
                 if not res.success:
@@ -811,7 +811,7 @@ class DLManager(Process):
         # clean up resume file
         if self.resume_file:
             try:
-                os.remove(self.resume_file)
+                Path(self.resume_file).unlink()
             except OSError as e:
                 self.log.warning(f'Failed to remove resume file: {e!r}')
 

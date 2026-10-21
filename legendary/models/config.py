@@ -1,6 +1,6 @@
 import configparser
-import os
 import time
+from pathlib import Path
 
 
 class LGDConf(configparser.ConfigParser):
@@ -13,8 +13,8 @@ class LGDConf(configparser.ConfigParser):
 
     def read(self, filename):
         # if config file exists, save modification time
-        if os.path.exists(filename):
-            self.modtime = int(os.stat(filename).st_mtime)
+        if Path(filename).exists():
+            self.modtime = int(Path(filename).stat().st_mtime)
 
         return super().read(filename)
 

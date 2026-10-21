@@ -1,5 +1,6 @@
 import logging
 import os
+from pathlib import Path
 
 from legendary.models.game import Game
 
@@ -34,6 +35,14 @@ EOS_OVERLAY_VALUE = 'OverlayPath'
 VULKAN_OVERLAY_KEY = r'SOFTWARE\Khronos\Vulkan\ImplicitLayers'
 
 
+def _read_user_reg(prefix: str) -> list[str]:
+    use_reg_file = Path(prefix, 'user.reg')
+    if not use_reg_file.exists():
+        raise ValueError('No user.reg file, invalid path')
+    with use_reg_file.open(encoding='utf-8') as f:
+        return f.readlines()
+
+
 def query_registry_entries(prefix=None):
     if os.name == 'nt':
         # Overlay location for the EOS SDK to load
@@ -56,11 +65,7 @@ def query_registry_entries(prefix=None):
                     vulkan_hklm=vulkan_hklm)
     elif prefix:
         # Only read HKCU since we don't really care for the Vulkan stuff (doesn't work in WINE)
-        use_reg_file = os.path.join(prefix, 'user.reg')
-        if not os.path.exists(use_reg_file):
-            raise ValueError('No user.reg file, invalid path')
-
-        reg_lines = open(use_reg_file, 'r', encoding='utf-8').readlines()
+        reg_lines = _read_user_reg(prefix)
         for line in reg_lines:
             if EOS_OVERLAY_VALUE in line:
                 overlay_path = line.partition('=')[2].strip().strip('"')
@@ -70,7 +75,7 @@ def query_registry_entries(prefix=None):
 
         if overlay_path:
             if overlay_path.startswith('C:'):
-                overlay_path = os.path.join(prefix, 'drive_c', overlay_path[3:])
+                overlay_path = str(Path(prefix, 'drive_c', overlay_path[3:]))
             elif overlay_path.startswith('Z:'):
                 overlay_path = overlay_path[2:]
 
@@ -86,8 +91,8 @@ def add_registry_entries(overlay_path, prefix=None):
         logger.debug(f'Settings HKCU EOS Overlay Path: {overlay_path}')
         set_registry_value(HKEY_CURRENT_USER, EOS_OVERLAY_KEY, EOS_OVERLAY_VALUE,
                            overlay_path.replace('\\', '/'), TYPE_STRING)
-        vk_32_path = os.path.join(overlay_path, 'EOSOverlayVkLayer-Win32.json').replace('/', '\\')
-        vk_64_path = os.path.join(overlay_path, 'EOSOverlayVkLayer-Win64.json').replace('/', '\\')
+        vk_32_path = str(Path(overlay_path, 'EOSOverlayVkLayer-Win32.json')).replace('/', '\\')
+        vk_64_path = str(Path(overlay_path, 'EOSOverlayVkLayer-Win64.json')).replace('/', '\\')
         # the launcher only sets those in HKCU, th e service sets them in HKLM,
         # but it's not in use yet, so just do HKCU for now
         logger.debug(f'Settings HKCU 32-bit Vulkan Layer: {vk_32_path}')
@@ -96,11 +101,7 @@ def add_registry_entries(overlay_path, prefix=None):
         set_registry_value(HKEY_CURRENT_USER, VULKAN_OVERLAY_KEY, vk_64_path, 0, TYPE_DWORD)
     elif prefix:
         # Again only care for HKCU OverlayPath because Windows Vulkan layers don't work anyway
-        use_reg_file = os.path.join(prefix, 'user.reg')
-        if not os.path.exists(use_reg_file):
-            raise ValueError('No user.reg file, invalid path')
-
-        reg_lines = open(use_reg_file, 'r', encoding='utf-8').readlines()
+        reg_lines = _read_user_reg(prefix)
 
         overlay_path = overlay_path.replace('\\', '/')
         if overlay_path.startswith('/'):
@@ -122,7 +123,7 @@ def add_registry_entries(overlay_path, prefix=None):
                 reg_lines.append(f'[{WINE_EOS_OVERLAY_KEY}]\n')
                 reg_lines.append(overlay_line)
 
-        open(use_reg_file, 'w', encoding='utf-8').writelines(reg_lines)
+        Path(prefix, 'user.reg').write_text(''.join(reg_lines), encoding='utf-8')
     else:
         raise ValueError('No prefix specified on non-Windows platform')
 
@@ -143,13 +144,9 @@ def remove_registry_entries(prefix=None):
             remove_registry_value(HKEY_LOCAL_MACHINE, VULKAN_OVERLAY_KEY, value, use_32bit_view=True)
     elif prefix:
         # Same as above, only HKCU.
-        use_reg_file = os.path.join(prefix, 'user.reg')
-        if not os.path.exists(use_reg_file):
-            raise ValueError('No user.reg file, invalid path')
-
+        reg_lines = _read_user_reg(prefix)
         if entries['overlay_path']:
-            reg_lines = open(use_reg_file, 'r', encoding='utf-8').readlines()
             filtered_lines = [line for line in reg_lines if EOS_OVERLAY_VALUE not in line]
-            open(use_reg_file, 'w', encoding='utf-8').writelines(filtered_lines)
+            Path(prefix, 'user.reg').write_text(''.join(filtered_lines), encoding='utf-8')
     else:
         raise ValueError('No prefix specified on non-Windows platform')

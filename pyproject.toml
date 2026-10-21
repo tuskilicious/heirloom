@@ -58,7 +58,7 @@ module-root = ""
 extend-exclude = ["zipapp_main.py"]
 
 [tool.ruff.lint]
-select = [ "E",  "F",  "UP",  "B",  "SIM",  "I" ]
+select = [ "E",  "F",  "UP",  "B",  "SIM",  "I",  "PTH" ]
 ignore = [ "E501", "UP015", "SIM102", "SIM115", "B905", "UP045" ]
 
 [tool.ruff.format]

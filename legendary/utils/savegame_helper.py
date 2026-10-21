@@ -1,11 +1,12 @@
 import logging
-import os
 from datetime import datetime
 from fnmatch import fnmatch
 from hashlib import sha1
 from io import BytesIO
+from pathlib import Path
 from tempfile import TemporaryFile
 
+from legendary.lfs.utils import StrPath
 from legendary.models.chunk import Chunk
 from legendary.models.manifest import (
     CDL,
@@ -92,21 +93,7 @@ class SaveGameHelper:
             m.custom_fields['CloudSaveFolder_MAC'] = cloud_folder_mac
 
         self.log.info(f'Packing savegame for "{app_name}", input folder: {input_folder}')
-        files = []
-        for _dir, _, _files in os.walk(input_folder):
-            for _file in _files:
-                _file_path = os.path.join(_dir, _file)
-                _file_path_rel = os.path.relpath(_file_path, input_folder).replace('\\', '/')
-
-                if include_filter and not _filename_matches(_file_path_rel, include_filter):
-                    self.log.debug(f'Excluding "{_file_path_rel}" (does not match include filter)')
-                    continue
-                elif exclude_filter and _filename_matches(_file_path_rel, exclude_filter):
-                    self.log.debug(f'Excluding "{_file_path_rel}" (does match exclude filter)')
-                    continue
-
-                files.append(_file_path)
-
+        files = self._find_files(input_folder, include_filter, exclude_filter)
         if not files:
             if exclude_filter or include_filter:
                 self.log.warning('No save files matching the specified filters have been found.')
@@ -116,16 +103,15 @@ class SaveGameHelper:
         cur_chunk = None
         cur_buffer = None
 
-        for _file in sorted(files, key=str.casefold):
-            s = os.stat(_file)
+        for _file, f_rel in sorted(files, key=lambda f: str(f[0]).casefold()):
+            s = _file.stat()
             f = FileManifest()
-            # get relative path for manifest
-            f.filename = os.path.relpath(_file, input_folder).replace('\\', '/')
+            f.filename = f_rel
             self.log.debug(f'Processing file "{f.filename}"')
             f.file_size = s.st_size
             fhash = sha1()
 
-            with open(_file, 'rb') as cf:
+            with _file.open('rb') as cf:
                 while remaining := s.st_size - cf.tell():
                     if not cur_chunk:  # create new chunk
                         cur_chunk = Chunk()
@@ -178,20 +164,26 @@ class SaveGameHelper:
         # return dict with created files for uploading/whatever
         return self.files
 
-    def get_deletion_list(self, save_folder, include_filter=None, exclude_filter=None):
+    def get_deletion_list(self, save_folder: StrPath, include_filter: list[str] | None = None,
+                          exclude_filter: list[str] | None = None) -> list[str]:
+        return [rel for _, rel in self._find_files(save_folder, include_filter, exclude_filter)]
+
+    def _find_files(self, folder: StrPath, include_filter: list[str] | None,
+                    exclude_filter: list[str] | None) -> list[tuple[Path, str]]:
+        """Files below folder that pass the filters, as (path, folder-relative POSIX path) pairs"""
         files = []
-        for _dir, _, _files in os.walk(save_folder):
-            for _file in _files:
-                _file_path = os.path.join(_dir, _file)
-                _file_path_rel = os.path.relpath(_file_path, save_folder).replace('\\', '/')
+        for _file_path in Path(folder).rglob('*'):
+            if not _file_path.is_file():
+                continue
+            _file_path_rel = _file_path.relative_to(folder).as_posix()
 
-                if include_filter and not _filename_matches(_file_path_rel, include_filter):
-                    self.log.debug(f'Excluding "{_file_path_rel}" (does not match include filter)')
-                    continue
-                elif exclude_filter and _filename_matches(_file_path_rel, exclude_filter):
-                    self.log.debug(f'Excluding "{_file_path_rel}" (does match exclude filter)')
-                    continue
+            if include_filter and not _filename_matches(_file_path_rel, include_filter):
+                self.log.debug(f'Excluding "{_file_path_rel}" (does not match include filter)')
+                continue
+            elif exclude_filter and _filename_matches(_file_path_rel, exclude_filter):
+                self.log.debug(f'Excluding "{_file_path_rel}" (does match exclude filter)')
+                continue
 
-                files.append(_file_path_rel)
+            files.append((_file_path, _file_path_rel))
 
         return files

@@ -3,9 +3,11 @@ import json
 import logging
 import os
 from collections import defaultdict
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from time import time
+from typing import Any
 
 from filelock import FileLock
 
@@ -20,76 +22,76 @@ FILELOCK_DEBUG = False
 
 
 class LGDLFS:
-    def __init__(self, config_file=None):
+    def __init__(self, config_file: str | None = None):
         self.log = logging.getLogger('LGDLFS')
 
+        self.path: Path
         if config_path := os.environ.get('LEGENDARY_CONFIG_PATH'):
-            self.path = config_path
+            self.path = Path(config_path)
         elif config_path := os.environ.get('XDG_CONFIG_HOME'):
-            self.path = os.path.join(config_path, 'legendary')
+            self.path = Path(config_path, 'legendary')
         else:
-            self.path = os.path.expanduser('~/.config/legendary')
+            self.path = Path('~/.config/legendary').expanduser()
 
         # EGS user info
-        self._user_data = None
+        self._user_data: dict | None = None
         # EGS entitlements
-        self._entitlements = None
+        self._entitlements: list | None = None
         # EGS achievements
-        self._achievements = None
+        self._achievements: dict | None = None
         # EGS asset data
-        self._assets = None
+        self._assets: dict[str, list[GameAsset]] | None = None
         # EGS metadata
-        self._game_metadata = dict()
+        self._game_metadata: dict[str, dict] = dict()
         # Legendary update check info
-        self._update_info = None
+        self._update_info: dict | None = None
         # EOS Overlay install/update check info
-        self._overlay_update_info = None
-        self._overlay_install_info = None
+        self._overlay_update_info: dict | None = None
+        self._overlay_install_info: InstalledGame | None = None
         # Config with game specific settings (e.g. start parameters, env variables)
         self.config = LGDConf(comment_prefixes='/', allow_no_value=True)
 
         if config_file:
             # if user specified a valid relative/absolute path use that,
             # otherwise create file in legendary config directory
-            if os.path.exists(config_file):
-                self.config_path = os.path.abspath(config_file)
+            if Path(config_file).exists():
+                self.config_path = Path(config_file).absolute()
             else:
-                self.config_path = os.path.join(self.path, clean_filename(config_file))
+                self.config_path = self.path / clean_filename(config_file)
             self.log.info(f'Using non-default config file "{self.config_path}"')
         else:
-            self.config_path = os.path.join(self.path, 'config.ini')
+            self.config_path = self.path / 'config.ini'
 
         # ensure folders exist.
-        for f in ['', 'manifests', 'metadata', 'tmp']:
-            if not os.path.exists(os.path.join(self.path, f)):
-                os.makedirs(os.path.join(self.path, f))
+        for f in ['manifests', 'metadata', 'tmp']:
+            (self.path / f).mkdir(parents=True, exist_ok=True)
 
         # if "old" folder exists migrate files and remove it
-        if os.path.exists(os.path.join(self.path, 'manifests', 'old')):
+        manifests = self.path / 'manifests'
+        old_manifests = manifests / 'old'
+        if old_manifests.exists():
             self.log.info('Migrating manifest files from old folders to new, please wait...')
             # remove unversioned manifest files
-            for _f in os.listdir(os.path.join(self.path, 'manifests')):
-                if '.manifest' not in _f:
+            for _f in manifests.iterdir():
+                if '.manifest' not in _f.name:
                     continue
-                if '_' not in _f or (_f.startswith('UE_') and _f.count('_') < 2):
-                    self.log.debug(f'Deleting "{_f}" ...')
-                    os.remove(os.path.join(self.path, 'manifests', _f))
+                if '_' not in _f.name or (_f.name.startswith('UE_') and _f.name.count('_') < 2):
+                    self.log.debug(f'Deleting "{_f.name}" ...')
+                    _f.unlink()
 
             # move files from "old" to the base folder
-            for _f in os.listdir(os.path.join(self.path, 'manifests', 'old')):
+            for _f in old_manifests.iterdir():
                 try:
-                    self.log.debug(f'Renaming "{_f}"')
-                    os.rename(os.path.join(self.path, 'manifests', 'old', _f),
-                              os.path.join(self.path, 'manifests', _f))
+                    self.log.debug(f'Renaming "{_f.name}"')
+                    _f.rename(manifests / _f.name)
                 except Exception as e:
-                    self.log.warning(f'Renaming manifest file "{_f}" failed: {e!r}')
+                    self.log.warning(f'Renaming manifest file "{_f.name}" failed: {e!r}')
 
             # remove "old" folder
             try:
-                os.removedirs(os.path.join(self.path, 'manifests', 'old'))
+                old_manifests.rmdir()
             except Exception as e:
-                self.log.warning(f'Removing "{os.path.join(self.path, "manifests", "old")}" folder failed: '
-                                 f'{e!r}, please remove manually')
+                self.log.warning(f'Removing "{old_manifests}" folder failed: {e!r}, please remove manually')
 
         if not FILELOCK_DEBUG:
             # Prevent filelock logger from spamming Legendary debug output
@@ -117,45 +119,51 @@ class LGDLFS:
             self.config.set('Legendary', '; Disables the notice about an available update on exit')
             self.config.set('Legendary', 'disable_update_notice', 'false' if is_windows_mac_or_pyi() else 'true')
 
-        self._installed_lock = FileLock(os.path.join(self.path, 'installed.json') + '.lock')
+        self._installed_lock = FileLock(self.path / 'installed.json.lock')
 
         try:
-            self._installed = json.load(open(os.path.join(self.path, 'installed.json')))
+            self._installed: dict[str, dict] | None = self._load_json('installed.json')
         except Exception as e:
             self.log.debug(f'Loading installed games failed: {e!r}')
             self._installed = None
 
         # load existing app metadata
-        for gm_file in os.listdir(os.path.join(self.path, 'metadata')):
+        for gm_file in (self.path / 'metadata').iterdir():
             try:
-                _meta = json.load(open(os.path.join(self.path, 'metadata', gm_file)))
+                _meta = json.loads(gm_file.read_text(encoding='utf-8'))
                 self._game_metadata[_meta['app_name']] = _meta
             except Exception as e:
-                self.log.debug(f'Loading game meta file "{gm_file}" failed: {e!r}')
+                self.log.debug(f'Loading game meta file "{gm_file.name}" failed: {e!r}')
 
         # load auto-aliases if enabled
-        self.aliases = dict()
+        self.aliases: dict[str, str] = dict()
         if not self.config.getboolean('Legendary', 'disable_auto_aliasing', fallback=False):
             try:
-                _j = json.load(open(os.path.join(self.path, 'aliases.json')))
+                _j = self._load_json('aliases.json')
                 for app_name, aliases in _j.items():
                     for alias in aliases:
                         self.aliases[alias] = app_name
             except Exception as e:
                 self.log.debug(f'Loading aliases failed with {e!r}')
 
+    def _load_json(self, name: str) -> Any:
+        return json.loads((self.path / name).read_text(encoding='utf-8'))
+
+    def _save_json(self, name: str, data: Any, **kwargs: Any) -> None:
+        (self.path / name).write_text(json.dumps(data, indent=2, sort_keys=True, **kwargs), encoding='utf-8')
+
     @property
     @contextmanager
-    def userdata_lock(self) -> LockedJSONData:
+    def userdata_lock(self) -> Iterator[LockedJSONData]:
         """Wrapper around the lock to automatically update user data when it is released"""
-        with LockedJSONData(os.path.join(self.path, 'user.json')) as lock:
+        with LockedJSONData(self.path / 'user.json') as lock:
             try:
                 yield lock
             finally:
                 self._user_data = lock.data
 
     @property
-    def userdata(self):
+    def userdata(self) -> dict | None:
         if self._user_data is not None:
             return self._user_data
 
@@ -166,61 +174,55 @@ class LGDLFS:
             self.log.debug(f'Failed to load user data: {e!r}')
             return None
 
-    @userdata.setter
-    def userdata(self, userdata):
-        raise NotImplementedError('The setter has been removed, use the locked userdata instead.')
-
-    def invalidate_userdata(self):
+    def invalidate_userdata(self) -> None:
         with self.userdata_lock as lock:
             lock.clear()
 
     @property
-    def entitlements(self):
+    def entitlements(self) -> list | None:
         if self._entitlements is not None:
             return self._entitlements
 
         try:
-            self._entitlements = json.load(open(os.path.join(self.path, 'entitlements.json')))
+            self._entitlements = self._load_json('entitlements.json')
             return self._entitlements
         except Exception as e:
             self.log.debug(f'Failed to load entitlements data: {e!r}')
             return None
 
     @entitlements.setter
-    def entitlements(self, entitlements):
+    def entitlements(self, entitlements: list) -> None:
         if entitlements is None:
             raise ValueError('Entitlements is none!')
 
         self._entitlements = entitlements
-        json.dump(entitlements, open(os.path.join(self.path, 'entitlements.json'), 'w'),
-                  indent=2, sort_keys=True)
+        self._save_json('entitlements.json', entitlements)
 
     @property
-    def achievements(self):
+    def achievements(self) -> dict | None:
         if self._achievements is not None:
             return self._achievements
 
         try:
-            self._achievements = json.load(open(os.path.join(self.path, 'achievements.json')))
+            self._achievements = self._load_json('achievements.json')
             return self._achievements
         except Exception as e:
             self.log.debug(f'Failed to load achievements data: {e!r}')
             return None
 
     @achievements.setter
-    def achievements(self, achievements):
+    def achievements(self, achievements: dict) -> None:
         if achievements is None:
             raise ValueError('Achievements is none!')
 
         self._achievements = achievements
-        json.dump(achievements, open(os.path.join(self.path, 'achievements.json'), 'w'),
-                  indent=2, sort_keys=True)
+        self._save_json('achievements.json', achievements)
 
     @property
-    def assets(self):
+    def assets(self) -> dict[str, list[GameAsset]] | None:
         if self._assets is None:
             try:
-                tmp = json.load(open(os.path.join(self.path, 'assets.json')))
+                tmp = self._load_json('assets.json')
                 self._assets = {k: [GameAsset.from_json(j) for j in v] for k, v in tmp.items()}
             except Exception as e:
                 self.log.debug(f'Failed to load assets data: {e!r}')
@@ -229,79 +231,73 @@ class LGDLFS:
         return self._assets
 
     @assets.setter
-    def assets(self, assets):
+    def assets(self, assets: dict[str, list[GameAsset]]) -> None:
         if assets is None:
             raise ValueError('Assets is none!')
 
         self._assets = assets
-        json.dump({platform: [a.__dict__ for a in assets] for platform, assets in self._assets.items()},
-                  open(os.path.join(self.path, 'assets.json'), 'w'),
-                  indent=2, sort_keys=True)
+        self._save_json('assets.json', {platform: [a.__dict__ for a in assets] for platform, assets in assets.items()})
 
-    def _get_manifest_filename(self, app_name, version, platform=None):
+    def _get_manifest_filename(self, app_name: str, version: str, platform: str | None = None) -> Path:
         if platform:
             fname = clean_filename(f'{app_name}_{platform}_{version}')
         else:
             fname = clean_filename(f'{app_name}_{version}')
-        return os.path.join(self.path, 'manifests', f'{fname}.manifest')
+        return self.path / 'manifests' / f'{fname}.manifest'
 
-    def load_manifest(self, app_name, version, platform='Windows'):
+    def load_manifest(self, app_name: str, version: str, platform: str = 'Windows') -> bytes | None:
         try:
-            return open(self._get_manifest_filename(app_name, version, platform), 'rb').read()
+            return self._get_manifest_filename(app_name, version, platform).read_bytes()
         except FileNotFoundError:  # all other errors should propagate
             self.log.debug('Loading manifest failed, retrying without platform in filename...')
             try:
-                return open(self._get_manifest_filename(app_name, version), 'rb').read()
+                return self._get_manifest_filename(app_name, version).read_bytes()
             except FileNotFoundError:  # all other errors should propagate
                 return None
 
-    def save_manifest(self, app_name, manifest, version, platform='Windows'):
-        with open(self._get_manifest_filename(app_name, version, platform), 'wb') as f:
+    def save_manifest(self, app_name: str, manifest, version: str, platform: str = 'Windows') -> None:
+        with self._get_manifest_filename(app_name, version, platform).open('wb') as f:
             manifest.write(f)
 
-    def get_game_meta(self, app_name):
+    def get_game_meta(self, app_name: str) -> Game | None:
         if _meta := self._game_metadata.get(app_name, None):
             return Game.from_json(_meta)
         return None
 
-    def set_game_meta(self, app_name, meta):
+    def set_game_meta(self, app_name: str, meta: Game) -> None:
         json_meta = meta.__dict__
         self._game_metadata[app_name] = json_meta
-        meta_file = os.path.join(self.path, 'metadata', f'{app_name}.json')
-        json.dump(json_meta, open(meta_file, 'w'), indent=2, sort_keys=True)
+        self._save_json(f'metadata/{app_name}.json', json_meta)
 
-    def delete_game_meta(self, app_name):
+    def delete_game_meta(self, app_name: str) -> None:
         if app_name not in self._game_metadata:
             raise ValueError(f'Game {app_name} does not exist in metadata DB!')
 
         del self._game_metadata[app_name]
-        meta_file = os.path.join(self.path, 'metadata', f'{app_name}.json')
-        if os.path.exists(meta_file):
-            os.remove(meta_file)
+        (self.path / 'metadata' / f'{app_name}.json').unlink(missing_ok=True)
 
-    def get_game_app_names(self):
+    def get_game_app_names(self) -> list[str]:
         return sorted(self._game_metadata.keys())
 
-    def get_tmp_path(self):
-        return os.path.join(self.path, 'tmp')
+    def get_tmp_path(self) -> Path:
+        return self.path / 'tmp'
 
-    def clean_tmp_data(self):
-        for f in os.listdir(os.path.join(self.path, 'tmp')):
+    def _delete_files(self, folder: str, keep=lambda _: False) -> None:
+        for f in (self.path / folder).iterdir():
+            if keep(f):
+                continue
             try:
-                os.remove(os.path.join(self.path, 'tmp', f))
+                f.unlink()
             except Exception as e:
-                self.log.warning(f'Failed to delete file "{f}": {e!r}')
+                self.log.warning(f'Failed to delete file "{f.name}": {e!r}')
 
-    def clean_metadata(self, app_names):
-        for f in os.listdir(os.path.join(self.path, 'metadata')):
-            app_name = f.rpartition('.')[0]
-            if app_name not in app_names:
-                try:
-                    os.remove(os.path.join(self.path, 'metadata', f))
-                except Exception as e:
-                    self.log.warning(f'Failed to delete file "{f}": {e!r}')
+    def clean_tmp_data(self) -> None:
+        self._delete_files('tmp')
 
-    def clean_manifests(self, in_use):
+    def clean_metadata(self, app_names) -> None:
+        self._delete_files('metadata', keep=lambda f: f.stem in app_names)
+
+    def clean_manifests(self, in_use) -> None:
         in_use_files = {
             f'{clean_filename(f"{app_name}_{version}")}.manifest'
             for app_name, version, _ in in_use
@@ -312,12 +308,7 @@ class LGDLFS:
             for app_name, version, platform in in_use
         }
 
-        for f in os.listdir(os.path.join(self.path, 'manifests')):
-            if f not in in_use_files:
-                try:
-                    os.remove(os.path.join(self.path, 'manifests', f))
-                except Exception as e:
-                    self.log.warning(f'Failed to delete file "{f}": {e!r}')
+        self._delete_files('manifests', keep=lambda f: f.name in in_use_files)
 
     def lock_installed(self) -> bool:
         """
@@ -332,7 +323,7 @@ class LGDLFS:
             self._installed_lock.acquire(blocking=False)
             # reload data in case it has been updated elsewhere
             try:
-                self._installed = json.load(open(os.path.join(self.path, 'installed.json')))
+                self._installed = self._load_json('installed.json')
             except Exception as e:
                 self.log.debug(f'Failed to load installed game data: {e!r}')
 
@@ -340,10 +331,10 @@ class LGDLFS:
         except TimeoutError:
             return False
 
-    def get_installed_game(self, app_name):
+    def get_installed_game(self, app_name: str) -> InstalledGame | None:
         if self._installed is None:
             try:
-                self._installed = json.load(open(os.path.join(self.path, 'installed.json')))
+                self._installed = self._load_json('installed.json')
             except Exception as e:
                 self.log.debug(f'Failed to load installed game data: {e!r}')
                 return None
@@ -352,7 +343,7 @@ class LGDLFS:
             return InstalledGame.from_json(game_json)
         return None
 
-    def set_installed_game(self, app_name, install_info):
+    def set_installed_game(self, app_name: str, install_info: InstalledGame) -> None:
         if self._installed is None:
             self._installed = dict()
 
@@ -361,10 +352,9 @@ class LGDLFS:
         else:
             self._installed[app_name] = install_info.__dict__
 
-        json.dump(self._installed, open(os.path.join(self.path, 'installed.json'), 'w'),
-                  indent=2, sort_keys=True)
+        self._save_json('installed.json', self._installed)
 
-    def remove_installed_game(self, app_name):
+    def remove_installed_game(self, app_name: str) -> None:
         if self._installed is None:
             self.log.warning('Trying to remove a game, but no installed games?!')
             return
@@ -375,117 +365,108 @@ class LGDLFS:
             self.log.warning(f'Trying to remove non-installed game: {app_name}')
             return
 
-        json.dump(self._installed, open(os.path.join(self.path, 'installed.json'), 'w'),
-                  indent=2, sort_keys=True)
+        self._save_json('installed.json', self._installed)
 
-    def get_installed_list(self):
+    def get_installed_list(self) -> list[InstalledGame]:
         if not self._installed:
             return []
 
         return [InstalledGame.from_json(i) for i in self._installed.values()]
 
-    def save_config(self):
+    def save_config(self) -> None:
         # do not save if in read-only mode or file hasn't changed
         if self.config.read_only or not self.config.modified:
             return
         # if config file has been modified externally, back-up the user-modified version before writing
-        if os.path.exists(self.config_path):
-            if (modtime := int(os.stat(self.config_path).st_mtime)) != self.config.modtime:
+        if self.config_path.exists():
+            if (modtime := int(self.config_path.stat().st_mtime)) != self.config.modtime:
                 new_filename = f'config.{modtime}.ini'
                 self.log.warning(f'Configuration file has been modified while legendary was running, '
                                  f'user-modified config will be renamed to "{new_filename}"...')
-                os.rename(self.config_path, os.path.join(os.path.dirname(self.config_path), new_filename))
+                self.config_path.rename(self.config_path.with_name(new_filename))
 
-        with open(self.config_path, 'w') as cf:
+        with self.config_path.open('w') as cf:
             self.config.write(cf)
 
-    def get_dir_size(self):
-        return sum(f.stat().st_size for f in Path(self.path).glob('**/*') if f.is_file())
+    def get_dir_size(self) -> int:
+        return sum(f.stat().st_size for f in self.path.glob('**/*') if f.is_file())
 
-    def get_cached_version(self):
+    def get_cached_version(self) -> dict:
         if self._update_info:
             return self._update_info
 
         try:
-            self._update_info = json.load(open(os.path.join(self.path, 'version.json')))
+            self._update_info = self._load_json('version.json')
         except Exception as e:
             self.log.debug(f'Failed to load cached update data: {e!r}')
             self._update_info = dict(last_update=0, data=None)
 
         return self._update_info
 
-    def set_cached_version(self, version_data):
+    def set_cached_version(self, version_data) -> None:
         if not version_data:
             return
         self._update_info = dict(last_update=time(), data=version_data)
-        json.dump(self._update_info, open(os.path.join(self.path, 'version.json'), 'w'),
-                  indent=2, sort_keys=True)
+        self._save_json('version.json', self._update_info)
 
-    def get_cached_sdl_data(self, app_name):
+    def get_cached_sdl_data(self, app_name: str) -> dict | None:
         try:
-            return json.load(open(os.path.join(self.path, 'tmp', f'{app_name}.json')))
+            return self._load_json(f'tmp/{app_name}.json')
         except Exception as e:
             self.log.debug(f'Failed to load cached SDL data: {e!r}')
             return None
 
-    def set_cached_sdl_data(self, app_name, sdl_version, sdl_data):
+    def set_cached_sdl_data(self, app_name: str, sdl_version, sdl_data) -> None:
         if not app_name or not sdl_data:
             return
-        json.dump(dict(version=sdl_version, data=sdl_data),
-                  open(os.path.join(self.path, 'tmp', f'{app_name}.json'), 'w'),
-                  indent=2, sort_keys=True)
+        self._save_json(f'tmp/{app_name}.json', dict(version=sdl_version, data=sdl_data))
 
-    def get_cached_overlay_version(self):
+    def get_cached_overlay_version(self) -> dict:
         if self._overlay_update_info:
             return self._overlay_update_info
 
         try:
-            self._overlay_update_info = json.load(open(
-                os.path.join(self.path, 'overlay_version.json')))
+            self._overlay_update_info = self._load_json('overlay_version.json')
         except Exception as e:
             self.log.debug(f'Failed to load cached Overlay update data: {e!r}')
             self._overlay_update_info = dict(last_update=0, data=None)
 
         return self._overlay_update_info
 
-    def set_cached_overlay_version(self, version_data):
+    def set_cached_overlay_version(self, version_data) -> None:
         self._overlay_update_info = dict(last_update=time(), data=version_data)
-        json.dump(self._overlay_update_info,
-                  open(os.path.join(self.path, 'overlay_version.json'), 'w'),
-                  indent=2, sort_keys=True)
+        self._save_json('overlay_version.json', self._overlay_update_info)
 
-    def get_overlay_install_info(self):
+    def get_overlay_install_info(self) -> InstalledGame | None:
         if not self._overlay_install_info:
             try:
-                data = json.load(open(os.path.join(self.path, 'overlay_install.json')))
-                self._overlay_install_info = InstalledGame.from_json(data)
+                self._overlay_install_info = InstalledGame.from_json(self._load_json('overlay_install.json'))
             except Exception as e:
                 self.log.debug(f'Failed to load overlay install data: {e!r}')
 
         return self._overlay_install_info
 
-    def set_overlay_install_info(self, igame: InstalledGame):
+    def set_overlay_install_info(self, igame: InstalledGame) -> None:
         self._overlay_install_info = igame
-        json.dump(vars(igame), open(os.path.join(self.path, 'overlay_install.json'), 'w'),
-                  indent=2, sort_keys=True)
+        self._save_json('overlay_install.json', vars(igame))
 
-    def remove_overlay_install_info(self):
+    def remove_overlay_install_info(self) -> None:
         try:
             self._overlay_install_info = None
-            os.remove(os.path.join(self.path, 'overlay_install.json'))
+            (self.path / 'overlay_install.json').unlink()
         except Exception as e:
             self.log.debug(f'Failed to delete overlay install data: {e!r}')
 
-    def generate_aliases(self):
+    def generate_aliases(self) -> None:
         self.log.debug('Generating list of aliases...')
 
         self.aliases = dict()
         aliases = set()
         collisions = set()
-        alias_map = defaultdict(set)
+        alias_map: dict[str, set[str]] = defaultdict(set)
 
         for app_name in self._game_metadata:
-            game = self.get_game_meta(app_name)
+            game = Game.from_json(self._game_metadata[app_name])
             if game.is_dlc:
                 continue
             game_folder = game.metadata.get('customAttributes', {}).get('FolderName', {}).get('value', None)
@@ -507,5 +488,4 @@ class LGDLFS:
             """Turn sets into sorted lists for storage"""
             return sorted(obj) if isinstance(obj, set) else obj
 
-        json.dump(alias_map, open(os.path.join(self.path, 'aliases.json'), 'w', newline='\n'),
-                  indent=2, sort_keys=True, default=serialise_sets)
+        self._save_json('aliases.json', alias_map, default=serialise_sets)

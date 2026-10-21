@@ -3,6 +3,7 @@ import io
 import json
 import os
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -101,16 +102,16 @@ def test_case_insensitive_file_search(tmp_path):
     (tmp_path / 'Game' / 'Binaries').mkdir(parents=True)
     (tmp_path / 'Game' / 'Binaries' / 'Run.EXE').write_bytes(b'')
     found = case_insensitive_file_search(str(tmp_path / 'game' / 'binaries' / 'run.exe'))
-    assert found == str(tmp_path / 'Game' / 'Binaries' / 'Run.EXE')
+    assert found == tmp_path / 'Game' / 'Binaries' / 'Run.EXE'
     missing = case_insensitive_file_search(str(tmp_path / 'game' / 'nothere' / 'x'))
-    assert missing == str(tmp_path / 'Game' / 'nothere' / 'x')
+    assert missing == tmp_path / 'Game' / 'nothere' / 'x'
 
 
 @pytest.mark.skipif(sys.platform == 'win32', reason='resolves POSIX-style absolute paths')
 def test_case_insensitive_path_search(tmp_path):
     (tmp_path / 'Saves' / 'Slot1').mkdir(parents=True)
     found = case_insensitive_path_search(str(tmp_path / 'saves' / 'SLOT1' / 'new'))
-    assert found == os.path.realpath(tmp_path / 'Saves' / 'Slot1' / 'new')
+    assert found == (tmp_path / 'Saves' / 'Slot1' / 'new').resolve()
 
 
 def test_wine_registry_shell_folders(tmp_path):
@@ -119,7 +120,7 @@ def test_wine_registry_shell_folders(tmp_path):
         '[Software\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Explorer\\\\Shell Folders] 1700000000\n'
         '"AppData"="C:\\\\users\\\\me\\\\AppData\\\\Roaming"\n')
     folders = get_shell_folders(read_registry(str(tmp_path)), str(tmp_path))
-    assert folders['AppData'] == os.path.join(str(tmp_path), 'drive_c', 'users/me/AppData/Roaming')
+    assert Path(folders['AppData']) == tmp_path / 'drive_c' / 'users' / 'me' / 'AppData' / 'Roaming'
 
 
 def test_lgdconf_tracks_modification_and_read_only(tmp_path):
