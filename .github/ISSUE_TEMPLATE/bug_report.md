@@ -1,16 +1,15 @@
 ---
-name: Legendary bug report
-about: Legendary crashes or bugs (not WINE/Game crashes!)
+name: Heirloom bug report
+about: Heirloom crashes or bugs (not WINE/Game crashes!)
 labels: ''
 assignees: ''
 ---
 
 <!-- READ THIS FIRST -->
-<!-- The Legendary GitHub issue tracker is **ONLY** to be used for issues with Legendary itself. -->
+<!-- The Heirloom GitHub issue tracker is **ONLY** to be used for issues with Heirloom itself. -->
 <!-- Game or WINE crashes/problems occuring after the game has been launched DO NOT belong here. -->
 
-<!-- For those issues instead use GitHub Discussions on this repo or our Discord chat, -->
-<!--  or ask for help in other Linux gaming communities' help sections. -->
+<!-- For those, ask for help in Linux gaming communities' help sections instead. -->
 
 <!--- Please provide a descriptive title, summarising the issue -->
 
@@ -18,7 +17,7 @@ assignees: ''
 <!-- Please fill out the following information about your bug report. -->
 <!-- If you are on Linux and installed using a package, please list the package type. -->
 Operating system and version:
-Legendary version (`legendary -V`):
+Heirloom version (`heirloom -V`):
 
 ## Expected Behavior
 <!--- Tell us what should happen -->

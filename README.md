@@ -5,7 +5,7 @@ Heirloom is an open-source game launcher that can download and install games fro
 Like Legendary, its name is a tongue-in-cheek play on tiers of [item rarity in many MMORPGs](https://wow.gamepedia.com/Quality).
 
 Heirloom is a fork of [Legendary](https://github.com/derrod/legendary) by derrod and its contributors, under the same GPL-3.0 license.
-It adds playtime tracking, plugins, terminal themes, download speed limits, and support for the new Epic Games Launcher.
+It adds playtime tracking, plugins, terminal themes, download speed limits, encrypted login storage, and support for the new Epic Games Launcher; see the [changelog](CHANGELOG.md).
 If you find it useful, consider [supporting Legendary's author](https://ko-fi.com/derrod), whose work it is built on.
 
 Please read the [config file](#config-file) and [cli usage](#usage) sections before creating an issue to avoid invalid reports.
