@@ -87,6 +87,9 @@ class PluginManifest:
     description: str = ''
     version: str = ''
     backend: str = 'main.py'
+    use_backend: bool = True
+    # theme files (see legendary.themes) this plugin provides while enabled
+    themes: tuple[str, ...] = ()
 
     @classmethod
     def read(cls, folder: Path) -> PluginManifest:
@@ -96,9 +99,11 @@ class PluginManifest:
             raise ValueError(f'"name" must be lowercase letters, digits, "-" and "_", got {name!r}')
         manifest = cls(name=name, common_name=data.get('common_name') or name,
                        description=data.get('description', ''), version=data.get('version', ''),
-                       backend=data.get('backend') or 'main.py')
-        if not (folder / manifest.backend).resolve().is_relative_to(folder.resolve()):
-            raise ValueError(f'"backend" must be a file inside the plugin folder, got {manifest.backend!r}')
+                       backend=data.get('backend') or 'main.py', use_backend=data.get('useBackend', True),
+                       themes=tuple(data.get('themes', [])))
+        for key, path in [('backend', manifest.backend), *(('themes', theme) for theme in manifest.themes)]:
+            if not (folder / path).resolve().is_relative_to(folder.resolve()):
+                raise ValueError(f'"{key}" must name files inside the plugin folder, got {path!r}')
         return manifest
 
 
@@ -174,7 +179,8 @@ class PluginManager:
                 continue
             plugin = Plugin(manifest, folder)
             try:
-                _import_backend(folder / manifest.backend, name).setup(plugin)
+                if manifest.use_backend:
+                    _import_backend(folder / manifest.backend, name).setup(plugin)
             except Exception as e:
                 self.errors[name] = f'failed to load: {e!r}'
                 logger.error(f'Plugin "{name}" failed to load: {e!r}',
@@ -190,6 +196,11 @@ class PluginManager:
                     continue
                 subparsers.add_parser(command, parents=[parser], help=f'{help_text} [plugin: {name}]')
                 self.commands[command] = (plugin, command_handler)
+
+    def theme_files(self) -> list[tuple[str, Path]]:
+        """Theme files of the loaded plugins, as (plugin name, path)"""
+        return [(name, plugin.folder / theme) for name, plugin in self.plugins.items()
+                for theme in plugin.manifest.themes]
 
     def emit(self, event: Any) -> None:
         for plugin, handler in self.handlers[type(event)]:

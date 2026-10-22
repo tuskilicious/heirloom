@@ -1,11 +1,15 @@
 import json
+import locale
 import subprocess
 import sys
 
 
 def run(*args):
-    return subprocess.run([sys.executable, '-m', 'legendary.cli', *args],
-                          capture_output=True, text=True, timeout=120)
+    result = subprocess.run([sys.executable, '-m', 'legendary.cli', *args], capture_output=True, timeout=120)
+    # legendary writes UTF-8 to stdout whenever it is not a terminal; stderr uses the system encoding
+    result.stdout = result.stdout.decode('utf-8')
+    result.stderr = result.stderr.decode(locale.getpreferredencoding(False), errors='replace')
+    return result
 
 
 def test_version():
