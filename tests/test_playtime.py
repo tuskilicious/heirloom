@@ -1,5 +1,4 @@
 import json
-import sys
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -9,7 +8,7 @@ from legendary.lfs.utils import LockedJSONData
 from legendary.models.game import PlaytimeSession
 from legendary.utils.cli import format_duration
 
-from .test_cli import run
+from .test_cli import launch_fish, run
 
 T0 = datetime(2026, 10, 22, 12, 0, tzinfo=timezone.utc)
 
@@ -52,40 +51,12 @@ def test_sessions_accumulate_per_app(lgd_home):
     assert [s.result for s in playtime['Cat']] == ['unobservable']
 
 
-@pytest.fixture
-def fake_game(lgd_home, tmp_path):
-    """An installed, offline-launchable game whose executable exits with the code in EXIT_CODE."""
-    game_dir = tmp_path / 'FishGame'
-    game_dir.mkdir()
-    if sys.platform == 'win32':
-        exe = game_dir / 'fish.cmd'
-        exe.write_text('@ping -n 2 127.0.0.1 >nul\r\n@exit /b %EXIT_CODE%\r\n')
-    else:
-        exe = game_dir / 'fish.sh'
-        exe.write_text('#!/bin/sh\nsleep 1\nexit "$EXIT_CODE"\n')
-        exe.chmod(0o755)
-
-    (lgd_home / 'metadata').mkdir(parents=True)
-    (lgd_home / 'metadata' / 'Fish.json').write_text(json.dumps({
-        'app_name': 'Fish', 'app_title': 'Fish Game', 'metadata': {}, 'asset_infos': {}}))
-    (lgd_home / 'installed.json').write_text(json.dumps({'Fish': {
-        'app_name': 'Fish', 'title': 'Fish Game', 'version': '1', 'install_path': str(game_dir),
-        'executable': exe.name, 'platform': 'Linux', 'can_run_offline': True}}))
-    (lgd_home / 'user.json').write_text(json.dumps({'account_id': 'abc', 'displayName': 'Tester'}))
-    return lgd_home
-
-
-def _launch(monkeypatch, exit_code, *args):
-    monkeypatch.setenv('EXIT_CODE', str(exit_code))
-    return run('launch', 'Fish', '--offline', *args)
-
-
 def test_launch_waits_and_records_sessions(fake_game, monkeypatch):
-    clean = _launch(monkeypatch, 0)
+    clean = launch_fish(monkeypatch, 0)
     assert clean.returncode == 0, clean.stderr
     assert 'Fish exited after' in clean.stderr
 
-    crash = _launch(monkeypatch, 3)
+    crash = launch_fish(monkeypatch, 3)
     assert 'Fish crashed after' in crash.stderr and '0x00000003' in crash.stderr
 
     sessions = json.loads((fake_game / 'playtime.json').read_text())['Fish']
@@ -104,12 +75,12 @@ def test_launch_waits_and_records_sessions(fake_game, monkeypatch):
 
 
 def test_launch_no_wait_and_config_opt_out_record_nothing(fake_game, monkeypatch):
-    result = _launch(monkeypatch, 0, '--no-wait')
+    result = launch_fish(monkeypatch, 0, '--no-wait')
     assert result.returncode == 0, result.stderr
     assert 'Waiting for the game' not in result.stderr
 
     (fake_game / 'config.ini').write_text('[Legendary]\ndisable_playtime_tracking = true\n')
-    _launch(monkeypatch, 0)
+    launch_fish(monkeypatch, 0)
 
     assert not (fake_game / 'playtime.json').exists()
     assert 'No playtime recorded yet' in run('playtime').stdout

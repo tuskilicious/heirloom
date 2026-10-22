@@ -29,3 +29,8 @@ def test_status_offline(lgd_home):
     assert result.returncode == 0, result.stderr
     assert 'Epic account: <not logged in>' in result.stdout
     assert str(lgd_home) in result.stdout
+
+
+def launch_fish(monkeypatch, exit_code, *args):
+    monkeypatch.setenv('EXIT_CODE', str(exit_code))
+    return run('launch', 'Fish', '--offline', *args)

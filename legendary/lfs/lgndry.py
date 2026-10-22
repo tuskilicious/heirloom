@@ -21,17 +21,18 @@ from .utils import LockedJSONData, clean_filename
 FILELOCK_DEBUG = False
 
 
+def config_dir() -> Path:
+    if config_path := os.environ.get('LEGENDARY_CONFIG_PATH'):
+        return Path(config_path)
+    if config_path := os.environ.get('XDG_CONFIG_HOME'):
+        return Path(config_path, 'legendary')
+    return Path('~/.config/legendary').expanduser()
+
+
 class LGDLFS:
     def __init__(self, config_file: str | None = None):
         self.log = logging.getLogger('LGDLFS')
-
-        self.path: Path
-        if config_path := os.environ.get('LEGENDARY_CONFIG_PATH'):
-            self.path = Path(config_path)
-        elif config_path := os.environ.get('XDG_CONFIG_HOME'):
-            self.path = Path(config_path, 'legendary')
-        else:
-            self.path = Path('~/.config/legendary').expanduser()
+        self.path = config_dir()
 
         # EGS user info
         self._user_data: dict | None = None

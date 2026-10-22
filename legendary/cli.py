@@ -34,6 +34,7 @@ from legendary.lfs.eos import (
     query_registry_entries,
     remove_registry_entries,
 )
+from legendary.lfs.lgndry import config_dir
 from legendary.lfs.utils import clean_filename, validate_files
 from legendary.lfs.wine_helpers import (
     case_insensitive_file_search,
@@ -42,6 +43,13 @@ from legendary.lfs.wine_helpers import (
 )
 from legendary.models.exceptions import InvalidCredentialsError
 from legendary.models.game import Game, PlaytimeSession, SaveGameStatus, VerifyResult
+from legendary.plugins import (
+    GameExited,
+    GameLaunching,
+    GameUpdated,
+    PluginManager,
+    install_event,
+)
 from legendary.utils.cli import (
     format_duration,
     get_boolean_choice,
@@ -62,10 +70,11 @@ logger = logging.getLogger('cli')
 
 
 class LegendaryCLI:
-    def __init__(self, override_config=None, api_timeout=None):
+    def __init__(self, override_config=None, api_timeout=None, plugins: PluginManager | None = None):
         self.core = LegendaryCore(override_config, timeout=api_timeout)
         self.logger = logging.getLogger('cli')
         self.logging_queue = None
+        self.plugins = plugins or PluginManager(config_dir() / 'plugins')
 
     def setup_threaded_logging(self):
         self.logging_queue = MPQueue(-1)
@@ -728,6 +737,9 @@ class LegendaryCLI:
                     f'{k}={v}' for k, v in params.environment.items())))
         else:
             logger.info(f'Launching {app_name}...')
+            launching = GameLaunching(app_name, igame, full_params, full_env, params.working_directory)
+            self.plugins.emit(launching)
+            full_params, full_env = launching.command, launching.environment
             if params.pre_launch_command:
                 try:
                     logger.debug(f'Running pre-launch command: {params.pre_launch_command}')
@@ -739,12 +751,12 @@ class LegendaryCLI:
                     logger.warning(f'Pre-launch command failed: {e!r}')
 
             logger.debug(f'Launch parameters: {shlex.join(full_params)}')
-            logger.debug(f'Working directory: {params.working_directory}')
+            logger.debug(f'Working directory: {launching.working_directory}')
             if params.environment:
                 logger.debug('Environment overrides: {}'.format(', '.join(
                     f'{k}={v}' for k, v in params.environment.items())))
             started = datetime.now(timezone.utc)
-            game_process = subprocess.Popen(full_params, cwd=params.working_directory, env=full_env,
+            game_process = subprocess.Popen(full_params, cwd=launching.working_directory, env=full_env,
                                             shell=os.name == 'nt')
             if not args.no_wait and not self.core.lgd.config.getboolean('Legendary', 'disable_playtime_tracking',
                                                                          fallback=False):
@@ -761,6 +773,7 @@ class LegendaryCLI:
 
         session = PlaytimeSession(start=started, end=datetime.now(timezone.utc), exit_code=exit_code)
         self.core.lgd.add_playtime_session(app_name, session)
+        self.plugins.emit(GameExited(app_name, session))
 
         played = format_duration(session.duration.total_seconds())
         if exit_code is None:
@@ -806,6 +819,40 @@ class LegendaryCLI:
             for session in sessions_by_app[summary[0]['app_name']]:
                 print(f'  - {session.start.astimezone():%Y-%m-%d %H:%M} for '
                       f'{format_duration(session.duration.total_seconds())} ({session.result})')
+
+    def manage_plugins(self, args):
+        available = self.plugins.discover()
+
+        if args.action in ('enable', 'disable'):
+            if args.plugin_name not in available:
+                logger.error(f'No plugin named "{args.plugin_name}" in "{self.plugins.folder}".')
+                exit(1)
+            self.plugins.set_enabled(args.plugin_name, args.action == 'enable')
+            if args.action == 'enable':
+                logger.info(f'Enabled plugin "{args.plugin_name}". Plugins run inside legendary with access to your '
+                            f'Epic account and files, only enable ones you trust.')
+            else:
+                logger.info(f'Disabled plugin "{args.plugin_name}".')
+            return
+
+        enabled = self.plugins.enabled()
+        print(f'Plugins folder: {self.plugins.folder}')
+        if not available and not self.plugins.errors:
+            print('No plugins installed. Put each plugin in its own folder there, then enable it with '
+                  '"legendary plugins enable <name>".')
+            return
+
+        for name, (_, manifest) in available.items():
+            status = self.plugins.errors.get(name) or ('enabled' if name in enabled else 'disabled')
+            version = f' {manifest.version}' if manifest.version else ''
+            print(f' * {manifest.common_name} ({name}){version} [{status}]')
+            if manifest.description:
+                print(f'     {manifest.description}')
+            if commands := [c for c, (p, _) in self.plugins.commands.items() if p.manifest.name == name]:
+                print(f'     Commands: {", ".join(commands)}')
+        for folder_name, error in self.plugins.errors.items():
+            if folder_name not in available:
+                print(f' ! {folder_name}: {error}')
 
     def _launch_third_party(self, args):
         game = self.core.get_game(app_name=args.app_name)
@@ -1098,8 +1145,9 @@ class LegendaryCLI:
 
             # check if the version changed, this can happen for DLC that gets a version bump with no actual file changes
             if old_igame and old_igame.version != igame.version:
-                old_igame.version = igame.version
+                previous_version, old_igame.version = old_igame.version, igame.version
                 self.core.install_game(old_igame)
+                self.plugins.emit(GameUpdated(game.app_name, old_igame, previous_version))
 
             exit(0)
 
@@ -1140,6 +1188,7 @@ class LegendaryCLI:
                 print('Aborting...')
                 exit(0)
 
+        previous_install = self.core.get_installed_game(game.app_name, skip_sync=True)
         start_t = time.time()
 
         try:
@@ -1165,6 +1214,9 @@ class LegendaryCLI:
                 postinstall = self.core.install_game(igame)
                 if postinstall:
                     self._handle_postinstall(postinstall, igame, skip_prereqs=args.yes)
+                if event := install_event(game.app_name, igame,
+                                          previous_install.version if previous_install else None):
+                    self.plugins.emit(event)
 
                 dlcs = self.core.get_dlc_for_game(game.app_name)
                 if dlcs and not args.skip_dlcs:
@@ -2843,6 +2895,7 @@ def main():
     list_saves_parser = subparsers.add_parser('list-saves', help='List available cloud saves')
     move_parser = subparsers.add_parser('move', help='Move specified app name to a new location')
     playtime_parser = subparsers.add_parser('playtime', help='Show playtime recorded by "legendary launch"')
+    plugins_parser = subparsers.add_parser('plugins', help='List, enable, or disable plugins')
     status_parser = subparsers.add_parser('status', help='Show legendary status information')
     sync_saves_parser = subparsers.add_parser('sync-saves', help='Sync cloud saves')
     uninstall_parser = subparsers.add_parser('uninstall', help='Uninstall (delete) a game')
@@ -3201,6 +3254,14 @@ def main():
     achievements_parser.add_argument('--json', dest='json', action='store_true',
                                      help='Output information in JSON format')
 
+    plugins_parser.add_argument('action', nargs='?', default='list', choices=('list', 'enable', 'disable'),
+                                help='What to do (default: list)')
+    plugins_parser.add_argument('plugin_name', nargs='?', metavar='<name>', help='Plugin to enable or disable')
+
+    # plugins can add commands, so they are loaded before parsing
+    plugins = PluginManager(config_dir() / 'plugins')
+    plugins.load(subparsers)
+
     args, extra = parser.parse_known_args()
 
     if args.version:
@@ -3230,7 +3291,7 @@ def main():
                 subprocess.Popen(['cmd', '/K', 'echo>nul'])
         return
 
-    cli = LegendaryCLI(override_config=args.config_file, api_timeout=args.api_timeout)
+    cli = LegendaryCLI(override_config=args.config_file, api_timeout=args.api_timeout, plugins=plugins)
     ql = cli.setup_threaded_logging()
 
     config_ll = cli.core.lgd.config.get('Legendary', 'log_level', fallback='info')
@@ -3305,6 +3366,10 @@ def main():
             cli.achievements(args)
         elif args.subparser_name == 'playtime':
             cli.playtime(args)
+        elif args.subparser_name == 'plugins':
+            cli.manage_plugins(args)
+        elif args.subparser_name in cli.plugins.commands:
+            cli.plugins.run_command(args, cli.core)
     except KeyboardInterrupt:
         logger.info('Command was aborted via KeyboardInterrupt, cleaning up...')
 
