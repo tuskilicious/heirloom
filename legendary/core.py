@@ -102,6 +102,13 @@ class LegendaryCore:
                 self.lgd.config.remove_option('Legendary', 'egl_sync')
                 self.lgd.save_config()
 
+        # installations.jsonl of the new Epic Games Launcher, set when it is not auto-detected (e.g. in WINE)
+        if installations := self.lgd.config.get('Legendary', 'egl_installations', fallback=None):
+            if Path(installations).is_file():
+                self.egl.installations_path = installations
+            else:
+                self.log.error(f'Config EGL installations file ("{installations}") does not exist, ignoring it.')
+
         self.local_timezone = datetime.now().astimezone().tzinfo
         self.language_code, self.country_code = ('en', 'US')
 
@@ -1949,12 +1956,19 @@ class LegendaryCore:
         return new_manifest, igame
 
     def egl_get_importable(self):
-        return [g for g in self.egl.get_manifests()
-                if not self.is_installed(g.app_name) and
-                g.main_game_appname == g.app_name and
-                self.asset_valid(g.app_name)]
+        importable = [g for g in self.egl.get_manifests()
+                      if not self.is_installed(g.app_name) and
+                      g.main_game_appname == g.app_name and
+                      self.asset_valid(g.app_name)]
+        for egl_game in importable:
+            if egl_game.display_name is None:  # not stored by the new Epic Games Launcher
+                game = self.get_game(egl_game.app_name)
+                egl_game.display_name = game.app_title if game else egl_game.app_name
+        return importable
 
     def egl_get_exportable(self):
+        if self.egl.installations_path:  # the new launcher's install list is only read, never written
+            return []
         if not self.egl.manifests:
             self.egl.read_manifests()
         return [g for g in self.get_installed_list() if
@@ -1980,8 +1994,12 @@ class LegendaryCore:
         # fix path on Linux if the game is installed to a Windows drive mapping
         if os.name != 'nt' and not lgd_igame.install_path.startswith('/'):
             drive_letter = lgd_igame.install_path[:2].lower()
-            drive_c_path = self.egl.programdata_path.partition('ProgramData')[0]
-            wine_pfx = Path(drive_c_path, '..').resolve()
+            egl_data = Path(self.egl.installations_path or self.egl.programdata_path)
+            drive_c_path = next((p for p in egl_data.parents if p.name.lower() == 'drive_c'), None)
+            if not drive_c_path:
+                self.log.error(f'"{egl_data}" is not inside a WINE prefix, cannot map drive "{drive_letter}"')
+                return
+            wine_pfx = (drive_c_path / '..').resolve()
             mapped_path = (wine_pfx / 'dosdevices' / drive_letter).resolve()
             if 'dosdevices' in mapped_path.parts:
                 self.log.error(f'Unable to resolve path for mapped drive "{drive_letter}" '
@@ -2006,6 +2024,19 @@ class LegendaryCore:
                                version=new_manifest.meta.build_version,
                                platform='Windows')
 
+        # the new Epic Games Launcher does not store these, take them from the metadata like "import" does
+        game = self.get_game(app_name)
+        custom_attributes = game.metadata.get('customAttributes', {}) if game else {}
+        if lgd_igame.title is None:
+            lgd_igame.title = game.app_title if game else app_name
+        if lgd_igame.install_size is None:
+            lgd_igame.install_size = sum(fm.file_size for fm in new_manifest.file_manifest_list.elements)
+        if lgd_igame.can_run_offline is None:
+            lgd_igame.can_run_offline = custom_attributes.get('CanRunOffline', {}).get('value', 'true') == 'true'
+        if lgd_igame.requires_ot is None:
+            ownership_token = custom_attributes.get('OwnershipToken', {}).get('value', 'false')
+            lgd_igame.requires_ot = ownership_token.lower() == 'true'
+
         # transfer install tag choices to config
         if lgd_igame.install_tags:
             self.lgd.config.set(app_name, 'install_tags', ','.join(lgd_igame.install_tags))
@@ -2014,6 +2045,10 @@ class LegendaryCore:
         _ = self._install_game(lgd_igame)
 
     def egl_export(self, app_name):
+        if self.egl.installations_path:
+            self.log.warning(f'Not exporting "{app_name}": adding games to the new Epic Games Launcher '
+                             f'is not supported yet.')
+            return
         if not self.lgd.lock_installed():
             self.log.warning('Could not acquire lock for EGL import')
             return
@@ -2051,13 +2086,17 @@ class LegendaryCore:
         self.egl.set_manifest(egl_game)
 
     def egl_uninstall(self, igame: InstalledGame, delete_files=True):
-        try:
-            self.egl.delete_manifest(igame.app_name)
-        except ValueError as e:
-            self.log.warning(f'Deleting EGL manifest failed: {e!r}')
-        except FileNotFoundError:
-            self.log.warning('EGL manifest was already deleted, in case you uninstalled the Epic Games Launcher'
-                             ' please disable and unlink EGL Sync.')
+        if self.egl.installations_path:
+            self.log.info(f'The new Epic Games Launcher may still list "{igame.app_name}", Legendary cannot '
+                          f'remove games from it.')
+        else:
+            try:
+                self.egl.delete_manifest(igame.app_name)
+            except ValueError as e:
+                self.log.warning(f'Deleting EGL manifest failed: {e!r}')
+            except FileNotFoundError:
+                self.log.warning('EGL manifest was already deleted, in case you uninstalled the Epic Games '
+                                 'Launcher please disable and unlink EGL Sync.')
 
         if delete_files:
             delete_folder(Path(igame.install_path, '.egstore'))
@@ -2124,6 +2163,10 @@ class LegendaryCore:
 
     @property
     def egl_sync_enabled(self):
+        # Two-way sync needs writing to the launcher's install list, which only the old launcher allows.
+        # Read-only sync with the new one would overwrite games Legendary updated with Epic's older versions.
+        if self.egl.installations_path:
+            return False
         return self.lgd.config.getboolean('Legendary', 'egl_sync', fallback=False)
 
     def check_for_overlay_updates(self):

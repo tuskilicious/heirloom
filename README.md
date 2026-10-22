@@ -197,6 +197,10 @@ Automatically sync all games with the Epic Games Launcher
 ````
 legendary -y egl-sync
 ````
+**Note:** With the new Epic Games Launcher (the 2026 rewrite, whose data lives in `%LOCALAPPDATA%\com.epicgames.eglv2`), `egl-sync` can only *import*:
+it reads the launcher's `installations.jsonl` and adds games installed there that Legendary doesn't have yet; games already in Legendary are left as they are.
+Exporting games to it, removing games from it, and automatic sync are not supported yet, so run `egl-sync` again to import games you install there later.
+On Windows the file is found automatically once the old launcher's `ProgramData` manifests are gone; elsewhere (e.g. in a WINE prefix) pass it with `--egl-installations <path>`.
 
 ## Usage
 
@@ -342,7 +346,8 @@ optional arguments:
 
 Command: egl-sync
 usage: legendary egl-sync [-h] [--egl-manifest-path EGL_MANIFEST_PATH]
-                          [--egl-wine-prefix EGL_WINE_PREFIX] [--enable-sync]
+                          [--egl-wine-prefix EGL_WINE_PREFIX]
+                          [--egl-installations <path>] [--enable-sync]
                           [--disable-sync] [--one-shot] [--import-only]
                           [--export-only] [--migrate] [--unlink]
 
@@ -355,6 +360,10 @@ optional arguments:
   --egl-wine-prefix EGL_WINE_PREFIX
                         Path to the WINE prefix the Epic Games Launcher is
                         installed in
+  --egl-installations <path>
+                        Path to the new Epic Games Launcher's
+                        installations.jsonl, if it is not found automatically
+                        (e.g. in a WINE prefix)
   --enable-sync         Enable automatic EGL <-> Legendary sync
   --disable-sync        Disable automatic sync and exit
   --one-shot            Sync once, do not ask to setup automatic sync
@@ -688,6 +697,8 @@ locale = en-US
 egl_sync = false
 ; path to the "Manifests" folder in the EGL ProgramData directory
 egl_programdata = /home/user/Games/epic-games-store/drive_c/... 
+; path to the new Epic Games Launcher's installations.jsonl (import only), if it is not found automatically
+egl_installations = /home/user/Games/epic-games-store/drive_c/users/user/AppData/Local/com.epicgames.eglv2/installations.jsonl
 ; Set preferred CDN host (e.g. to improve download speed)
 preferred_cdn = epicgames-download1.akamaized.net
 ; disable HTTPS for downloads (e.g. to use a LanCache)
