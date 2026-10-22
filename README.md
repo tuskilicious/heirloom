@@ -245,6 +245,7 @@ Commands:
     list-saves          List available cloud saves
     move                Move specified app name to a new location
     playtime            Show playtime recorded by "legendary launch"
+    plugins             List, enable, or disable plugins
     status              Show legendary status information
     sync-saves          Sync cloud saves
     uninstall           Uninstall (delete) a game
@@ -641,6 +642,18 @@ optional arguments:
   --json      Output information in JSON format
 
 
+Command: plugins
+usage: legendary plugins [-h] [{list,enable,disable}] [<name>]
+
+positional arguments:
+  {list,enable,disable}
+                        What to do (default: list)
+  <name>                Plugin to enable or disable
+
+optional arguments:
+  -h, --help            show this help message and exit
+
+
 Command: status
 usage: legendary status [-h] [--offline] [--json]
 
@@ -690,6 +703,63 @@ positional arguments:
 optional arguments:
   -h, --help  show this help message and exit
 ````
+
+
+## Plugins
+
+Plugins add features to Legendary, much like [Millennium](https://github.com/SteamClientHomebrew/Millennium) does for Steam.
+Each plugin is a folder in the `plugins` folder of the config directory (`~/.config/legendary/plugins` by default) with a `plugin.json` manifest and a Python file:
+
+````json
+{
+  "name": "session-log",
+  "common_name": "Session Log",
+  "description": "Logs how long each game ran",
+  "version": "1.0.0",
+  "backend": "main.py"
+}
+````
+
+Only `name` is required (lowercase letters, digits, `-` and `_`); `backend` defaults to `main.py`.
+Plugins run inside Legendary with access to your Epic account and files, so each one stays off until you enable it:
+
+````
+legendary plugins
+legendary plugins enable session-log
+legendary plugins disable session-log
+````
+
+The backend's `setup(plugin)` function subscribes to events and can add commands:
+
+````python
+def setup(plugin):
+    def on_launch(event):
+        # event.command, event.environment and event.working_directory can be changed before the game starts
+        event.environment['DXVK_HUD'] = 'fps'
+
+    def on_exit(event):
+        plugin.log.info(f'{event.app_name} ran for {event.session.duration} ({event.session.result})')
+
+    plugin.on('game_launching', on_launch)
+    plugin.on('game_exited', on_exit)
+
+    def count(args, core):
+        print(f'{len(core.get_installed_list())} games installed')
+
+    parser = plugin.command('count', count, help='Count installed games')
+    parser.add_argument('--verbose', action='store_true')
+````
+
+| Event            | Sent                                                          | Fields                                                                           |
+|------------------|---------------------------------------------------------------|----------------------------------------------------------------------------------|
+| `game_launching` | right before `legendary launch` starts a game                 | `app_name`, `game`, and the editable `command`, `environment`, `working_directory` |
+| `game_exited`    | when that game exits (not with `--no-wait`)                   | `app_name`, `session` (`start`, `end`, `duration`, `exit_code`, `result`)         |
+| `game_installed` | after a game or DLC is installed                              | `app_name`, `game`                                                               |
+| `game_updated`   | after an installed game or DLC is updated                     | `app_name`, `game`, `previous_version`                                           |
+
+A backend can import other files in its folder with relative imports (`from . import helpers`).
+A plugin that fails to load or raises in a handler is logged and skipped, it never stops Legendary; run with `-v` to see the traceback.
+Plugin commands cannot replace Legendary's own commands.
 
 
 ## Config file
