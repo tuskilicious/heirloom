@@ -4,10 +4,10 @@ import sys
 
 import pytest
 
-from legendary.core import LegendaryCore
-from legendary.lfs.egl import EPCLFS, read_v2_installations
-from legendary.models.egl import EGLManifest
-from legendary.utils.savegame_helper import SaveGameHelper
+from heirloom.core import HeirloomCore
+from heirloom.lfs.egl import EPCLFS, read_v2_installations
+from heirloom.models.egl import EGLManifest
+from heirloom.utils.savegame_helper import SaveGameHelper
 
 from .test_cli import run
 from .test_formats import _make_save
@@ -118,16 +118,16 @@ def test_new_launcher_is_detected_once_the_old_one_is_gone(tmp_path, no_real_lau
 def test_sync_from_the_old_launcher_stays_off_with_the_new_one(tmp_path, lgd_home, no_real_launcher):
     path = write_installations(tmp_path / 'installations.jsonl')
     lgd_home.mkdir()
-    (lgd_home / 'config.ini').write_text(f'[Legendary]\negl_sync = true\negl_installations = {path}\n')
+    (lgd_home / 'config.ini').write_text(f'[Heirloom]\negl_sync = true\negl_installations = {path}\n')
 
-    core = LegendaryCore()
+    core = HeirloomCore()
     assert core.egl.installations_path == str(path)
-    assert not core.egl_sync_enabled, 'an old "egl_sync = true" must not make Legendary export to or sync with it'
+    assert not core.egl_sync_enabled, 'an old "egl_sync = true" must not make Heirloom export to or sync with it'
 
 
 @pytest.fixture
 def new_launcher_game(lgd_home, tmp_path, no_real_launcher):
-    """A game installed by the new launcher (with its .egstore manifest) that Legendary knows about"""
+    """A game installed by the new launcher (with its .egstore manifest) that Heirloom knows about"""
     game_dir = tmp_path / 'FishGame'
     files = _make_save(game_dir)
     out = SaveGameHelper().package_savegame(str(game_dir))
@@ -164,9 +164,9 @@ def test_egl_sync_imports_from_the_new_launcher(new_launcher_game, lgd_home):
     assert (igame['can_run_offline'], igame['requires_ot']) == (False, True), 'flags come from the metadata'
     config = configparser.ConfigParser()
     config.read(lgd_home / 'config.ini')
-    assert not config.has_option('Legendary', 'egl_sync'), 'automatic sync is not switched on'
-    assert config.get('Legendary', 'egl_installations') == str(installations), 'the path is remembered'
+    assert not config.has_option('Heirloom', 'egl_sync'), 'automatic sync is not switched on'
+    assert config.get('Heirloom', 'egl_installations') == str(installations), 'the path is remembered'
 
     again = run('egl-sync', '--yes')
     assert again.returncode == 0, again.stderr
-    assert 'Nothing to import' in again.stdout, 'games already in Legendary are left as they are'
+    assert 'Nothing to import' in again.stdout, 'games already in Heirloom are left as they are'

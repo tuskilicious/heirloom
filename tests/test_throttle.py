@@ -5,8 +5,8 @@ import time
 
 import pytest
 
-from legendary.downloader import throttle
-from legendary.downloader.throttle import (
+from heirloom.downloader import throttle
+from heirloom.downloader.throttle import (
     SpeedLimits,
     Throttle,
     games_running,
@@ -113,7 +113,7 @@ def test_launch_holds_the_running_lock_while_the_game_runs(fake_game, tmp_path, 
     (fake_game / 'installed.json').write_text(json.dumps(install))
     running_dir = fake_game / 'running'
 
-    launch = subprocess.Popen([sys.executable, '-m', 'legendary.cli', 'launch', 'Fish', '--offline'],
+    launch = subprocess.Popen([sys.executable, '-m', 'heirloom.cli', 'launch', 'Fish', '--offline'],
                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     seen_running = False
     deadline = time.monotonic() + 30

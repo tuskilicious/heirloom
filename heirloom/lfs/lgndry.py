@@ -2,6 +2,7 @@
 import json
 import logging
 import os
+import shutil
 from collections import defaultdict
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -11,27 +12,55 @@ from typing import Any
 
 from filelock import FileLock
 
-from legendary.models.config import LGDConf
-from legendary.models.game import Game, GameAsset, InstalledGame, PlaytimeSession
-from legendary.utils.aliasing import generate_aliases
-from legendary.utils.env import is_windows_mac_or_pyi
+from heirloom.models.config import LGDConf
+from heirloom.models.game import Game, GameAsset, InstalledGame, PlaytimeSession
+from heirloom.utils.aliasing import generate_aliases
+from heirloom.utils.env import is_windows_mac_or_pyi
 
 from .utils import LockedJSONData, clean_filename
 
 FILELOCK_DEBUG = False
 
 
-def config_dir() -> Path:
-    if config_path := os.environ.get('LEGENDARY_CONFIG_PATH'):
-        return Path(config_path)
+def _config_base() -> Path:
     if config_path := os.environ.get('XDG_CONFIG_HOME'):
-        return Path(config_path, 'legendary')
-    return Path('~/.config/legendary').expanduser()
+        return Path(config_path)
+    return Path('~/.config').expanduser()
+
+
+def config_dir() -> Path:
+    # LEGENDARY_CONFIG_PATH still works, so setups made for Legendary keep working
+    for variable in ('HEIRLOOM_CONFIG_PATH', 'LEGENDARY_CONFIG_PATH'):
+        if config_path := os.environ.get(variable):
+            return Path(config_path)
+    return _config_base() / 'heirloom'
+
+
+def migrate_legendary_config() -> None:
+    """On first run, copies Legendary's config folder, leaving the original for Legendary itself"""
+    if os.environ.get('HEIRLOOM_CONFIG_PATH') or os.environ.get('LEGENDARY_CONFIG_PATH'):
+        return
+    new, old = config_dir(), _config_base() / 'legendary'
+    if new.exists() or not old.is_dir():
+        return
+    log = logging.getLogger('LGDLFS')
+    # copied under another name and renamed when complete, so a failed copy never looks like a finished one
+    partial = new.with_name(f'{new.name}.copying')
+    try:
+        shutil.rmtree(partial, ignore_errors=True)
+        shutil.copytree(old, partial, symlinks=True, ignore=shutil.ignore_patterns('*.lock', 'tmp', 'running'))
+        partial.rename(new)
+    except OSError as e:
+        shutil.rmtree(partial, ignore_errors=True)
+        log.error(f'Could not copy your Legendary data from "{old}" to "{new}": {e!r}')
+        return
+    log.info(f'Copied your Legendary data from "{old}" to "{new}". Legendary itself keeps using its own copy.')
 
 
 class LGDLFS:
     def __init__(self, config_file: str | None = None):
         self.log = logging.getLogger('LGDLFS')
+        migrate_legendary_config()
         self.path = config_dir()
 
         # EGS user info
@@ -44,7 +73,7 @@ class LGDLFS:
         self._assets: dict[str, list[GameAsset]] | None = None
         # EGS metadata
         self._game_metadata: dict[str, dict] = dict()
-        # Legendary update check info
+        # Heirloom update check info
         self._update_info: dict | None = None
         # EOS Overlay install/update check info
         self._overlay_update_info: dict | None = None
@@ -54,7 +83,7 @@ class LGDLFS:
 
         if config_file:
             # if user specified a valid relative/absolute path use that,
-            # otherwise create file in legendary config directory
+            # otherwise create file in heirloom config directory
             if Path(config_file).exists():
                 self.config_path = Path(config_file).absolute()
             else:
@@ -95,7 +124,7 @@ class LGDLFS:
                 self.log.warning(f'Removing "{old_manifests}" folder failed: {e!r}, please remove manually')
 
         if not FILELOCK_DEBUG:
-            # Prevent filelock logger from spamming Legendary debug output
+            # Prevent filelock logger from spamming Heirloom debug output
             filelock_logger = logging.getLogger('filelock')
             filelock_logger.setLevel(logging.INFO)
 
@@ -108,17 +137,29 @@ class LGDLFS:
             self.log.warning('Continuing with blank config in safe-mode...')
             self.config.read_only = True
 
-        # make sure "Legendary" section exists
-        if 'Legendary' not in self.config:
-            self.config.add_section('Legendary')
+        # configs made by Legendary use its name for these sections
+        for section in self.config.sections():
+            if section == 'Legendary' or section.startswith('Legendary.'):
+                renamed = 'Heirloom' + section.removeprefix('Legendary')
+                if not self.config.has_section(renamed):
+                    self.config.add_section(renamed)
+                for option, value in self.config[section].items():
+                    if not self.config.has_option(renamed, option):
+                        self.config.set(renamed, option, value)
+                self.config.remove_section(section)
+                self.config.modified = True
+
+        # make sure "Heirloom" section exists
+        if 'Heirloom' not in self.config:
+            self.config.add_section('Heirloom')
 
         # Add opt-out options with explainers
-        if not self.config.has_option('Legendary', 'disable_update_check'):
-            self.config.set('Legendary', '; Disables the automatic update check')
-            self.config.set('Legendary', 'disable_update_check', 'false')
-        if not self.config.has_option('Legendary', 'disable_update_notice'):
-            self.config.set('Legendary', '; Disables the notice about an available update on exit')
-            self.config.set('Legendary', 'disable_update_notice', 'false' if is_windows_mac_or_pyi() else 'true')
+        if not self.config.has_option('Heirloom', 'disable_update_check'):
+            self.config.set('Heirloom', '; Disables the automatic update check')
+            self.config.set('Heirloom', 'disable_update_check', 'false')
+        if not self.config.has_option('Heirloom', 'disable_update_notice'):
+            self.config.set('Heirloom', '; Disables the notice about an available update on exit')
+            self.config.set('Heirloom', 'disable_update_notice', 'false' if is_windows_mac_or_pyi() else 'true')
 
         self._installed_lock = FileLock(self.path / 'installed.json.lock')
 
@@ -138,7 +179,7 @@ class LGDLFS:
 
         # load auto-aliases if enabled
         self.aliases: dict[str, str] = dict()
-        if not self.config.getboolean('Legendary', 'disable_auto_aliasing', fallback=False):
+        if not self.config.getboolean('Heirloom', 'disable_auto_aliasing', fallback=False):
             try:
                 _j = self._load_json('aliases.json')
                 for app_name, aliases in _j.items():
@@ -314,7 +355,7 @@ class LGDLFS:
     def lock_installed(self) -> bool:
         """
         Locks the install data. We do not care about releasing this lock.
-        If it is acquired by a Legendary instance it should own the lock until it exits.
+        If it is acquired by a Heirloom instance it should own the lock until it exits.
         Some operations such as egl sync may be simply skipped if a lock cannot be acquired
         """
         if self._installed_lock.is_locked:
@@ -382,7 +423,7 @@ class LGDLFS:
         if self.config_path.exists():
             if (modtime := int(self.config_path.stat().st_mtime)) != self.config.modtime:
                 new_filename = f'config.{modtime}.ini'
-                self.log.warning(f'Configuration file has been modified while legendary was running, '
+                self.log.warning(f'Configuration file has been modified while heirloom was running, '
                                  f'user-modified config will be renamed to "{new_filename}"...')
                 self.config_path.rename(self.config_path.with_name(new_filename))
 
@@ -394,12 +435,12 @@ class LGDLFS:
         return self.path / 'running'
 
     def game_running_lock(self, app_name: str) -> FileLock:
-        """Held while "legendary launch" waits for a game, so downloads can tell a game is running"""
+        """Held while "heirloom launch" waits for a game, so downloads can tell a game is running"""
         self.running_games_dir.mkdir(exist_ok=True)
         return FileLock(self.running_games_dir / f'{clean_filename(app_name)}-{os.getpid()}.lock')
 
     def add_playtime_session(self, app_name: str, session: PlaytimeSession) -> None:
-        # locked, since several "legendary launch" processes may finish at the same time
+        # locked, since several "heirloom launch" processes may finish at the same time
         with LockedJSONData(self.path / 'playtime.json') as lock:
             data = lock.data or {}
             data.setdefault(app_name, []).append(session.to_json())

@@ -10,10 +10,10 @@ from multiprocessing import Queue
 
 import pytest
 
-from legendary.downloader.mp.manager import DLManager
-from legendary.downloader.throttle import SpeedLimits
-from legendary.models.manifest import Manifest
-from legendary.utils.savegame_helper import SaveGameHelper
+from heirloom.downloader.mp.manager import DLManager
+from heirloom.downloader.throttle import SpeedLimits
+from heirloom.models.manifest import Manifest
+from heirloom.utils.savegame_helper import SaveGameHelper
 
 from .test_formats import _make_save
 from .test_throttle import HOLD_LOCK

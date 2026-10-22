@@ -19,10 +19,10 @@ from platform import platform
 from sys import exit, stdout
 from sys import platform as sys_platform
 
-from legendary import __codename__, __version__
-from legendary.core import LegendaryCore
-from legendary.downloader.throttle import parse_speed
-from legendary.lfs.crossover import (
+from heirloom import __codename__, __version__
+from heirloom.core import HeirloomCore
+from heirloom.downloader.throttle import parse_speed
+from heirloom.lfs.crossover import (
     mac_find_crossover_apps,
     mac_get_bottle_path,
     mac_get_crossover_bottles,
@@ -30,38 +30,38 @@ from legendary.lfs.crossover import (
     mac_is_crossover_running,
     mac_is_valid_bottle,
 )
-from legendary.lfs.eos import (
+from heirloom.lfs.eos import (
     add_registry_entries,
     query_registry_entries,
     remove_registry_entries,
 )
-from legendary.lfs.lgndry import config_dir
-from legendary.lfs.utils import clean_filename, validate_files
-from legendary.lfs.wine_helpers import (
+from heirloom.lfs.lgndry import config_dir, migrate_legendary_config
+from heirloom.lfs.utils import clean_filename, validate_files
+from heirloom.lfs.wine_helpers import (
     case_insensitive_file_search,
     get_shell_folders,
     read_registry,
 )
-from legendary.models.exceptions import InvalidCredentialsError
-from legendary.models.game import Game, PlaytimeSession, SaveGameStatus, VerifyResult
-from legendary.plugins import (
+from heirloom.models.exceptions import InvalidCredentialsError
+from heirloom.models.game import Game, PlaytimeSession, SaveGameStatus, VerifyResult
+from heirloom.plugins import (
     GameExited,
     GameLaunching,
     GameUpdated,
     PluginManager,
     install_event,
 )
-from legendary.themes import DEFAULT_THEME, Theme, ThemedFormatter, load_themes
-from legendary.utils.cli import (
+from heirloom.themes import DEFAULT_THEME, Theme, ThemedFormatter, load_themes
+from heirloom.utils.cli import (
     format_duration,
     get_boolean_choice,
     get_int_choice,
     sdl_prompt,
     strtobool,
 )
-from legendary.utils.custom_parser import HiddenAliasSubparsersAction
-from legendary.utils.env import is_windows_mac_or_pyi
-from legendary.utils.selective_dl import get_sdl_appname
+from heirloom.utils.custom_parser import HiddenAliasSubparsersAction
+from heirloom.utils.env import is_windows_mac_or_pyi
+from heirloom.utils.selective_dl import get_sdl_appname
 
 # replaced by the configured theme's formatter once the config is loaded
 logging.basicConfig(
@@ -71,9 +71,9 @@ logging.basicConfig(
 logger = logging.getLogger('cli')
 
 
-class LegendaryCLI:
+class HeirloomCLI:
     def __init__(self, override_config=None, api_timeout=None, plugins: PluginManager | None = None):
-        self.core = LegendaryCore(override_config, timeout=api_timeout)
+        self.core = HeirloomCore(override_config, timeout=api_timeout)
         self.logger = logging.getLogger('cli')
         self.logging_queue = None
         self.plugins = plugins or PluginManager(config_dir() / 'plugins')
@@ -89,9 +89,9 @@ class LegendaryCLI:
 
     def use_configured_theme(self):
         themes, _ = self.available_themes()
-        name = self.core.lgd.config.get('Legendary', 'theme', fallback=DEFAULT_THEME.name)
+        name = self.core.lgd.config.get('Heirloom', 'theme', fallback=DEFAULT_THEME.name)
         if name not in themes:
-            logger.warning(f'Theme "{name}" is not available, using the default theme (see "legendary themes").')
+            logger.warning(f'Theme "{name}" is not available, using the default theme (see "heirloom themes").')
         self.theme = themes.get(name, DEFAULT_THEME)
         for handler in logging.getLogger().handlers:
             handler.setFormatter(ThemedFormatter(self.theme.for_stream(handler.stream)))
@@ -110,7 +110,7 @@ class LegendaryCLI:
         name = name.strip()
         # resolve alias (if any) to real app name
         return self.core.lgd.config.get(
-            section='Legendary.aliases', option=name,
+            section='Heirloom.aliases', option=name,
             fallback=self.core.lgd.aliases.get(name.lower(), name)
         )
 
@@ -131,7 +131,7 @@ class LegendaryCLI:
             logger.info('Testing existing login data if present...')
             if self.core.login():
                 logger.info('Stored credentials are still valid, if you wish to switch to a different '
-                            'account, run "legendary auth --delete" and try again.')
+                            'account, run "heirloom auth --delete" and try again.')
                 return
         except ValueError:
             pass
@@ -196,7 +196,7 @@ class LegendaryCLI:
         auth_code = ''
         if not args.auth_code and not args.session_id and not args.ex_token:
             # only import here since pywebview import is slow
-            from legendary.utils.webview_login import (
+            from heirloom.utils.webview_login import (
                 do_webview_login,
                 webview_available,
             )
@@ -252,7 +252,7 @@ class LegendaryCLI:
             platform=args.platform, skip_ue=not args.include_ue,
             force_refresh=args.force_refresh
         )
-        # Get information for games that cannot be installed through legendary (yet), such
+        # Get information for games that cannot be installed through heirloom (yet), such
         # as games that have to be activated on and launched through Origin.
         if args.include_noasset:
             na_games, na_dlcs = self.core.get_non_asset_library_items(skip_ue=not args.include_ue)
@@ -290,13 +290,13 @@ class LegendaryCLI:
         for game in games:
             version = game.app_version(args.platform)
             print(f' {out.bullet(game.app_title.strip())} (App name: {game.app_name} | Version: {version})')
-            # Games that "require" launching through EGL/Legendary, but have to be installed and managed through
+            # Games that "require" launching through EGL/Heirloom, but have to be installed and managed through
             # a third-party application (such as Origin).
             if not version:
                 _store = game.third_party_store
                 if game.is_origin_game:
                     print(f'  - This game has to be activated, installed, and launched via Origin, use '
-                          f'"legendary launch --origin {game.app_name}" to activate and/or run the game.')
+                          f'"heirloom launch --origin {game.app_name}" to activate and/or run the game.')
                 elif _store:
                     print('  ' + out.alert(f'This game has to be installed through a third-party store ({_store}, not supported)'))
                 else:
@@ -307,8 +307,8 @@ class LegendaryCLI:
                 _type = game.partner_link_type
                 if _type == 'ubisoft':
                     print('  - This game can be activated directly on your Ubisoft account and does not require '
-                          'legendary to install/run. This game requires Ubisoft Connect to be installed. '
-                          'Use "legendary activate --uplay" and follow the instructions.')
+                          'heirloom to install/run. This game requires Ubisoft Connect to be installed. '
+                          'Use "heirloom activate --uplay" and follow the instructions.')
                 else:
                     print('  ' + out.alert(f'This app requires linking to a third-party account (name: "{_type}", not supported)'))
 
@@ -338,7 +338,7 @@ class LegendaryCLI:
                 versions[game.app_name] = self.core.get_asset(game.app_name, platform=game.platform).build_version
             except ValueError:
                 logger.warning(f'Metadata for "{game.app_name}" is missing, the game may have been removed from '
-                               f'your account or not be in legendary\'s database yet, try rerunning the command '
+                               f'your account or not be in heirloom\'s database yet, try rerunning the command '
                                f'with "--check-updates".')
 
         if args.csv or args.tsv:
@@ -362,7 +362,7 @@ class LegendaryCLI:
             dlc = self.core.get_game(game.app_name)
             if not dlc or not dlc.metadata:
                 logger.warning(f'DLC "{game.app_name}" is missing metadata for some reason. '
-                               f'Running "legendary list-games" may fix this.')
+                               f'Running "heirloom list-games" may fix this.')
                 continue
             main_app_name = dlc.metadata['mainGameItem']['releaseInfo'][0]['appId']
             installed_dlcs[main_app_name].append(game)
@@ -725,8 +725,8 @@ class LegendaryCLI:
 
         full_params = list()
         full_params.extend(params.launch_command)
-        if 'LEGENDARY_WRAPPER_EXE' in full_env:
-            full_params.append(full_env['LEGENDARY_WRAPPER_EXE'].strip())
+        if wrapper := full_env.get('HEIRLOOM_WRAPPER_EXE') or full_env.get('LEGENDARY_WRAPPER_EXE'):
+            full_params.append(wrapper.strip())
         full_params.append(str(Path(params.game_directory, params.game_executable)))
         full_params.extend(params.game_parameters)
         full_params.extend(params.user_parameters)
@@ -779,7 +779,7 @@ class LegendaryCLI:
             started = datetime.now(timezone.utc)
             game_process = subprocess.Popen(full_params, cwd=launching.working_directory, env=full_env,
                                             shell=os.name == 'nt')
-            if not args.no_wait and not self.core.lgd.config.getboolean('Legendary', 'disable_playtime_tracking',
+            if not args.no_wait and not self.core.lgd.config.getboolean('Heirloom', 'disable_playtime_tracking',
                                                                          fallback=False):
                 self._track_playtime(app_name, game_process, started)
 
@@ -830,11 +830,11 @@ class LegendaryCLI:
                                     args.pretty_json)
 
         if not summary:
-            print('No playtime recorded yet. Playtime is recorded for games started with "legendary launch".')
+            print('No playtime recorded yet. Playtime is recorded for games started with "heirloom launch".')
             return
 
         out = self.out
-        print('\nPlaytime recorded by "legendary launch":')
+        print('\nPlaytime recorded by "heirloom launch":')
         for s in summary:
             print(f' {out.bullet(s["title"])} ({s["app_name"]}) | {format_duration(s["total_seconds"])} | '
                   f'{s["sessions"]} session(s) | last played {s["last_played"].astimezone():%Y-%m-%d %H:%M}')
@@ -849,9 +849,9 @@ class LegendaryCLI:
         themes, errors = self.available_themes()
         if args.action == 'use':
             if args.theme_name not in themes:
-                logger.error(f'No theme named "{args.theme_name}" (see "legendary themes").')
+                logger.error(f'No theme named "{args.theme_name}" (see "heirloom themes").')
                 exit(1)
-            self.core.lgd.config.set('Legendary', 'theme', args.theme_name)
+            self.core.lgd.config.set('Heirloom', 'theme', args.theme_name)
             logger.info(f'Now using the "{themes[args.theme_name].common_name}" theme.')
             return
 
@@ -876,7 +876,7 @@ class LegendaryCLI:
                 exit(1)
             self.plugins.set_enabled(args.plugin_name, args.action == 'enable')
             if args.action == 'enable':
-                logger.info(f'Enabled plugin "{args.plugin_name}". Plugins run inside legendary with access to your '
+                logger.info(f'Enabled plugin "{args.plugin_name}". Plugins run inside heirloom with access to your '
                             f'Epic account and files, only enable ones you trust.')
             else:
                 logger.info(f'Disabled plugin "{args.plugin_name}".')
@@ -887,7 +887,7 @@ class LegendaryCLI:
         print(f'Plugins folder: {self.plugins.folder}')
         if not available and not self.plugins.errors:
             print('No plugins installed. Put each plugin in its own folder there, then enable it with '
-                  '"legendary plugins enable <name>".')
+                  '"heirloom plugins enable <name>".')
             return
 
         for name, (_, manifest) in available.items():
@@ -905,7 +905,7 @@ class LegendaryCLI:
     def _launch_third_party(self, args):
         game = self.core.get_game(app_name=args.app_name)
         if not game:
-            logger.error(f'Unknown game "{args.app_name}", run "legendary list-games --third-party" '
+            logger.error(f'Unknown game "{args.app_name}", run "heirloom list-games --third-party" '
                          f'to fetch data for Origin titles before using this command.')
             return
 
@@ -1002,7 +1002,7 @@ class LegendaryCLI:
 
     def install_game(self, args):
         if not self.core.lgd.lock_installed():
-            logger.fatal('Failed to acquire installed data lock, only one instance of Legendary may '
+            logger.fatal('Failed to acquire installed data lock, only one instance of Heirloom may '
                          'install/import/move applications at a time.')
             return
 
@@ -1045,18 +1045,18 @@ class LegendaryCLI:
         if store := game.third_party_store:
             logger.error(f'The selected title has to be installed via a third-party store: {store}')
             if game.is_origin_game:
-                logger.info(f'For Origin games use "legendary launch --origin {args.app_name}" to '
+                logger.info(f'For Origin games use "heirloom launch --origin {args.app_name}" to '
                             f'activate and/or run the game.')
             exit(0)
 
         if args.platform not in game.asset_infos:
             if not args.no_install:
-                if self.core.lgd.config.getboolean('Legendary', 'install_platform_fallback', fallback=True):
+                if self.core.lgd.config.getboolean('Heirloom', 'install_platform_fallback', fallback=True):
                     logger.warning(f'App has no asset for platform "{args.platform}", falling back to "Windows".')
                     args.platform = 'Windows'
                 else:
                     logger.error(f'No app asset found for platform "{args.platform}", run '
-                                 f'"legendary info --platform {args.platform}" and make '
+                                 f'"heirloom info --platform {args.platform}" and make '
                                  f'sure the app is available for the specified platform.')
                     exit(1)
             else:
@@ -1296,7 +1296,7 @@ class LegendaryCLI:
                     #  args does not have the required attributes for sync_saves in here,
                     #  not sure how to solve that elegantly.
                     logger.info(f'This game supports cloud saves, syncing is handled by the "sync-saves" command. '
-                                f'To download saves for this game run "legendary sync-saves {args.app_name}"')
+                                f'To download saves for this game run "heirloom sync-saves {args.app_name}"')
 
                 # show tip again after installation finishes so users hopefully actually see it
                 if tip_url := self.core.get_game_tip(igame.app_name):
@@ -1350,7 +1350,7 @@ class LegendaryCLI:
 
     def uninstall_game(self, args):
         if not self.core.lgd.lock_installed():
-            logger.fatal('Failed to acquire installed data lock, only one instance of Legendary may '
+            logger.fatal('Failed to acquire installed data lock, only one instance of Heirloom may '
                          'install/import/move applications at a time.')
             return
 
@@ -1410,7 +1410,7 @@ class LegendaryCLI:
         if not Path(igame.install_path).exists():
             logger.error(f'Install path "{igame.install_path}" does not exist, make sure all necessary mounts '
                          f'are available. If you previously deleted the game folder without uninstalling, run '
-                         f'"legendary uninstall -y {igame.app_name}" and reinstall from scratch.')
+                         f'"heirloom uninstall -y {igame.app_name}" and reinstall from scratch.')
             return
 
         manifest_data, _ = self.core.get_installed_manifest(args.app_name)
@@ -1426,7 +1426,7 @@ class LegendaryCLI:
                 game = self.core.get_game(args.app_name, platform=igame.platform)
                 manifest_data, _, _, manifest_secrets = self.core.get_cdn_manifest(game, igame.platform)
             else:
-                logger.critical(f'Manifest appears to be missing! To repair, run "legendary repair '
+                logger.critical(f'Manifest appears to be missing! To repair, run "heirloom repair '
                                 f'{args.app_name} --repair-and-update", this will however redownload all files '
                                 f'that do not match the latest manifest in their entirety.')
                 return
@@ -1504,11 +1504,11 @@ class LegendaryCLI:
         else:
             logger.error(f'Verification failed, {len(failed)} file(s) corrupted, {len(missing)} file(s) are missing.')
             if print_command:
-                logger.info(f'Run "legendary repair {args.app_name}" to repair your game installation.')
+                logger.info(f'Run "heirloom repair {args.app_name}" to repair your game installation.')
 
     def import_game(self, args):
         if not self.core.lgd.lock_installed():
-            logger.fatal('Failed to acquire installed data lock, only one instance of Legendary may '
+            logger.fatal('Failed to acquire installed data lock, only one instance of Heirloom may '
                          'install/import/move applications at a time.')
             return
 
@@ -1583,8 +1583,8 @@ class LegendaryCLI:
         self.core.install_game(igame)
         if igame.needs_verification:
             logger.info(f'NOTE: The {"DLC" if game.is_dlc else "Game"} installation will have to be '
-                        f'verified before it can be updated with legendary.')
-            logger.info(f'Run "legendary repair {args.app_name}" to do so.')
+                        f'verified before it can be updated with heirloom.')
+            logger.info(f'Run "heirloom repair {args.app_name}" to do so.')
         else:
             logger.info(f'Installation had Epic Games Launcher metadata for version "{igame.version}", '
                         f'verification will not be required.')
@@ -1608,14 +1608,14 @@ class LegendaryCLI:
 
     def egs_sync(self, args):
         if not self.core.lgd.lock_installed():
-            logger.fatal('Failed to acquire installed data lock, only one instance of Legendary may '
+            logger.fatal('Failed to acquire installed data lock, only one instance of Heirloom may '
                          'install/import/move applications at a time.')
             return
 
         if args.unlink:
             logger.info('Unlinking and resetting EGS and LGD sync...')
-            self.core.lgd.config.remove_option('Legendary', 'egl_programdata')
-            self.core.lgd.config.remove_option('Legendary', 'egl_sync')
+            self.core.lgd.config.remove_option('Heirloom', 'egl_programdata')
+            self.core.lgd.config.remove_option('Heirloom', 'egl_sync')
             # remove EGL GUIDs from all games, DO NOT remove .egstore folders because that would fuck things up.
             for igame in self.core.get_installed_list():
                 if not igame.egl_guid:
@@ -1623,16 +1623,16 @@ class LegendaryCLI:
                 igame.egl_guid = ''
                 self.core.install_game(igame)
             # todo track which games were imported, remove those from LGD and exported ones from EGL
-            logger.info('NOTE: All games are still available in Legendary and EGL, but future changes '
+            logger.info('NOTE: All games are still available in Heirloom and EGL, but future changes '
                         'will not be synced. This may cause issues when trying to update/uninstall games.')
             return
         elif args.disable_sync:
             logger.info('Disabling EGS/LGD sync...')
-            self.core.lgd.config.remove_option('Legendary', 'egl_sync')
+            self.core.lgd.config.remove_option('Heirloom', 'egl_sync')
             return
 
         if not self.core.lgd.assets:
-            logger.error('Legendary is missing game metadata, please login (if not already) and use the '
+            logger.error('Heirloom is missing game metadata, please login (if not already) and use the '
                          '"status" command to fetch necessary information to set-up syncing.')
             return
 
@@ -1645,7 +1645,7 @@ class LegendaryCLI:
                 logger.fatal(f'"{args.egl_installations}" does not exist.')
                 exit(1)
             self.core.egl.installations_path = args.egl_installations
-            self.core.lgd.config.set('Legendary', 'egl_installations', args.egl_installations)
+            self.core.lgd.config.set('Heirloom', 'egl_installations', args.egl_installations)
 
         if self.core.egl.installations_path:
             logger.info(f'Using the new Epic Games Launcher\'s install list "{self.core.egl.installations_path}"')
@@ -1684,7 +1684,7 @@ class LegendaryCLI:
                 if not any(egl_path.iterdir()):
                     logger.warning('Folder is empty, this may be fine if nothing has been installed yet.')
                 self.core.egl.programdata_path = str(egl_path)
-                self.core.lgd.config.set('Legendary', 'egl_programdata', str(egl_path))
+                self.core.lgd.config.set('Heirloom', 'egl_programdata', str(egl_path))
             elif args.egl_wine_prefix:
                 egl_data_path = Path(args.egl_wine_prefix, 'drive_c/ProgramData/Epic/EpicGamesLauncher/Data')
                 egl_path = egl_data_path / 'Manifests'
@@ -1698,13 +1698,13 @@ class LegendaryCLI:
                 if not any(egl_path.iterdir()):
                     logger.warning('Folder is empty, this may be fine if nothing has been installed yet.')
                 self.core.egl.programdata_path = str(egl_path)
-                self.core.lgd.config.set('Legendary', 'egl_programdata', str(egl_path))
+                self.core.lgd.config.set('Heirloom', 'egl_programdata', str(egl_path))
             else:
                 if not Path(args.egl_manifest_path).exists():
                     logger.fatal('Path specified via --egl-manifest-path does not exist')
                     exit(1)
                 self.core.egl.programdata_path = args.egl_manifest_path
-                self.core.lgd.config.set('Legendary', 'egl_programdata', args.egl_manifest_path)
+                self.core.lgd.config.set('Heirloom', 'egl_programdata', args.egl_manifest_path)
 
         logger.debug(f'Using EGL ProgramData path "{self.core.egl.programdata_path}"...')
         logger.info('Reading EGL game manifests...')
@@ -1713,11 +1713,11 @@ class LegendaryCLI:
             print('\nChecking for importable games...')
             importable = self.core.egl_get_importable()
             if importable:
-                print('The following games are importable (EGL -> Legendary):')
+                print('The following games are importable (EGL -> Heirloom):')
                 for egl_game in importable:
                     print(' *', egl_game.app_name, '-', egl_game.display_name)
 
-                print('\nNote: Only games that are also in Legendary\'s database are listed, '
+                print('\nNote: Only games that are also in Heirloom\'s database are listed, '
                       'if anything is missing run "list-games" first to update it.')
 
                 if args.yes or get_boolean_choice('Do you want to import the games from EGL?'):
@@ -1731,7 +1731,7 @@ class LegendaryCLI:
         if new_launcher:
             print('\nExporting games to the new Epic Games Launcher and automatic sync with it are not supported '
                   'yet. Run this command again to import games you install there later, games that are already '
-                  'in Legendary are left as they are.')
+                  'in Heirloom are left as they are.')
             if args.migrate:
                 logger.info('Unlinking imported games, the Epic Games Launcher keeps listing them.')
                 for igame in self.core.get_installed_list():
@@ -1744,7 +1744,7 @@ class LegendaryCLI:
             print('\nChecking for exportable games...')
             exportable = self.core.egl_get_exportable()
             if exportable:
-                print('The following games are exportable (Legendary -> EGL)')
+                print('The following games are exportable (Heirloom -> EGL)')
                 for lgd_game in exportable:
                     print(' *', lgd_game.app_name, '-', lgd_game.title)
 
@@ -1761,12 +1761,12 @@ class LegendaryCLI:
                 args.enable_sync = args.yes or get_boolean_choice('Enable automatic synchronization?')
                 if not args.enable_sync:  # if user chooses no, still run the sync once
                     self.core.egl_sync()
-            self.core.lgd.config.set('Legendary', 'egl_sync', str(args.enable_sync))
+            self.core.lgd.config.set('Heirloom', 'egl_sync', str(args.enable_sync))
         elif args.migrate:
             # migration also disables sync
             logger.info('Disabling automatic sync (if enabled) and removing EGL link to finish migration...')
-            self.core.lgd.config.remove_option('Legendary', 'egl_programdata')
-            self.core.lgd.config.remove_option('Legendary', 'egl_sync')
+            self.core.lgd.config.remove_option('Heirloom', 'egl_programdata')
+            self.core.lgd.config.remove_option('Heirloom', 'egl_sync')
 
             for igame in self.core.get_installed_list():
                 if not igame.egl_guid:
@@ -1775,7 +1775,7 @@ class LegendaryCLI:
                 igame.egl_guid = ''
                 self.core.install_game(igame)
 
-            logger.info('Migration complete. Your games will now be exclusively managed by Legendary.')
+            logger.info('Migration complete. Your games will now be exclusively managed by Heirloom.')
         else:
             self.core.egl_sync()
 
@@ -1813,7 +1813,7 @@ class LegendaryCLI:
         print(f'EGL Sync enabled: {self.core.egl_sync_enabled}')
         print(f'Config directory: {self.core.lgd.path}')
         print(f'Platform (System): {platform()} ({os.name})')
-        print(f'\nLegendary version: {__version__} - "{__codename__}"')
+        print(f'\nHeirloom version: {__version__} - "{__codename__}"')
         print(f'Update available: {"yes" if self.core.update_available else "no"}')
         if self.core.update_available:
             if update_info := self.core.get_update_info():
@@ -2167,24 +2167,24 @@ class LegendaryCLI:
             if not game:
                 logger.error(f'Invalid app name: "{app_name}"')
                 return
-            self.core.lgd.config.set('Legendary.aliases', alias, app_name)
+            self.core.lgd.config.set('Heirloom.aliases', alias, app_name)
             logger.info(f'Added alias "{alias}" to "{app_name}" (Title: "{game.app_title}")')
         elif args.action == 'rename':
             old_alias = args.app_or_alias
             new_alias = args.alias
-            app_name = self.core.lgd.config.get('Legendary.aliases', old_alias, fallback=None)
+            app_name = self.core.lgd.config.get('Heirloom.aliases', old_alias, fallback=None)
             if not app_name:
                 logger.error(f'Invalid old alias: "{app_name}"')
                 return
-            self.core.lgd.config.set('Legendary.aliases', new_alias, app_name)
-            self.core.lgd.config.remove_option('Legendary.aliases', old_alias)
+            self.core.lgd.config.set('Heirloom.aliases', new_alias, app_name)
+            self.core.lgd.config.remove_option('Heirloom.aliases', old_alias)
             logger.info(f'Renamed alias "{old_alias}" to "{new_alias}"')
         elif args.action == 'remove':
             alias = args.app_or_alias
-            if not self.core.lgd.config.has_option('Legendary.aliases', alias):
+            if not self.core.lgd.config.has_option('Heirloom.aliases', alias):
                 logger.error(f'Alias does not exist: "{args.alias}"')
                 return
-            self.core.lgd.config.remove_option('Legendary.aliases', alias)
+            self.core.lgd.config.remove_option('Heirloom.aliases', alias)
             logger.info(f'Removed alias "{alias}"')
         elif args.action == 'list':
             if args.app_or_alias:
@@ -2196,8 +2196,8 @@ class LegendaryCLI:
                     return
                 print(f'\nAliases for "{game.app_title}" ({app_name}):')
                 # Use-defined
-                if self.core.lgd.config.has_section('Legendary.aliases'):
-                    aliases = [alias for (alias, app_name) in self.core.lgd.config['Legendary.aliases'].items()
+                if self.core.lgd.config.has_section('Heirloom.aliases'):
+                    aliases = [alias for (alias, app_name) in self.core.lgd.config['Heirloom.aliases'].items()
                                if app_name == game.app_name]
                     if aliases:
                         print('- User-defined aliases:')
@@ -2215,12 +2215,12 @@ class LegendaryCLI:
                 else:
                     print('- Automatic aliases: (None)')
             else:
-                if not self.core.lgd.config.has_section('Legendary.aliases'):
+                if not self.core.lgd.config.has_section('Heirloom.aliases'):
                     logger.error('No aliases in config!')
                     return
 
                 print('User-defined aliases:')
-                for alias, app_name in self.core.lgd.config['Legendary.aliases'].items():
+                for alias, app_name in self.core.lgd.config['Heirloom.aliases'].items():
                     print(f' - {alias} => {app_name}')
 
     def cleanup(self, args):
@@ -2358,7 +2358,7 @@ class LegendaryCLI:
             for game in origin_games:
                 logger.info(f' - {game.app_title}')
 
-            logger.info('Note: Legendary does not know which of these have already been activated. '
+            logger.info('Note: Heirloom does not know which of these have already been activated. '
                         'Proceeding will result in it attempting to activate all of them.')
             logger.info('If Origin asks you to install the title rather than to activate, '
                         'it has already been activated, and the dialog can be dismissed.')
@@ -2368,7 +2368,7 @@ class LegendaryCLI:
                             'please use the launch commands listed below together with --wine/--wine-prefix to '
                             'specify the wine binary to use and the prefix where Origin is installed.')
                 for idx, game in enumerate(origin_games, start=1):
-                    logger.info(f'{idx}. legendary launch --origin {game.app_name}')
+                    logger.info(f'{idx}. heirloom launch --origin {game.app_name}')
                 return
 
             logger.info('After one title has been processed, hit enter to proceed with the next one.')
@@ -2454,7 +2454,7 @@ class LegendaryCLI:
         if args.action == 'info':
             igame = self.core.lgd.get_overlay_install_info()
             if not igame:
-                logger.info('No Legendary-managed installation found.')
+                logger.info('No Heirloom-managed installation found.')
             else:
                 logger.info(f'Installed version: {igame.version}')
                 logger.info(f'Installed path: {igame.install_path}')
@@ -2519,15 +2519,15 @@ class LegendaryCLI:
             reg_paths = query_registry_entries(prefix)
             old_path = reg_paths["overlay_path"]
             remove_registry_entries(prefix)
-            # if the install is not managed by legendary, specify the command including the path
+            # if the install is not managed by heirloom, specify the command including the path
             if self.core.is_overlay_installed():
-                logger.info('To re-enable the overlay, run: legendary eos-overlay enable')
+                logger.info('To re-enable the overlay, run: heirloom eos-overlay enable')
             else:
-                logger.info(f'To re-enable the overlay, run: legendary eos-overlay enable --path "{old_path}"')
+                logger.info(f'To re-enable the overlay, run: heirloom eos-overlay enable --path "{old_path}"')
 
         elif args.action == 'remove':
             if not self.core.is_overlay_installed():
-                logger.error('No legendary-managed overlay installation found.')
+                logger.error('No heirloom-managed overlay installation found.')
                 return
 
             if not args.yes:
@@ -2597,7 +2597,7 @@ class LegendaryCLI:
                     add_registry_entries(install_path, prefix)
                     logger.info('Done.')
                 else:
-                    logger.info('Overlay has been downloaded. Run "legendary eos-overlay enable -h" to see '
+                    logger.info('Overlay has been downloaded. Run "heirloom eos-overlay enable -h" to see '
                                 'available options for enabling the overlay by specifying a prefix, app, or bottle.')
 
     def crossover_setup(self, args):
@@ -2663,11 +2663,11 @@ class LegendaryCLI:
             logger.info(f'Using Bottle "{args.crossover_bottle}"')
             forced_selection = args.crossover_bottle
         elif not any(b.startswith('Legendary') for b in bottles) and not args.download:
-            logger.info('It is recommended to set up a bottle specifically for Legendary, see '
+            logger.info('It is recommended to set up a bottle specifically for Heirloom, see '
                         'https://legendary.gl/crossover-setup for setup instructions.')
         elif args.download:
             logger.warning('This feature is experimental, and may not work properly. This is not supported by '
-                           'CodeWeavers/CrossOver, please report issues only on the Legendary GitHub or Discord!')
+                           'CodeWeavers/CrossOver, please report issues only on the Heirloom GitHub or Discord!')
             if mac_is_crossover_running():
                 logger.error('CrossOver is still running, please quit it before proceeding.')
                 return
@@ -2809,7 +2809,7 @@ class LegendaryCLI:
 
     def move(self, args):
         if not self.core.lgd.lock_installed():
-            logger.fatal('Failed to acquire installed data lock, only one instance of Legendary may '
+            logger.fatal('Failed to acquire installed data lock, only one instance of Heirloom may '
                          'install/import/move applications at a time.')
             return
 
@@ -2832,17 +2832,17 @@ class LegendaryCLI:
             except Exception as e:
                 if isinstance(e, OSError) and e.errno == 18:
                     logger.error(f'Moving to a different drive is not supported. Move the folder manually to '
-                                 f'"{new_path}" and run "legendary move {app_name} "{args.new_path}" --skip-move"')
+                                 f'"{new_path}" and run "heirloom move {app_name} "{args.new_path}" --skip-move"')
                 elif isinstance(e, FileExistsError):
                     logger.error(f'The target path already contains a folder called "{game_folder}", '
                                  f'please remove or rename it first.')
                 else:
                     logger.error(f'Moving failed with unknown error {e!r}.')
                     logger.info(f'Try moving the folder manually to "{new_path}" and running '
-                                f'"legendary move {app_name} "{args.new_path}" --skip-move"')
+                                f'"heirloom move {app_name} "{args.new_path}" --skip-move"')
                 return
         else:
-            logger.info('Not moving, just rewriting legendary metadata...')
+            logger.info('Not moving, just rewriting heirloom metadata...')
 
         igame.install_path = new_path
         self.core.install_game(igame)
@@ -2908,7 +2908,7 @@ def main():
     if not stdout.isatty():
         stdout.reconfigure(encoding='utf-8')
 
-    parser = argparse.ArgumentParser(description=f'Legendary v{__version__} - "{__codename__}"')
+    parser = argparse.ArgumentParser(description=f'Heirloom v{__version__} - "{__codename__}"')
     parser.register('action', 'parsers', HiddenAliasSubparsersAction)
 
     # general arguments
@@ -2951,10 +2951,10 @@ def main():
     list_installed_parser = subparsers.add_parser('list-installed', help='List installed games')
     list_saves_parser = subparsers.add_parser('list-saves', help='List available cloud saves')
     move_parser = subparsers.add_parser('move', help='Move specified app name to a new location')
-    playtime_parser = subparsers.add_parser('playtime', help='Show playtime recorded by "legendary launch"')
+    playtime_parser = subparsers.add_parser('playtime', help='Show playtime recorded by "heirloom launch"')
     plugins_parser = subparsers.add_parser('plugins', help='List, enable, or disable plugins')
     themes_parser = subparsers.add_parser('themes', help='List terminal themes or switch to one')
-    status_parser = subparsers.add_parser('status', help='Show legendary status information')
+    status_parser = subparsers.add_parser('status', help='Show heirloom status information')
     sync_saves_parser = subparsers.add_parser('sync-saves', help='Sync cloud saves')
     uninstall_parser = subparsers.add_parser('uninstall', help='Uninstall (delete) a game')
     verify_parser = subparsers.add_parser('verify', help='Verify a game\'s local files',
@@ -3028,7 +3028,7 @@ def main():
                                      '0 for no limit (default: max_download_speed from the config)')
     install_parser.add_argument('--max-speed-while-playing', dest='max_speed_while_playing', action='store',
                                 metavar='<speed>', type=_speed_argument,
-                                help='Lower download speed limit while a game started by "legendary launch" is '
+                                help='Lower download speed limit while a game started by "heirloom launch" is '
                                      'running (default: max_download_speed_while_playing from the config)')
     install_parser.add_argument('--manifest', dest='override_manifest', action='store', metavar='<uri>',
                                 help='Manifest URL or path to use instead of the CDN one (e.g. for downgrading)')
@@ -3089,7 +3089,7 @@ def main():
                                 help='Comma-separated list of IPs to bind to for downloading')
 
     uninstall_parser.add_argument('--keep-files', dest='keep_files', action='store_true',
-                                  help='Keep files but remove game from Legendary database')
+                                  help='Keep files but remove game from Heirloom database')
     uninstall_parser.add_argument('--skip-uninstaller', dest='skip_uninstaller', action='store_true',
                                   help='Skip running the uninstaller')
 
@@ -3229,7 +3229,7 @@ def main():
                                  help='Path to the new Epic Games Launcher\'s installations.jsonl, if it is not '
                                       'found automatically (e.g. in a WINE prefix)')
     egl_sync_parser.add_argument('--enable-sync', dest='enable_sync', action='store_true',
-                                 help='Enable automatic EGL <-> Legendary sync')
+                                 help='Enable automatic EGL <-> Heirloom sync')
     egl_sync_parser.add_argument('--disable-sync', dest='disable_sync', action='store_true',
                                  help='Disable automatic sync and exit')
     egl_sync_parser.add_argument('--one-shot', dest='one_shot', action='store_true',
@@ -3239,7 +3239,7 @@ def main():
     egl_sync_parser.add_argument('--export-only', dest='export_only', action='store_true',
                                  help='Only export games to EGL (no import)')
     egl_sync_parser.add_argument('--migrate', dest='migrate', action='store_true',
-                                 help='Import games into legendary, then remove them from EGL '
+                                 help='Import games into heirloom, then remove them from EGL '
                                       '(implies --import-only --one-shot --unlink)')
     egl_sync_parser.add_argument('--unlink', dest='unlink', action='store_true',
                                  help='Disable sync and remove EGL metadata from installed games')
@@ -3307,7 +3307,7 @@ def main():
                            help='Specify bottle to skip interactive selection')
 
     move_parser.add_argument('--skip-move', dest='skip_move', action='store_true',
-                             help='Only change legendary database, do not move files (e.g. if already moved)')
+                             help='Only change heirloom database, do not move files (e.g. if already moved)')
 
     playtime_parser.add_argument('app_name', nargs='?', metavar='<App Name>',
                                  help='Only show this app, including its individual sessions')
@@ -3329,13 +3329,14 @@ def main():
     themes_parser.add_argument('theme_name', nargs='?', metavar='<name>', help='Theme to use')
 
     # plugins can add commands, so they are loaded before parsing
+    migrate_legendary_config()
     plugins = PluginManager(config_dir() / 'plugins')
     plugins.load(subparsers)
 
     args, extra = parser.parse_known_args()
 
     if args.version:
-        print(f'legendary version "{__version__}", codename "{__codename__}"')
+        print(f'heirloom version "{__version__}", codename "{__codename__}"')
         exit(0)
 
     if not args.subparser_name or args.full_help:
@@ -3354,18 +3355,18 @@ def main():
                 print(f'\nCommand: {choice}')
                 print(subparser.format_help())
         elif os.name == 'nt':
-            from legendary.lfs.windows_helpers import double_clicked
+            from heirloom.lfs.windows_helpers import double_clicked
             if double_clicked():
-                print('Please note that this is not the intended way to run Legendary.')
+                print('Please note that this is not the intended way to run Heirloom.')
                 print('Follow https://github.com/derrod/legendary/wiki/Setup-Instructions to set it up properly')
                 subprocess.Popen(['cmd', '/K', 'echo>nul'])
         return
 
-    cli = LegendaryCLI(override_config=args.config_file, api_timeout=args.api_timeout, plugins=plugins)
+    cli = HeirloomCLI(override_config=args.config_file, api_timeout=args.api_timeout, plugins=plugins)
     cli.use_configured_theme()
     ql = cli.setup_threaded_logging()
 
-    config_ll = cli.core.lgd.config.get('Legendary', 'log_level', fallback='info')
+    config_ll = cli.core.lgd.config.get('Heirloom', 'log_level', fallback='info')
     if config_ll == 'debug' or args.debug:
         logging.getLogger().setLevel(level=logging.DEBUG)
         # keep requests quiet
@@ -3375,7 +3376,7 @@ def main():
     if hasattr(args, 'platform'):
         if not args.platform:
             os_default = 'Mac' if sys_platform == 'darwin' else 'Windows'
-            args.platform = cli.core.lgd.config.get('Legendary', 'default_platform', fallback=os_default)
+            args.platform = cli.core.lgd.config.get('Heirloom', 'default_platform', fallback=os_default)
         elif args.platform not in ('Win32', 'Windows', 'Mac'):
             logger.warning(f'Platform "{args.platform}" may be invalid. Valid ones are: Windows, Win32, Mac.')
 
@@ -3458,13 +3459,13 @@ def main():
     # show note if update is available
     if not disable_update_message and cli.core.update_available and cli.core.update_notice_enabled():
         if update_info := cli.core.get_update_info():
-            print('\nLegendary update available!')
+            print('\nHeirloom update available!')
             print(f'- New version: {update_info["version"]} - "{update_info["name"]}"')
             print(f'- Release summary:\n{update_info["summary"]}\n- Release URL: {update_info["gh_url"]}')
             if update_info['critical']:
                 print('! This update is recommended as it fixes major issues.')
             if not is_windows_mac_or_pyi():
-                print('If you installed legendary via a package manager it may '
+                print('If you installed heirloom via a package manager it may '
                       'take some time for the update to become available.')
             elif 'downloads' in update_info:
                 dl_platform = 'windows'
@@ -3479,7 +3480,7 @@ def main():
         old_version = cli.core.lgd.get_overlay_install_info().version
         new_version = cli.core.lgd.get_cached_overlay_version()["data"]["buildVersion"]
         print(f'\nEOS Overlay update available: {new_version} (Current: {old_version}).')
-        print('Run "legendary eos-overlay update" to update to the latest version.')
+        print('Run "heirloom eos-overlay update" to update to the latest version.')
 
     cli.core.exit()
     ql.stop()

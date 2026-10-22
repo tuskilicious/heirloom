@@ -51,7 +51,7 @@ def case_insensitive_path_search(path: str) -> Path:
     """
     Attempts to find a path case-insensitively
     """
-    # Legendary's save path resolver always returns absolute paths, so this is not as horrible as it looks
+    # Heirloom's save path resolver always returns absolute paths, so this is not as horrible as it looks
     path_parts = path.replace('\\', '/').split('/')
     path_parts[0] = '/'
     # filter out empty parts

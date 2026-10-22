@@ -4,8 +4,8 @@ import logging
 
 import pytest
 
-from legendary.plugins import PluginManager, PluginManifest
-from legendary.themes import (
+from heirloom.plugins import PluginManager, PluginManifest
+from heirloom.themes import (
     BUILTIN_THEMES,
     DEFAULT_THEME,
     Theme,

@@ -4,7 +4,7 @@ import logging
 import os
 from pathlib import Path
 
-from legendary.models.egl import EGLManifest
+from heirloom.models.egl import EGLManifest
 
 logger = logging.getLogger('EGLFS')
 

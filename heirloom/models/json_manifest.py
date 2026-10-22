@@ -3,7 +3,7 @@ import json
 import struct
 from copy import deepcopy
 
-from legendary.models.manifest import (
+from heirloom.models.manifest import (
     CDL,
     FML,
     ChunkInfo,

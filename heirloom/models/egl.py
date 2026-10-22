@@ -1,7 +1,7 @@
 from copy import deepcopy
 
-from legendary.models.game import Game, InstalledGame
-from legendary.utils.cli import strtobool
+from heirloom.models.game import Game, InstalledGame
+from heirloom.utils.cli import strtobool
 
 _template = {
     'AppCategories': ['public', 'games', 'applications'],

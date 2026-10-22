@@ -1,5 +1,5 @@
 """
-Terminal themes: the colours and symbols legendary prints with.
+Terminal themes: the colours and symbols heirloom prints with.
 Built-in themes live here; more come from <config>/themes/*.json and from enabled plugins.
 """
 from __future__ import annotations
@@ -164,7 +164,7 @@ def load_themes(user_dir: Path, plugin_themes: list[tuple[str, Path]]) -> tuple[
 
 
 class ThemedFormatter(logging.Formatter):
-    """Legendary's "[logger] LEVEL: message" log lines, coloured by level"""
+    """Heirloom's "[logger] LEVEL: message" log lines, coloured by level"""
 
     def __init__(self, theme: Theme):
         super().__init__('%(message)s')

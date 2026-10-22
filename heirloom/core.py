@@ -23,36 +23,35 @@ from uuid import uuid4
 from requests import session
 from requests.exceptions import ConnectionError, HTTPError
 
-from legendary import __version__
-from legendary.api.egs import EPCAPI
-from legendary.api.lgd import LGDAPI
-from legendary.downloader.mp.manager import DLManager
-from legendary.downloader.throttle import SpeedLimits, parse_speed
-from legendary.lfs.crossover import (
+from heirloom.api.egs import EPCAPI
+from heirloom.api.lgd import LGDAPI
+from heirloom.downloader.mp.manager import DLManager
+from heirloom.downloader.throttle import SpeedLimits, parse_speed
+from heirloom.lfs.crossover import (
     mac_find_crossover_apps,
     mac_get_bottle_path,
     mac_get_crossover_version,
     mac_is_valid_bottle,
 )
-from legendary.lfs.egl import EPCLFS
-from legendary.lfs.eos import EOSOverlayApp, query_registry_entries
-from legendary.lfs.lgndry import LGDLFS
-from legendary.lfs.utils import (
+from heirloom.lfs.egl import EPCLFS
+from heirloom.lfs.eos import EOSOverlayApp, query_registry_entries
+from heirloom.lfs.lgndry import LGDLFS
+from heirloom.lfs.utils import (
     clean_filename,
     delete_filelist,
     delete_folder,
     get_dir_size,
 )
-from legendary.lfs.wine_helpers import (
+from heirloom.lfs.wine_helpers import (
     case_insensitive_path_search,
     get_shell_folders,
     read_registry,
 )
-from legendary.models.chunk import Chunk
-from legendary.models.downloading import AnalysisResult, ConditionCheckResult
-from legendary.models.egl import EGLManifest
-from legendary.models.exceptions import InvalidCredentialsError
-from legendary.models.game import (
+from heirloom.models.chunk import Chunk
+from heirloom.models.downloading import AnalysisResult, ConditionCheckResult
+from heirloom.models.egl import EGLManifest
+from heirloom.models.exceptions import InvalidCredentialsError
+from heirloom.models.game import (
     Achievements,
     Game,
     GameAsset,
@@ -62,25 +61,25 @@ from legendary.models.game import (
     SaveGameStatus,
     Sidecar,
 )
-from legendary.models.json_manifest import JSONManifest
-from legendary.models.manifest import Manifest
-from legendary.utils.egl_crypt import decrypt_epic_data
-from legendary.utils.env import get_system_locale, is_windows_mac_or_pyi
-from legendary.utils.game_workarounds import (
+from heirloom.models.json_manifest import JSONManifest
+from heirloom.models.manifest import Manifest
+from heirloom.utils.egl_crypt import decrypt_epic_data
+from heirloom.utils.env import get_system_locale, is_windows_mac_or_pyi
+from heirloom.utils.game_workarounds import (
     get_exe_override,
     is_opt_enabled,
     update_workarounds,
 )
-from legendary.utils.savegame_helper import SaveGameHelper
-from legendary.utils.selective_dl import games as sdl_games
+from heirloom.utils.savegame_helper import SaveGameHelper
+from heirloom.utils.selective_dl import games as sdl_games
 
 # ToDo: instead of true/false return values for success/failure actually raise an exception that the CLI/GUI
 #  can handle to give the user more details. (Not required yet since there's no GUI so log output is fine)
 
 
-class LegendaryCore:
+class HeirloomCore:
     """
-    LegendaryCore handles most of the lower level interaction with
+    HeirloomCore handles most of the lower level interaction with
     the downloader, lfs, and api components to make writing CLI/GUI
     code easier and cleaner and avoid duplication.
     """
@@ -95,16 +94,16 @@ class LegendaryCore:
 
         # on non-Windows load the programdata path from config
         if os.name != 'nt':
-            self.egl.programdata_path = self.lgd.config.get('Legendary', 'egl_programdata', fallback=None)
+            self.egl.programdata_path = self.lgd.config.get('Heirloom', 'egl_programdata', fallback=None)
             if self.egl.programdata_path and not Path(self.egl.programdata_path).exists():
                 self.log.error(f'Config EGL path ("{self.egl.programdata_path}") is invalid! Disabling sync...')
                 self.egl.programdata_path = None
-                self.lgd.config.remove_option('Legendary', 'egl_programdata')
-                self.lgd.config.remove_option('Legendary', 'egl_sync')
+                self.lgd.config.remove_option('Heirloom', 'egl_programdata')
+                self.lgd.config.remove_option('Heirloom', 'egl_sync')
                 self.lgd.save_config()
 
         # installations.jsonl of the new Epic Games Launcher, set when it is not auto-detected (e.g. in WINE)
-        if installations := self.lgd.config.get('Legendary', 'egl_installations', fallback=None):
+        if installations := self.lgd.config.get('Heirloom', 'egl_installations', fallback=None):
             if Path(installations).is_file():
                 self.egl.installations_path = installations
             else:
@@ -113,7 +112,7 @@ class LegendaryCore:
         self.local_timezone = datetime.now().astimezone().tzinfo
         self.language_code, self.country_code = ('en', 'US')
 
-        if locale := self.lgd.config.get('Legendary', 'locale',
+        if locale := self.lgd.config.get('Heirloom', 'locale',
                                          fallback=get_system_locale()):
             try:
                 self.language_code, self.country_code = locale.split('-' if '-' in locale else '_')
@@ -243,7 +242,7 @@ class LegendaryCore:
             try:
                 self.check_for_updates()
             except Exception as e:
-                self.log.warning(f'Checking for Legendary updates failed: {e!r}')
+                self.log.warning(f'Checking for Heirloom updates failed: {e!r}')
         else:
             self.apply_lgd_config()
 
@@ -293,26 +292,24 @@ class LegendaryCore:
             return self._login(lock, force_refresh=force_refresh)
 
     def update_check_enabled(self):
-        return not self.lgd.config.getboolean('Legendary', 'disable_update_check', fallback=False)
+        return not self.lgd.config.getboolean('Heirloom', 'disable_update_check', fallback=False)
 
     def update_notice_enabled(self):
         if self.force_show_update:
             return True
-        return not self.lgd.config.getboolean('Legendary', 'disable_update_notice',
+        return not self.lgd.config.getboolean('Heirloom', 'disable_update_notice',
                                               fallback=not is_windows_mac_or_pyi())
 
     def check_for_updates(self, force=False):
-        def version_tuple(v):
-            return tuple(map(int, (v.split('.'))))
-
         cached = self.lgd.get_cached_version()
         version_info = cached['data']
         if force or not version_info or (datetime.now().timestamp() - cached['last_update']) > 24*3600:
             version_info = self.lgdapi.get_version_information()
             self.lgd.set_cached_version(version_info)
 
-        web_version = version_info['release_info']['version']
-        self.update_available = version_tuple(web_version) > version_tuple(__version__)
+        # The version feed is upstream Legendary's, so it says nothing about Heirloom releases.
+        # Its other data (EGL settings, game workarounds) still applies.
+        self.update_available = False
         self.apply_lgd_config(version_info)
 
     def apply_lgd_config(self, version_info=None):
@@ -321,7 +318,7 @@ class LegendaryCore:
             version_info = self.lgd.get_cached_version()['data']
         # if cached data is invalid
         if not version_info:
-            self.log.debug('No cached legendary config to apply.')
+            self.log.debug('No cached heirloom config to apply.')
             return
 
         if 'egl_config' in version_info:
@@ -468,7 +465,7 @@ class LegendaryCore:
         return sdl_data
 
     def update_aliases(self, force=False):
-        _aliases_enabled = not self.lgd.config.getboolean('Legendary', 'disable_auto_aliasing', fallback=False)
+        _aliases_enabled = not self.lgd.config.getboolean('Heirloom', 'disable_auto_aliasing', fallback=False)
         if _aliases_enabled and (force or not self.lgd.aliases):
             self.lgd.generate_aliases()
 
@@ -798,7 +795,7 @@ class LegendaryCore:
                 crossover_app = self.lgd.config.get('default', 'crossover_app', fallback=None)
                 crossover_app = self.lgd.config.get(app_name, 'crossover_app', fallback=crossover_app)
                 # on Mac we use CrossOver by default if we can
-                if not crossover_app and not self.lgd.config.getboolean('Legendary', 'disable_auto_crossover',
+                if not crossover_app and not self.lgd.config.getboolean('Heirloom', 'disable_auto_crossover',
                                                                         fallback=False):
                     cx_apps = mac_find_crossover_apps()
                     cx_version, crossover_app = cx_apps[0]
@@ -1255,10 +1252,10 @@ class LegendaryCore:
             if not chunks:
                 if manifest_name:
                     self.log.fatal(f'No chunks were available, aborting. Try running '
-                                   f'"legendary clean-saves {app_name}" and try again.')
+                                   f'"heirloom clean-saves {app_name}" and try again.')
                     return
                 else:
-                    self.log.error('No chunks were available, skipping. You can run "legendary clean-saves" '
+                    self.log.error('No chunks were available, skipping. You can run "heirloom clean-saves" '
                                    'to remove this broken save from your account.')
                     continue
 
@@ -1331,7 +1328,7 @@ class LegendaryCore:
                 deletion_list.append(fname)
                 continue
             elif 0 < missing_chunks < total_chunks:
-                self.log.error('Some chunk(s) missing, optionally run "legendary download-saves" to obtain a backup '
+                self.log.error('Some chunk(s) missing, optionally run "heirloom download-saves" to obtain a backup '
                                'of the corrupted save, then re-run this command with "--delete-incomplete" to remove '
                                'it from the cloud save service.')
 
@@ -1509,8 +1506,8 @@ class LegendaryCore:
         base_urls = game.base_urls
 
         # The EGS client uses plaintext HTTP by default for the purposes of enabling simple DNS based
-        # CDN redirection to a (local) cache. In Legendary this will be a config option.
-        disable_https = disable_https or self.lgd.config.getboolean('Legendary', 'disable_https', fallback=False)
+        # CDN redirection to a (local) cache. In Heirloom this will be a config option.
+        disable_https = disable_https or self.lgd.config.getboolean('Heirloom', 'disable_https', fallback=False)
 
         if override_manifest:
             self.log.info(f'Overriding manifest with "{override_manifest}"')
@@ -1625,7 +1622,7 @@ class LegendaryCore:
         if override_base_url:
             self.log.info(f'Overriding base URL with "{override_base_url}"')
             base_url = override_base_url
-        elif preferred_cdn or (preferred_cdn := self.lgd.config.get('Legendary', 'preferred_cdn', fallback=None)):
+        elif preferred_cdn or (preferred_cdn := self.lgd.config.get('Heirloom', 'preferred_cdn', fallback=None)):
             for url in base_urls:
                 if preferred_cdn in url:
                     base_url = url
@@ -1646,7 +1643,7 @@ class LegendaryCore:
         self.log.info(f'Selected CDN: {cdn_host} ({scheme.strip(":")})')
 
         if not max_shm:
-            max_shm = self.lgd.config.getint('Legendary', 'max_memory', fallback=2048)
+            max_shm = self.lgd.config.getint('Heirloom', 'max_memory', fallback=2048)
 
         if dl_optimizations or is_opt_enabled(game.app_name, new_manifest.meta.build_version):
             self.log.info('Download order optimizations are enabled.')
@@ -1655,7 +1652,7 @@ class LegendaryCore:
             process_opt = False
 
         if not max_workers:
-            max_workers = self.lgd.config.getint('Legendary', 'max_workers', fallback=0)
+            max_workers = self.lgd.config.getint('Heirloom', 'max_workers', fallback=0)
 
         speed_limits = SpeedLimits(
             max_speed=self._speed_setting(max_speed, 'max_download_speed'),
@@ -1753,7 +1750,7 @@ class LegendaryCore:
         else:
             results.failures.add(f'Install path "{base_path}" does not exist, make sure all necessary mounts are '
                                  f'available. If you previously deleted the game folder without uninstalling, run '
-                                 f'"legendary uninstall -y {game.app_name}" first.')
+                                 f'"heirloom uninstall -y {game.app_name}" first.')
 
         # check if the game actually ships the files or just a uplay installer + packed game files
         uplay_required = False
@@ -1782,16 +1779,16 @@ class LegendaryCore:
             if os.name == 'nt':
                 results.warnings.add('This game requires installation of Uplay/Ubisoft Connect, direct '
                                      'installation via Uplay is recommended. '
-                                     'Use "legendary activate --uplay" and follow the instructions.')
+                                     'Use "heirloom activate --uplay" and follow the instructions.')
             else:
                 results.warnings.add('This game requires installation of Uplay/Ubisoft Connect, direct '
                                      'installation via Uplay running in WINE (e.g. using Lutris) is recommended. '
-                                     'Use "legendary activate --uplay" and follow the instructions.')
+                                     'Use "heirloom activate --uplay" and follow the instructions.')
 
         # Detect 2K launcher, warn about it
         if '2klauncher' in install.executable.lower():
-            results.warnings.add('This game uses the 2K Launcher which is does not work with Legendary. '
-                                 'Consult the Legendary or EpicLinux Wikis for workarounds (e.g. exe override).')
+            results.warnings.add('This game uses the 2K Launcher which is does not work with Heirloom. '
+                                 'Consult the Heirloom or EpicLinux Wikis for workarounds (e.g. exe override).')
             # suggest alternative EXEs
             alts = []
             all_files = analysis.manifest_comparison.added \
@@ -1829,16 +1826,16 @@ class LegendaryCore:
         if speed is not None:
             return speed
         try:
-            return parse_speed(self.lgd.config.get('Legendary', option, fallback='0'))
+            return parse_speed(self.lgd.config.get('Heirloom', option, fallback='0'))
         except ValueError as e:
             self.log.error(f'Ignoring "{option}" in the config: {e}')
             return 0
 
     def get_default_install_dir(self, platform='Windows'):
         if platform == 'Mac':
-            install_dir = self.lgd.config.get('Legendary', 'mac_install_dir', fallback='~/Applications')
+            install_dir = self.lgd.config.get('Heirloom', 'mac_install_dir', fallback='~/Applications')
         else:
-            install_dir = self.lgd.config.get('Legendary', 'install_dir', fallback='~/Games')
+            install_dir = self.lgd.config.get('Heirloom', 'install_dir', fallback='~/Games')
         return str(Path(install_dir).expanduser())
 
     def install_game(self, installed_game: InstalledGame) -> dict:
@@ -2106,7 +2103,7 @@ class LegendaryCore:
 
     def egl_uninstall(self, igame: InstalledGame, delete_files=True):
         if self.egl.installations_path:
-            self.log.info(f'The new Epic Games Launcher may still list "{igame.app_name}", Legendary cannot '
+            self.log.info(f'The new Epic Games Launcher may still list "{igame.app_name}", Heirloom cannot '
                           f'remove games from it.')
         else:
             try:
@@ -2132,7 +2129,7 @@ class LegendaryCore:
 
     def egl_sync(self, app_name=''):
         """
-        Sync game installs between Legendary and the Epic Games Launcher
+        Sync game installs between Heirloom and the Epic Games Launcher
         """
         if not self.lgd.lock_installed():
             self.log.warning('Could not acquire lock for EGL sync')
@@ -2154,7 +2151,7 @@ class LegendaryCore:
                     self.log.info(f'App "{egl_igame.app_name}" has been updated from EGL, syncing...')
                     return self.egl_import(egl_igame.app_name)
         else:
-            # check EGL -> Legendary sync
+            # check EGL -> Heirloom sync
             for egl_igame in self.egl.get_manifests():
                 if egl_igame.main_game_appname != egl_igame.app_name:  # skip DLC
                     continue
@@ -2183,10 +2180,10 @@ class LegendaryCore:
     @property
     def egl_sync_enabled(self):
         # Two-way sync needs writing to the launcher's install list, which only the old launcher allows.
-        # Read-only sync with the new one would overwrite games Legendary updated with Epic's older versions.
+        # Read-only sync with the new one would overwrite games Heirloom updated with Epic's older versions.
         if self.egl.installations_path:
             return False
-        return self.lgd.config.getboolean('Legendary', 'egl_sync', fallback=False)
+        return self.lgd.config.getboolean('Heirloom', 'egl_sync', fallback=False)
 
     def check_for_overlay_updates(self):
         cached = self.lgd.get_cached_overlay_version()

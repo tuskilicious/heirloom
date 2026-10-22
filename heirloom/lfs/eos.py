@@ -2,10 +2,10 @@ import logging
 import sys
 from pathlib import Path
 
-from legendary.models.game import Game
+from heirloom.models.game import Game
 
 if sys.platform == 'win32':
-    from legendary.lfs.windows_helpers import (
+    from heirloom.lfs.windows_helpers import (
         HKEY_CURRENT_USER,
         HKEY_LOCAL_MACHINE,
         TYPE_DWORD,

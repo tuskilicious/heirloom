@@ -10,9 +10,9 @@ from queue import Empty
 import requests
 from requests.adapters import DEFAULT_POOLBLOCK, HTTPAdapter
 
-from legendary.lfs.wine_helpers import case_insensitive_file_search
-from legendary.models.chunk import Chunk
-from legendary.models.downloading import (
+from heirloom.lfs.wine_helpers import case_insensitive_file_search
+from heirloom.models.chunk import Chunk
+from heirloom.models.downloading import (
     DownloaderTask,
     DownloaderTaskResult,
     TaskFlags,

@@ -12,7 +12,7 @@ _optimize_default = {
     }
 }
 
-# Some games use launchers that don't work with Legendary, these are overriden here
+# Some games use launchers that don't work with Heirloom, these are overriden here
 _exe_overrides = {
     'kinglet':  {
         'darwin': 'Base/Binaries/Win64EOS/CivilizationVI.exe',

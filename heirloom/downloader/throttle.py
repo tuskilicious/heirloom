@@ -1,4 +1,4 @@
-"""Download speed limits, including a lower one while a game started by "legendary launch" is running"""
+"""Download speed limits, including a lower one while a game started by "heirloom launch" is running"""
 from __future__ import annotations
 
 import re
@@ -28,7 +28,7 @@ def format_speed(speed: int) -> str:
 
 
 def games_running(folder: Path) -> bool:
-    """Whether a "legendary launch" is waiting for a game, which it shows by holding a lock in the folder"""
+    """Whether a "heirloom launch" is waiting for a game, which it shows by holding a lock in the folder"""
     for lock_file in folder.glob('*.lock'):
         lock = FileLock(lock_file)
         try:

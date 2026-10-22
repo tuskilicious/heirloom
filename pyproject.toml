@@ -3,7 +3,7 @@ requires = ["uv_build>=0.11.4,<0.12"]
 build-backend = "uv_build"
 
 [project]
-name = "legendary-gl"
+name = "heirloom-gl"
 version = "0.21.1"
 dependencies = [
     "requests",
@@ -34,10 +34,12 @@ webview_gtk = ["pywebview>=3.4", "PyGObject"]
 pyinstaller_build = ["pyinstaller"]
 
 [project.scripts]
-legendary = "legendary.cli:main"
+heirloom = "heirloom.cli:main"
+legendary = "heirloom.cli:main"
 
 [project.urls]
-source = "https://github.com/derrod/legendary"
+source = "https://github.com/tuskilicious/legendary"
+upstream = "https://github.com/derrod/legendary"
 
 [dependency-groups]
 dev = [
@@ -51,7 +53,7 @@ dev = [
 required-version = ">=0.11.0"
 
 [tool.uv.build-backend]
-module-name = "legendary"
+module-name = "heirloom"
 module-root = ""
 
 [tool.ruff]
@@ -67,11 +69,11 @@ quote-style = "single"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # fail on deprecated stdlib calls in our own code before they are removed
-filterwarnings = ["error::DeprecationWarning:legendary.*"]
+filterwarnings = ["error::DeprecationWarning:heirloom.*"]
 
 [tool.mypy]
 python_version = "3.10"
-files = ["legendary"]
+files = ["heirloom"]
 check_untyped_defs = true
 warn_unused_ignores = true
 warn_redundant_casts = true
@@ -84,13 +86,13 @@ ignore_missing_imports = true
 # follow inside unannotated functions. Remove a module from this list once it passes.
 [[tool.mypy.overrides]]
 module = [
-    "legendary.api.egs",
-    "legendary.cli",
-    "legendary.core",
-    "legendary.downloader.mp.workers",
-    "legendary.models.chunk",
-    "legendary.models.egl",
-    "legendary.models.manifest",
-    "legendary.utils.webview_login",
+    "heirloom.api.egs",
+    "heirloom.cli",
+    "heirloom.core",
+    "heirloom.downloader.mp.workers",
+    "heirloom.models.chunk",
+    "heirloom.models.egl",
+    "heirloom.models.manifest",
+    "heirloom.utils.webview_login",
 ]
 check_untyped_defs = false

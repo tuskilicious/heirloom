@@ -4,8 +4,8 @@ from textwrap import dedent
 
 import pytest
 
-from legendary.models.game import InstalledGame
-from legendary.plugins import (
+from heirloom.models.game import InstalledGame
+from heirloom.plugins import (
     GameExited,
     GameInstalled,
     GameUpdated,
@@ -90,7 +90,7 @@ def test_loads_only_enabled_plugins_and_isolates_failures(tmp_path, subparsers):
 
     event = GameExited('Fish', session=[])
     manager.emit(event)
-    calls = __import__('legendary_plugin_good').CALLS
+    calls = __import__('heirloom_plugin_good').CALLS
     assert calls == [event], 'a failing handler does not stop the next one'
     assert event.session == [], 'a plugin whose setup() failed gets no events'
 
@@ -118,7 +118,7 @@ def test_multi_file_plugin_and_enabled_state(tmp_path, subparsers):
     manager.set_enabled('multi', True)
     manager.load(sub)
     manager.emit(GameInstalled('Fish', game=None))
-    assert __import__('legendary_plugin_multi.helper', fromlist=['SEEN']).SEEN == ['Fish']
+    assert __import__('heirloom_plugin_multi.helper', fromlist=['SEEN']).SEEN == ['Fish']
 
 
 def test_unreadable_enabled_list_enables_nothing(tmp_path):

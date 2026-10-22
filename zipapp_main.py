@@ -8,9 +8,9 @@ import zlib
 
 cache_path = os.environ.get('XDG_CACHE_HOME')
 if cache_path:
-    cache_path = os.path.join(cache_path, 'legendary')
+    cache_path = os.path.join(cache_path, 'heirloom')
 else:
-    cache_path = os.path.expanduser('~/.cache/legendary')
+    cache_path = os.path.expanduser('~/.cache/heirloom')
 
 vendored_packages_path = os.path.join(cache_path, 'vendored')
 vendored_packages_lock = os.path.join(cache_path, 'vendored.lock')
@@ -38,5 +38,5 @@ if zipfile.is_zipfile(os.path.dirname(__file__)):
     sys.path.insert(0, vendored_packages_path)
 
 # Run CLI
-import legendary.cli
-legendary.cli.main()
+import heirloom.cli
+heirloom.cli.main()

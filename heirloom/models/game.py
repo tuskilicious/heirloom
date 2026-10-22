@@ -281,11 +281,11 @@ class SaveGameFile:
 @dataclass
 class PlaytimeSession:
     """
-    One play session recorded by "legendary launch"
+    One play session recorded by "heirloom launch"
     """
     start: datetime
     end: datetime
-    # None when legendary stopped watching before the game exited
+    # None when heirloom stopped watching before the game exited
     exit_code: Optional[int] = None
 
     @property

@@ -7,8 +7,8 @@ import requests
 import requests.adapters
 from requests.auth import HTTPBasicAuth
 
-from legendary.models.exceptions import InvalidCredentialsError
-from legendary.models.gql import (
+from heirloom.models.exceptions import InvalidCredentialsError
+from heirloom.models.gql import (
     egl_game_achievements_query,
     egl_game_achievements_user_query,
     uplay_claim_query,

@@ -1,20 +1,17 @@
-# Legendary
+# Heirloom
 ## A free and open-source Epic Games Launcher alternative
-![Logo](https://repository-images.githubusercontent.com/249938026/80b18f80-96c7-11ea-9183-0a8c96e7cada)
 
-[![Discord](https://discordapp.com/api/guilds/695233346627698689/widget.png?style=shield)](https://legendary.gl/discord) [![Twitter Follow](https://img.shields.io/twitter/follow/legendary_gl?label=Follow%20us%20for%20updates%21&style=social)](https://twitter.com/legendary_gl)
+Heirloom is an open-source game launcher that can download and install games from the Epic Games platform on Linux, macOS, and Windows.
+Like Legendary, its name is a tongue-in-cheek play on tiers of [item rarity in many MMORPGs](https://wow.gamepedia.com/Quality).
 
-Legendary is an open-source game launcher that can download and install games from the Epic Games platform on Linux, macOS, and Windows.
-Its name as a tongue-in-cheek play on tiers of [item rarity in many MMORPGs](https://wow.gamepedia.com/Quality).
+Heirloom is a fork of [Legendary](https://github.com/derrod/legendary) by derrod and its contributors, under the same GPL-3.0 license.
+It adds playtime tracking, plugins, terminal themes, download speed limits, and support for the new Epic Games Launcher.
+If you find it useful, consider [supporting Legendary's author](https://ko-fi.com/derrod), whose work it is built on.
 
-Please read the the [config file](#config-file) and [cli usage](#usage) sections before creating an issue to avoid invalid reports.
+Please read the [config file](#config-file) and [cli usage](#usage) sections before creating an issue to avoid invalid reports.
+Report problems with Heirloom [on its GitHub](https://github.com/tuskilicious/legendary/issues), not to the Legendary project.
 
-If you run into any issues [ask for help on our Discord](https://legendary.gl/discord) or [create an issue on GitHub](https://github.com/derrod/legendary/issues/new/choose) so we can fix it!
-
-Finally, if you wish to support the project, please consider [buying me a coffee on Ko-Fi](https://ko-fi.com/derrod).
-Alternatively, if you've been considering picking up a copy of CrossOver you can use my [affiliate link](https://www.codeweavers.com/?ad=892) and discount code `LEGENDARY15` in their store.
-
-**Note:** Legendary is currently a CLI (command-line interface) application without a graphical user interface,
+**Note:** Heirloom is currently a CLI (command-line interface) application without a graphical user interface,
 it has to be run from a terminal (e.g. PowerShell)
 
 **Features:**
@@ -45,79 +42,40 @@ it has to be run from a terminal (e.g. PowerShell)
 
 ## How to run/install
 
-### Package Manager (Linux)
+Heirloom is not on PyPI or in Linux package managers yet, and has no prebuilt binaries yet: install it from this repository.
 
-Several distros already have packages available, check out the [Available Linux Packages](https://github.com/derrod/legendary/wiki/Available-Linux-Packages) wiki page for details.
-
-Currently this includes
-[Arch](https://github.com/derrod/legendary/wiki/Available-Linux-Packages#arch-aur),
-[Fedora](https://github.com/derrod/legendary/wiki/Available-Linux-Packages#fedora),
-[openSUSE](https://github.com/derrod/legendary/wiki/Available-Linux-Packages#opensuse), and
-[Gentoo](https://github.com/derrod/legendary/wiki/Available-Linux-Packages#gentoo)
-but more will be available in the future.
-
-Note that since packages are maintained by third parties it may take a bit for them to be updated to the latest version.
-If you always want to have the latest features and fixes available then using the PyPI distribution is recommended.
-
-### Prebuilt Standalone Binary (Windows, macOS, and Linux)
-
-Download the `legendary` or `legendary.exe` binary from [the latest release](https://github.com/derrod/legendary/releases/latest)
-and move it to somewhere in your `$PATH`/`%PATH%`. Don't forget to `chmod +x` it on Linux/macOS.
-
-The Windows .exe and Linux/macOS executable were created with PyInstaller and will run standalone even without python being installed.
-Note that on Linux glibc >= 2.25 is required, so older distributions such as Ubuntu 16.04 or Debian stretch will not work.
-
-### Python Package (any)
-
-#### Prerequisites
-
-To prevent problems with permissions during installation, please upgrade your `pip` by running `python -m pip install -U pip --user`. 
-
-> **Tip:** You may need to replace `python` in the above command with `python3` on Linux/macOS, or `py -3` on Windows.
-
-#### Installation from PyPI (recommended)
-
-Legendary is available on [PyPI](https://pypi.org/project/legendary-gl/), to install simply run:
-
-Note: `uv pip` may be used as a substitute to `pip` in the below commands
+### With pip
 
 ```bash
-pip install legendary-gl
+pip install "heirloom-gl @ git+https://github.com/tuskilicious/legendary"
 ```
 
-Optionally if logging in via an embedded web view is desired also run
+Optionally, for logging in through an embedded web view:
 ```bash
-pip install legendary-gl[webview]
+pip install "heirloom-gl[webview] @ git+https://github.com/tuskilicious/legendary"
 ```
-On Linux this may also require installing a supported web engine and its python bindings.  
-Ubunutu example:
-```bash
-sudo apt install python3-gi-cairo
-pip install legendary-gl[webview]
-```
+On Linux this may also require a supported web engine and its Python bindings (on Ubuntu: `sudo apt install python3-gi-cairo`).
+Using pywebview's Qt engine may not work correctly, and pywebview is currently unsupported on macOS.
 
-Alternatively `pip install legendary-gl[webview_gtk]` or `pip install pywebview[gtk]` will work
-but may require manually installing dependencies needed to build `PyGObject`.
-
-**Note:** Using pywebview's Qt engine may not work correctly. Using pywebview is currently unsupported on macOS.
-
-#### Manually from the repo
-
-- Install uv
-- Clone the git repository and cd into it
-- Run `uv sync --no-editable`
-
-#### Ubuntu 20.04 example
+### With uv, from a clone
 
 `uv` has various methods of installation. See <https://docs.astral.sh/uv/getting-started/installation/> and choose one.
 
 ````bash
-git clone https://github.com/derrod/legendary.git
-cd legendary
+git clone https://github.com/tuskilicious/legendary.git heirloom
+cd heirloom
 uv sync --no-editable
 ````
 
-If the `legendary` executable is not available after installation, you may need to configure your `PATH` correctly. You can do this by running the command: 
+### Coming from Legendary
+
+- The command is now `heirloom`; `legendary` still works as an alias.
+- On first run Heirloom copies your Legendary config folder (`~/.config/legendary`) to `~/.config/heirloom`, including your login and installed games.
+  Legendary's own folder is left untouched. If you keep using both, you may have to log in again in one of them, since Epic replaces the login token on use.
+- The `[Legendary]` config sections become `[Heirloom]` automatically.
+- `HEIRLOOM_CONFIG_PATH` sets the config folder; `LEGENDARY_CONFIG_PATH` still works too.
+
+If the `heirloom` executable is not available after installation, you may need to configure your `PATH` correctly. You can do this by running the command: 
 
 ```bash
 echo 'export PATH=$PATH:~/.local/bin' >> ~/.profile && source ~/.profile
@@ -129,7 +87,7 @@ echo 'export PATH=$PATH:~/.local/bin' >> ~/.profile && source ~/.profile
 - cd into the repository
 - Run `uv sync`
 
-This installs `legendary` in "editable" mode - any changes to the source code will take effect next time the `legendary` executable runs.
+This installs `heirloom` in "editable" mode - any changes to the source code will take effect next time the `heirloom` executable runs.
 
 Before opening a pull request, run the same checks as CI:
 
@@ -141,11 +99,11 @@ uv run pytest
 
 ## Quickstart
 
-**Tip:** When using PowerShell with the standalone executable, you may need to replace `legendary` with `.\legendary` in the commands below.
+**Tip:** When using PowerShell with the standalone executable, you may need to replace `heirloom` with `.\heirloom` in the commands below.
 
 To log in:
 ````
-legendary auth
+heirloom auth
 ````
 When using the prebuilt Windows executables of version 0.20.14 or higher this should open a new window with the Epic Login.
 
@@ -157,73 +115,73 @@ Note that this will log you out of the Epic Launcher.
 
 Listing your games
 ````
-legendary list
+heirloom list
 ````
 This will fetch a list of games available on your account, the first time may take a while depending on how many games you have.
 
 Installing a game
 ````
-legendary install Anemone
+heirloom install Anemone
 ````
-**Note:** the name used here is generally the game's "app name" as seen in the games list rather than its title, but as of 0.20.12 legendary will try to match game names or abbreviations thereof as well. In this case `legendary install world of goo` or `legendary install wog` would also work!
+**Note:** the name used here is generally the game's "app name" as seen in the games list rather than its title, but as of 0.20.12 heirloom will try to match game names or abbreviations thereof as well. In this case `heirloom install world of goo` or `heirloom install wog` would also work!
 
-Limit the download speed, and slow it down further while you play a game started with `legendary launch`
+Limit the download speed, and slow it down further while you play a game started with `heirloom launch`
 ````
-legendary install Anemone --max-speed 20M --max-speed-while-playing 2M
+heirloom install Anemone --max-speed 20M --max-speed-while-playing 2M
 ````
 Speeds are in MiB/s by default (`20` and `20M` are the same), `K` and `G` suffixes are also accepted.
 Set `max_download_speed` and `max_download_speed_while_playing` in the config to apply them to every download.
-The lower limit kicks in within a couple of seconds of a game starting, and only for games that `legendary launch` waits for (not with `--no-wait`).
+The lower limit kicks in within a couple of seconds of a game starting, and only for games that `heirloom launch` waits for (not with `--no-wait`).
 
 List installed games and check for updates
 ````
-legendary list-installed --check-updates
+heirloom list-installed --check-updates
 ````
 
 Launch (run) a game with online authentication
 ````
-legendary launch "world of goo"
+heirloom launch "world of goo"
 ````
-**Tip:** most games will run fine offline (`--offline`), and thus won't require launching through legendary for online authentication.
-You can run `legendary launch <App Name> --offline --dry-run` to get a command line that will launch the game with all parameters that would be used by the Epic Launcher.
+**Tip:** most games will run fine offline (`--offline`), and thus won't require launching through heirloom for online authentication.
+You can run `heirloom launch <App Name> --offline --dry-run` to get a command line that will launch the game with all parameters that would be used by the Epic Launcher.
 These can then be entered into any other game launcher (e.g. Lutris/Steam) if the game requires them.
 
-`legendary launch` waits for the game to exit and records how long you played, and whether the game exited normally or crashed.
+`heirloom launch` waits for the game to exit and records how long you played, and whether the game exited normally or crashed.
 Use `--no-wait` to return immediately instead, or set `disable_playtime_tracking = true` in the config to turn this off.
 
 Show recorded playtime (add an app name to also list its individual sessions)
 ````
-legendary playtime
+heirloom playtime
 ````
 
 Importing a previously installed game
 ````
-legendary import Anemone /mnt/games/Epic/WorldOfGoo
+heirloom import Anemone /mnt/games/Epic/WorldOfGoo
 ````
-**Note:** Importing will require a full verification so Legendary can correctly update the game later.  
-**Note 2:** In order to use an alias here you may have to put it into quotes if if contains more than one word, e.g. `legendary import-game "world of goo" /mnt/games/Epic/WorldOfGoo`.
+**Note:** Importing will require a full verification so Heirloom can correctly update the game later.  
+**Note 2:** In order to use an alias here you may have to put it into quotes if if contains more than one word, e.g. `heirloom import-game "world of goo" /mnt/games/Epic/WorldOfGoo`.
 
 Sync savegames with the Epic Cloud
 ````
-legendary sync-saves
+heirloom sync-saves
 ````
 **Note:** When this command is run the first time after a supported game has been installed it will ask you to confirm or provide the path to where the savegame is located.
 
 Automatically sync all games with the Epic Games Launcher
 ````
-legendary -y egl-sync
+heirloom -y egl-sync
 ````
 **Note:** With the new Epic Games Launcher (the 2026 rewrite, whose data lives in `%LOCALAPPDATA%\com.epicgames.eglv2`), `egl-sync` can only *import*:
-it reads the launcher's `installations.jsonl` and adds games installed there that Legendary doesn't have yet; games already in Legendary are left as they are.
+it reads the launcher's `installations.jsonl` and adds games installed there that Heirloom doesn't have yet; games already in Heirloom are left as they are.
 Exporting games to it, removing games from it, and automatic sync are not supported yet, so run `egl-sync` again to import games you install there later.
 On Windows the file is found automatically once the old launcher's `ProgramData` manifests are gone; elsewhere (e.g. in a WINE prefix) pass it with `--egl-installations <path>`.
 
 ## Usage
 
 ````
-usage: legendary [-h] [-H] [-v] [-y] [-V] [-J] [-A <seconds>] <command> ...
+usage: heirloom [-h] [-H] [-v] [-y] [-V] [-J] [-A <seconds>] <command> ...
 
-Legendary v0.X.X - "Codename"
+Heirloom v0.X.X - "Codename"
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -256,10 +214,10 @@ Commands:
     list-installed      List installed games
     list-saves          List available cloud saves
     move                Move specified app name to a new location
-    playtime            Show playtime recorded by "legendary launch"
+    playtime            Show playtime recorded by "heirloom launch"
     plugins             List, enable, or disable plugins
     themes              List terminal themes or switch to one
-    status              Show legendary status information
+    status              Show heirloom status information
     sync-saves          Sync cloud saves
     uninstall           Uninstall (delete) a game
     verify              Verify a game's local files
@@ -267,7 +225,7 @@ Commands:
 Individual command help:
 
 Command: activate
-usage: legendary activate [-h] (-U | -O)
+usage: heirloom activate [-h] (-U | -O)
 
 optional arguments:
   -h, --help    show this help message and exit
@@ -278,7 +236,7 @@ optional arguments:
 
 
 Command: alias
-usage: legendary alias [-h]
+usage: heirloom alias [-h]
                        <add|rename|remove|list> [<App name/Old alias>]
                        [<New alias>]
 
@@ -294,7 +252,7 @@ optional arguments:
 
 
 Command: auth
-usage: legendary auth [-h] [--import] [--code <exchange code>]
+usage: heirloom auth [-h] [--import] [--code <exchange code>]
                       [--sid <session id>] [--delete] [--disable-webview]
 
 optional arguments:
@@ -312,7 +270,7 @@ optional arguments:
 
 
 Command: clean-saves
-usage: legendary clean-saves [-h] [--delete-incomplete] [<App Name>]
+usage: heirloom clean-saves [-h] [--delete-incomplete] [<App Name>]
 
 positional arguments:
   <App Name>           Name of the app (optional)
@@ -323,7 +281,7 @@ optional arguments:
 
 
 Command: cleanup
-usage: legendary cleanup [-h] [--keep-manifests]
+usage: heirloom cleanup [-h] [--keep-manifests]
 
 optional arguments:
   -h, --help        show this help message and exit
@@ -331,7 +289,7 @@ optional arguments:
 
 
 Command: crossover
-usage: legendary crossover [-h] [--reset] [--download] [--ignore-version]
+usage: heirloom crossover [-h] [--reset] [--download] [--ignore-version]
                            [--crossover-app <path to .app>]
                            [--crossover-bottle <bottle name>]
                            [<App Name>]
@@ -354,7 +312,7 @@ optional arguments:
 
 
 Command: download-saves
-usage: legendary download-saves [-h] [<App Name>]
+usage: heirloom download-saves [-h] [<App Name>]
 
 positional arguments:
   <App Name>  Name of the app (optional)
@@ -364,7 +322,7 @@ optional arguments:
 
 
 Command: egl-sync
-usage: legendary egl-sync [-h] [--egl-manifest-path EGL_MANIFEST_PATH]
+usage: heirloom egl-sync [-h] [--egl-manifest-path EGL_MANIFEST_PATH]
                           [--egl-wine-prefix EGL_WINE_PREFIX]
                           [--egl-installations <path>] [--enable-sync]
                           [--disable-sync] [--one-shot] [--import-only]
@@ -383,19 +341,19 @@ optional arguments:
                         Path to the new Epic Games Launcher's
                         installations.jsonl, if it is not found automatically
                         (e.g. in a WINE prefix)
-  --enable-sync         Enable automatic EGL <-> Legendary sync
+  --enable-sync         Enable automatic EGL <-> Heirloom sync
   --disable-sync        Disable automatic sync and exit
   --one-shot            Sync once, do not ask to setup automatic sync
   --import-only         Only import games from EGL (no export)
   --export-only         Only export games to EGL (no import)
-  --migrate             Import games into legendary, then remove them from EGL
+  --migrate             Import games into heirloom, then remove them from EGL
                         (implies --import-only --one-shot --unlink)
   --unlink              Disable sync and remove EGL metadata from installed
                         games
 
 
 Command: eos-overlay
-usage: legendary eos-overlay [-h] [--path PATH] [--prefix PREFIX] [--app APP]
+usage: heirloom eos-overlay [-h] [--path PATH] [--prefix PREFIX] [--app APP]
                              [--bottle BOTTLE]
                              <install|update|remove|enable|disable|info>
 
@@ -414,7 +372,7 @@ optional arguments:
 
 
 Command: import
-usage: legendary import [-h] [--disable-check] [--with-dlcs] [--skip-dlcs]
+usage: heirloom import [-h] [--disable-check] [--with-dlcs] [--skip-dlcs]
                         [--platform <Platform>]
                         <App Name> <Installation directory>
 
@@ -437,7 +395,7 @@ optional arguments:
 
 
 Command: info
-usage: legendary info [-h] [--offline] [--json] [--platform <Platform>]
+usage: heirloom info [-h] [--offline] [--json] [--platform <Platform>]
                       <App Name/Manifest URI>
 
 positional arguments:
@@ -454,7 +412,7 @@ optional arguments:
 
 
 Command: install
-usage: legendary install <App Name> [options]
+usage: heirloom install <App Name> [options]
 
 Aliases: download, update
 
@@ -476,7 +434,7 @@ optional arguments:
                         max_download_speed from the config)
   --max-speed-while-playing <speed>
                         Lower download speed limit while a game started by
-                        "legendary launch" is running (default:
+                        "heirloom launch" is running (default:
                         max_download_speed_while_playing from the config)
   --manifest <uri>      Manifest URL or path to use instead of the CDN one
                         (e.g. for downgrading)
@@ -533,7 +491,7 @@ optional arguments:
 
 
 Command: launch
-usage: legendary launch <App Name> [options]
+usage: heirloom launch <App Name> [options]
 
 Note: additional arguments are passed to the game
 
@@ -578,7 +536,7 @@ optional arguments:
 
 
 Command: list
-usage: legendary list [-h] [--platform <Platform>] [--include-ue] [-T] [--csv]
+usage: heirloom list [-h] [--platform <Platform>] [--include-ue] [-T] [--csv]
                       [--tsv] [--json] [--force-refresh]
 
 optional arguments:
@@ -598,7 +556,7 @@ optional arguments:
 
 
 Command: list-files
-usage: legendary list-files [-h] [--force-download] [--platform <Platform>]
+usage: heirloom list-files [-h] [--force-download] [--platform <Platform>]
                             [--manifest <uri>] [--csv] [--tsv] [--json]
                             [--hashlist] [--install-tag <tag>]
                             [<App Name>]
@@ -621,7 +579,7 @@ optional arguments:
 
 
 Command: list-installed
-usage: legendary list-installed [-h] [--check-updates] [--csv] [--tsv]
+usage: heirloom list-installed [-h] [--check-updates] [--csv] [--tsv]
                                 [--json] [--show-dirs]
 
 optional arguments:
@@ -634,7 +592,7 @@ optional arguments:
 
 
 Command: list-saves
-usage: legendary list-saves [-h] [<App Name>]
+usage: heirloom list-saves [-h] [<App Name>]
 
 positional arguments:
   <App Name>  Name of the app (optional)
@@ -644,7 +602,7 @@ optional arguments:
 
 
 Command: move
-usage: legendary move [-h] [--skip-move] <App Name> <New Base Path>
+usage: heirloom move [-h] [--skip-move] <App Name> <New Base Path>
 
 positional arguments:
   <App Name>       Name of the app
@@ -652,12 +610,12 @@ positional arguments:
 
 optional arguments:
   -h, --help       show this help message and exit
-  --skip-move      Only change legendary database, do not move files (e.g. if
+  --skip-move      Only change heirloom database, do not move files (e.g. if
                    already moved)
 
 
 Command: playtime
-usage: legendary playtime [-h] [--json] [<App Name>]
+usage: heirloom playtime [-h] [--json] [<App Name>]
 
 positional arguments:
   <App Name>  Only show this app, including its individual sessions
@@ -668,7 +626,7 @@ optional arguments:
 
 
 Command: plugins
-usage: legendary plugins [-h] [{list,enable,disable}] [<name>]
+usage: heirloom plugins [-h] [{list,enable,disable}] [<name>]
 
 positional arguments:
   {list,enable,disable}
@@ -680,7 +638,7 @@ optional arguments:
 
 
 Command: themes
-usage: legendary themes [-h] [{list,use}] [<name>]
+usage: heirloom themes [-h] [{list,use}] [<name>]
 
 positional arguments:
   {list,use}  What to do (default: list)
@@ -691,7 +649,7 @@ optional arguments:
 
 
 Command: status
-usage: legendary status [-h] [--offline] [--json]
+usage: heirloom status [-h] [--offline] [--json]
 
 optional arguments:
   -h, --help  show this help message and exit
@@ -700,7 +658,7 @@ optional arguments:
 
 
 Command: sync-saves
-usage: legendary sync-saves [-h] [--skip-upload] [--skip-download]
+usage: heirloom sync-saves [-h] [--skip-upload] [--skip-download]
                             [--force-upload] [--force-download]
                             [--save-path <path>] [--disable-filters]
                             [<App Name>]
@@ -720,18 +678,18 @@ optional arguments:
 
 
 Command: uninstall
-usage: legendary uninstall [-h] [--keep-files] <App Name>
+usage: heirloom uninstall [-h] [--keep-files] <App Name>
 
 positional arguments:
   <App Name>    Name of the app
 
 optional arguments:
   -h, --help    show this help message and exit
-  --keep-files  Keep files but remove game from Legendary database
+  --keep-files  Keep files but remove game from Heirloom database
 
 
 Command: verify
-usage: legendary verify [-h] <App Name>
+usage: heirloom verify [-h] <App Name>
 
 positional arguments:
   <App Name>  Name of the app
@@ -743,8 +701,8 @@ optional arguments:
 
 ## Plugins
 
-Plugins add features to Legendary, much like [Millennium](https://github.com/SteamClientHomebrew/Millennium) does for Steam.
-Each plugin is a folder in the `plugins` folder of the config directory (`~/.config/legendary/plugins` by default) with a `plugin.json` manifest and a Python file:
+Plugins add features to Heirloom, much like [Millennium](https://github.com/SteamClientHomebrew/Millennium) does for Steam.
+Each plugin is a folder in the `plugins` folder of the config directory (`~/.config/heirloom/plugins` by default) with a `plugin.json` manifest and a Python file:
 
 ````json
 {
@@ -757,12 +715,12 @@ Each plugin is a folder in the `plugins` folder of the config directory (`~/.con
 ````
 
 Only `name` is required (lowercase letters, digits, `-` and `_`); `backend` defaults to `main.py`.
-Plugins run inside Legendary with access to your Epic account and files, so each one stays off until you enable it:
+Plugins run inside Heirloom with access to your Epic account and files, so each one stays off until you enable it:
 
 ````
-legendary plugins
-legendary plugins enable session-log
-legendary plugins disable session-log
+heirloom plugins
+heirloom plugins enable session-log
+heirloom plugins disable session-log
 ````
 
 The backend's `setup(plugin)` function subscribes to events and can add commands:
@@ -788,22 +746,22 @@ def setup(plugin):
 
 | Event            | Sent                                                          | Fields                                                                           |
 |------------------|---------------------------------------------------------------|----------------------------------------------------------------------------------|
-| `game_launching` | right before `legendary launch` starts a game                 | `app_name`, `game`, and the editable `command`, `environment`, `working_directory` |
+| `game_launching` | right before `heirloom launch` starts a game                 | `app_name`, `game`, and the editable `command`, `environment`, `working_directory` |
 | `game_exited`    | when that game exits (not with `--no-wait`)                   | `app_name`, `session` (`start`, `end`, `duration`, `exit_code`, `result`)         |
 | `game_installed` | after a game or DLC is installed                              | `app_name`, `game`                                                               |
 | `game_updated`   | after an installed game or DLC is updated                     | `app_name`, `game`, `previous_version`                                           |
 
 A backend can import other files in its folder with relative imports (`from . import helpers`).
-A plugin that fails to load or raises in a handler is logged and skipped, it never stops Legendary; run with `-v` to see the traceback.
-Plugin commands cannot replace Legendary's own commands.
+A plugin that fails to load or raises in a handler is logged and skipped, it never stops Heirloom; run with `-v` to see the traceback.
+Plugin commands cannot replace Heirloom's own commands.
 
 
 ## Themes
 
-Themes set the colours and symbols Legendary prints with. `legendary themes` lists the available themes with a preview, and `legendary themes use <name>` switches to one.
-Legendary comes with `default`, `modern` (bright colours, Unicode symbols), `high-contrast`, and `plain` (no colours).
+Themes set the colours and symbols Heirloom prints with. `heirloom themes` lists the available themes with a preview, and `heirloom themes use <name>` switches to one.
+Heirloom comes with `default`, `modern` (bright colours, Unicode symbols), `high-contrast`, and `plain` (no colours).
 
-A theme is a JSON file. Put your own in the `themes` folder of the config directory (`~/.config/legendary/themes` by default):
+A theme is a JSON file. Put your own in the `themes` folder of the config directory (`~/.config/heirloom/themes` by default):
 
 ````json
 {
@@ -847,9 +805,9 @@ Colours are only used when printing to a terminal, and never when `NO_COLOR` is 
 
 ## Config file
 
-Legendary supports some options as well as game specific configuration in `~/.config/legendary/config.ini`:
+Heirloom supports some options as well as game specific configuration in `~/.config/heirloom/config.ini`:
 ````ini
-[Legendary]
+[Heirloom]
 log_level = debug
 ; maximum shared memory (in MiB) to use for installation
 max_memory = 2048
@@ -857,7 +815,7 @@ max_memory = 2048
 max_workers = 8
 ; download speed limit (MiB/s, or with a K/M/G suffix), 0 for none
 max_download_speed = 20
-; lower download speed limit while a game started by "legendary launch" is running
+; lower download speed limit while a game started by "heirloom launch" is running
 max_download_speed_while_playing = 2
 ; default install directory
 install_dir = /mnt/tank/games
@@ -881,7 +839,7 @@ disable_update_notice = false
 disable_auto_aliasing = false
 ; Do not wait for launched games to exit, and do not record playtime
 disable_playtime_tracking = false
-; Terminal theme (see "legendary themes")
+; Terminal theme (see "heirloom themes")
 theme = default
 
 ; macOS specific settings
@@ -892,9 +850,9 @@ install_platform_fallback = true
 ; (macOS) Disable automatic CrossOver use
 disable_auto_crossover = false
 ; Default directory for native Mac applications (.app packages)
-mac_install_dir = /User/legendary/Applications
+mac_install_dir = /User/heirloom/Applications
 
-[Legendary.aliases]
+[Heirloom.aliases]
 ; List of aliases for simpler CLI use, in the format `<alias> = <app name>`
 HITMAN 3 = Eider
 gtav = 9d2d0eb64d5c44529cece33fe2a46482
@@ -909,11 +867,11 @@ wine_executable = wine
 wine_prefix = /home/user/.wine
 ; (macOS) CrossOver options
 crossover_app = /Applications/CrossOver.app
-crossover_bottle = Legendary
+crossover_bottle = Heirloom
 
 ; default environment variables to set (overridden by game specific ones)
 [default.env]
-WINEPREFIX = /home/user/legendary/.wine
+WINEPREFIX = /home/user/heirloom/.wine
 
 ; Settings to only use for "AppName"
 [AppName]

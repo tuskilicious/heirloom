@@ -14,9 +14,9 @@ from queue import Empty
 from sys import exit
 from threading import Condition, Thread
 
-from legendary.downloader.mp.workers import DLWorker, FileWorker
-from legendary.downloader.throttle import SpeedLimits, Throttle, format_speed
-from legendary.models.downloading import (
+from heirloom.downloader.mp.workers import DLWorker, FileWorker
+from heirloom.downloader.throttle import SpeedLimits, Throttle, format_speed
+from heirloom.models.downloading import (
     AnalysisResult,
     ChunkTask,
     DownloaderTask,
@@ -28,7 +28,7 @@ from legendary.models.downloading import (
     UIUpdate,
     WriterTask,
 )
-from legendary.models.manifest import CDL, Manifest, ManifestComparison
+from heirloom.models.manifest import CDL, Manifest, ManifestComparison
 
 
 class DLManager(Process):
@@ -430,9 +430,9 @@ class DLManager(Process):
                                   (analysis_res.min_memory - self.max_shared_memory) / 1024 / 1024 + 32)
 
             if processing_optimization:
-                message = f'Try running legendary with "--enable-reordering --max-shared-memory {suggested_mib:.0f}"'
+                message = f'Try running heirloom with "--enable-reordering --max-shared-memory {suggested_mib:.0f}"'
             else:
-                message = 'Try running legendary with "--enable-reordering" to reduce memory usage, ' \
+                message = 'Try running heirloom with "--enable-reordering" to reduce memory usage, ' \
                           f'or use "--max-shared-memory {suggested_mib:.0f}" to increase the limit.'
 
             raise MemoryError(f'Current shared memory cache is smaller than required: {shared_mib} < {required_mib}. '
