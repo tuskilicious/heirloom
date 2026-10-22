@@ -1,0 +1,44 @@
+# Changelog
+
+## 0.22.0 "Keepsake" (2026-10-22)
+
+The first Heirloom release. Heirloom is a fork of [Legendary](https://github.com/derrod/legendary):
+this release has everything in Legendary 0.21.1 "Lowlife", plus the changes below.
+
+### Renamed to Heirloom
+- The command is `heirloom`; `legendary` still works as an alias. The package is `heirloom-gl`, the Python module `heirloom`.
+- On first run your Legendary config folder is copied to `~/.config/heirloom`, login and installed games included.
+  Legendary's own folder is left untouched.
+- `[Legendary]` sections in `config.ini` become `[Heirloom]` automatically.
+- `HEIRLOOM_CONFIG_PATH` sets the config folder; `LEGENDARY_CONFIG_PATH` and `LEGENDARY_WRAPPER_EXE` still work.
+- There is no update notice for now: the update feed Heirloom reads is still Legendary's, and says nothing about Heirloom releases.
+  Its Epic launcher settings and game workarounds are still applied.
+
+### New
+- **Playtime tracking.** `heirloom launch` waits for the game to exit and records how long you played and whether the game exited normally or crashed.
+  `heirloom playtime` shows the totals, `heirloom playtime <App Name>` the sessions of one game, `--json` for scripts.
+  `--no-wait` or `disable_playtime_tracking = true` turns it off.
+- **Plugins.** A plugin is a folder with a `plugin.json` manifest in the `plugins` folder of the config directory.
+  Its Python code can react to the `game_launching`, `game_exited`, `game_installed` and `game_updated` events and add its own commands.
+  `heirloom plugins` lists them, `heirloom plugins enable|disable <name>` switches them.
+  A plugin that fails is logged and skipped; it never stops Heirloom.
+- **Terminal themes.** Themes set the colours and symbols Heirloom prints with.
+  `heirloom themes` previews them, `heirloom themes use <name>` switches.
+  Built in: `default`, `modern`, `high-contrast` and `plain`. Add your own as JSON files in the `themes` folder, or ship them in a plugin.
+  `NO_COLOR` and `FORCE_COLOR` are respected.
+- **The new Epic Games Launcher.** `egl-sync` imports games installed with the 2026 launcher from its `installations.jsonl`.
+  The file is found automatically on Windows; elsewhere use `--egl-installations <path>` or `egl_installations` in the config.
+  This is import only: exporting to the new launcher isn't supported yet.
+- **Download speed limits.** `install` (and `update`/`repair`) accept `--max-speed`, plus a lower `--max-speed-while-playing` that applies while a game started by `heirloom launch` is running.
+  `max_download_speed` and `max_download_speed_while_playing` in the config apply them to every download.
+- **Encrypted login.** Your Epic login tokens are no longer saved in plain text in `user.json`:
+  - On Windows they are encrypted with DPAPI (`user.dpapi`), as the Epic Games Launcher does.
+  - On macOS and Linux they go into the system keyring.
+  - An existing login is moved there on first run.
+  - Without a usable keyring they stay in `user.json` as before.
+
+### Under the hood
+- Paths use `pathlib` throughout, and the code has type hints checked with mypy for Linux, macOS and Windows.
+- A pytest suite covers the CLI, downloads from a local test CDN, and the new features.
+- CI runs ruff, mypy, and the tests on Linux, macOS and Windows with Python 3.10 and 3.14.
+- The Windows and macOS executables are built with Python 3.14.

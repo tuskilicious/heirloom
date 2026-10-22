@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Request features that are missing (compared to EGS) or new ones for improving Legendary itself.
+about: Request features that are missing (compared to EGS) or new ones for improving Heirloom itself.
 labels: ''
 assignees: ''
 ---
