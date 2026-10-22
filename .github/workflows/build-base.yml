@@ -42,10 +42,10 @@ jobs:
       if: runner.os != 'Windows'
 
     - name: Build
-      working-directory: legendary
+      working-directory: heirloom
       run: uv run --module PyInstaller
         --onefile
-        --name legendary
+        --name heirloom
         ${{ steps.strip.outputs.option }}
         -i ../assets/windows_icon.ico
         cli.py
@@ -55,7 +55,7 @@ jobs:
     - uses: actions/upload-artifact@v7
       with:
         name: ${{ runner.os }}-${{ runner.arch }}-package
-        path: legendary/dist/*
+        path: heirloom/dist/*
 
   zipapp:
     runs-on: ${{ matrix.os }}
@@ -87,7 +87,7 @@ jobs:
 
     - name: Build
       run: python -m zipapp
-        --output dist/legendary
+        --output dist/heirloom
         --python "/usr/bin/env python3"
         --compress
         build
@@ -95,4 +95,4 @@ jobs:
     - uses: actions/upload-artifact@v7
       with:
         name: ${{ runner.os }}-${{ runner.arch }}-package
-        path: dist/legendary
+        path: dist/heirloom

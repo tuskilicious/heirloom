@@ -7,21 +7,21 @@ from pathlib import Path
 
 import pytest
 
-from legendary.lfs.lgndry import LGDLFS
-from legendary.lfs.utils import (
+from heirloom.lfs.lgndry import LGDLFS
+from heirloom.lfs.utils import (
     LockedJSONData,
     delete_filelist,
     get_dir_size,
     validate_files,
 )
-from legendary.lfs.wine_helpers import (
+from heirloom.lfs.wine_helpers import (
     case_insensitive_file_search,
     case_insensitive_path_search,
     get_shell_folders,
     read_registry,
 )
-from legendary.models.config import LGDConf
-from legendary.models.game import Game, InstalledGame, VerifyResult
+from heirloom.models.config import LGDConf
+from heirloom.models.game import Game, InstalledGame, VerifyResult
 
 
 def _sha1(data: bytes) -> str:
@@ -60,7 +60,7 @@ def test_validate_files(tmp_path):
 
 def test_validate_files_large_file_progress(tmp_path, monkeypatch):
     out = io.StringIO()
-    monkeypatch.setattr('legendary.lfs.utils.stdout', out)
+    monkeypatch.setattr('heirloom.lfs.utils.stdout', out)
     data = b'x' * 4096
     (tmp_path / 'big').write_bytes(data)
     [(result, _, _, size)] = validate_files(str(tmp_path), [('big', _sha1(data))], large_file_threshold=1)
@@ -263,7 +263,7 @@ def test_lgdlfs_backs_up_externally_modified_config(lgd_home):
     lgd.save_config()
     config = lgd_home / 'config.ini'
     os.utime(config, (1_000_000, 1_000_000))
-    lgd.config.set('Legendary', 'log_level', 'debug')
+    lgd.config.set('Heirloom', 'log_level', 'debug')
     lgd.save_config()
     assert (lgd_home / 'config.1000000.ini').exists()
     assert 'log_level' in config.read_text()

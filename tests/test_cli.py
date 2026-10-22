@@ -5,8 +5,8 @@ import sys
 
 
 def run(*args):
-    result = subprocess.run([sys.executable, '-m', 'legendary.cli', *args], capture_output=True, timeout=120)
-    # legendary writes UTF-8 to stdout whenever it is not a terminal; stderr uses the system encoding
+    result = subprocess.run([sys.executable, '-m', 'heirloom.cli', *args], capture_output=True, timeout=120)
+    # heirloom writes UTF-8 to stdout whenever it is not a terminal; stderr uses the system encoding
     result.stdout = result.stdout.decode('utf-8')
     result.stderr = result.stderr.decode(locale.getpreferredencoding(False), errors='replace')
     return result
@@ -15,7 +15,7 @@ def run(*args):
 def test_version():
     result = run('--version')
     assert result.returncode == 0
-    assert 'legendary version' in result.stdout
+    assert 'heirloom version' in result.stdout
 
 
 def test_list_installed_reads_install_db(lgd_home):

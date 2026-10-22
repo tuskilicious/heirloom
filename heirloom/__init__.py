@@ -1,5 +1,5 @@
-"""Legendary!"""
+"""Heirloom!"""
 from importlib.metadata import version
 
-__version__ = version('legendary-gl')
+__version__ = version('heirloom-gl')
 __codename__ = 'Lowlife'

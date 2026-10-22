@@ -4,16 +4,16 @@ import warnings
 
 import pytest
 
-from legendary.lfs.utils import clean_filename
-from legendary.utils.aliasing import generate_aliases
-from legendary.utils.cli import (
+from heirloom.lfs.utils import clean_filename
+from heirloom.utils.aliasing import generate_aliases
+from heirloom.utils.cli import (
     get_boolean_choice,
     get_int_choice,
     sdl_prompt,
     strtobool,
 )
-from legendary.utils.env import get_system_locale
-from legendary.utils.selective_dl import get_sdl_appname
+from heirloom.utils.env import get_system_locale
+from heirloom.utils.selective_dl import get_sdl_appname
 
 
 @pytest.mark.parametrize(('env', 'expected'), [

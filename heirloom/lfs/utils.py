@@ -13,8 +13,8 @@ from typing import Any
 
 from filelock import FileLock
 
-from legendary.lfs.wine_helpers import case_insensitive_file_search
-from legendary.models.game import VerifyResult
+from heirloom.lfs.wine_helpers import case_insensitive_file_search
+from heirloom.models.game import VerifyResult
 
 logger = logging.getLogger('LFS Utils')
 

@@ -6,9 +6,9 @@ from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryFile
 
-from legendary.lfs.utils import StrPath
-from legendary.models.chunk import Chunk
-from legendary.models.manifest import (
+from heirloom.lfs.utils import StrPath
+from heirloom.models.chunk import Chunk
+from heirloom.models.manifest import (
     ChunkInfo,
     ChunkPart,
     FileManifest,

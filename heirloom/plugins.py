@@ -1,6 +1,6 @@
 """
 Plugins, modelled on Millennium's: a folder with a plugin.json manifest and a Python backend
-whose setup(plugin) subscribes to legendary's events and adds commands.
+whose setup(plugin) subscribes to heirloom's events and adds commands.
 """
 from __future__ import annotations
 
@@ -17,10 +17,10 @@ from pathlib import Path
 from types import ModuleType
 from typing import TYPE_CHECKING, Any
 
-from legendary.models.game import InstalledGame, PlaytimeSession
+from heirloom.models.game import InstalledGame, PlaytimeSession
 
 if TYPE_CHECKING:
-    from legendary.core import LegendaryCore
+    from heirloom.core import HeirloomCore
 
 logger = logging.getLogger('Plugins')
 
@@ -40,7 +40,7 @@ class GameLaunching:
 
 @dataclass
 class GameExited:
-    """Sent when a game started by "legendary launch" exits (or legendary stops watching it)"""
+    """Sent when a game started by "heirloom launch" exits (or heirloom stops watching it)"""
     app_name: str
     session: PlaytimeSession
 
@@ -66,7 +66,7 @@ EVENTS: dict[str, type] = {
 }
 
 EventHandler = Callable[[Any], None]
-CommandHandler = Callable[[argparse.Namespace, 'LegendaryCore'], None]
+CommandHandler = Callable[[argparse.Namespace, 'HeirloomCore'], None]
 
 
 def install_event(app_name: str, game: InstalledGame,
@@ -88,7 +88,7 @@ class PluginManifest:
     version: str = ''
     backend: str = 'main.py'
     use_backend: bool = True
-    # theme files (see legendary.themes) this plugin provides while enabled
+    # theme files (see heirloom.themes) this plugin provides while enabled
     themes: tuple[str, ...] = ()
 
     @classmethod
@@ -123,7 +123,7 @@ class Plugin:
         self._handlers.append((EVENTS[event], handler))
 
     def command(self, name: str, handler: CommandHandler, help: str = '') -> argparse.ArgumentParser:
-        """Adds "legendary <name>"; add its options to the returned parser. handler(args, core) runs it."""
+        """Adds "heirloom <name>"; add its options to the returned parser. handler(args, core) runs it."""
         parser = argparse.ArgumentParser(add_help=False)
         self._commands[name] = (handler, parser, help)
         return parser
@@ -210,7 +210,7 @@ class PluginManager:
                 logger.error(f'Plugin "{plugin.manifest.name}" failed to handle {type(event).__name__}: {e!r}',
                              exc_info=logger.isEnabledFor(logging.DEBUG))
 
-    def run_command(self, args: argparse.Namespace, core: LegendaryCore) -> None:
+    def run_command(self, args: argparse.Namespace, core: HeirloomCore) -> None:
         plugin, handler = self.commands[args.subparser_name]
         try:
             handler(args, core)
@@ -221,7 +221,7 @@ class PluginManager:
 
 def _import_backend(path: Path, name: str) -> ModuleType:
     # loaded as a package rooted at the plugin folder, so the backend can import its own modules relatively
-    module_name = f'legendary_plugin_{name.replace("-", "_")}'
+    module_name = f'heirloom_plugin_{name.replace("-", "_")}'
     spec = importlib.util.spec_from_file_location(module_name, path, submodule_search_locations=[str(path.parent)])
     if spec is None or spec.loader is None:
         raise ImportError(f'cannot load {path}')

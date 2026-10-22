@@ -5,11 +5,11 @@ from platform import system
 
 import requests
 
-from legendary import __version__
+from heirloom import __version__
 
 
 class LGDAPI:
-    _user_agent = f'Legendary/{__version__} ({system()})'
+    _user_agent = f'Heirloom/{__version__} ({system()})'
     _api_host = 'api.legendary.gl'
 
     def __init__(self):

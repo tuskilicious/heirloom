@@ -3,10 +3,10 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from legendary.lfs.lgndry import LGDLFS
-from legendary.lfs.utils import LockedJSONData
-from legendary.models.game import PlaytimeSession
-from legendary.utils.cli import format_duration
+from heirloom.lfs.lgndry import LGDLFS
+from heirloom.lfs.utils import LockedJSONData
+from heirloom.models.game import PlaytimeSession
+from heirloom.utils.cli import format_duration
 
 from .test_cli import launch_fish, run
 
@@ -79,7 +79,7 @@ def test_launch_no_wait_and_config_opt_out_record_nothing(fake_game, monkeypatch
     assert result.returncode == 0, result.stderr
     assert 'Waiting for the game' not in result.stderr
 
-    (fake_game / 'config.ini').write_text('[Legendary]\ndisable_playtime_tracking = true\n')
+    (fake_game / 'config.ini').write_text('[Heirloom]\ndisable_playtime_tracking = true\n')
     launch_fish(monkeypatch, 0)
 
     assert not (fake_game / 'playtime.json').exists()

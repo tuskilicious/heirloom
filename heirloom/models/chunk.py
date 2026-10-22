@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from Cryptodome.Cipher import AES
 
-from legendary.utils.rolling_hash import get_hash
+from heirloom.utils.rolling_hash import get_hash
 
 
 class Chunk:

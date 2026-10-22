@@ -5,10 +5,10 @@ from datetime import datetime
 from Cryptodome.Cipher import AES
 from Cryptodome.Util.Padding import pad
 
-from legendary.models.chunk import Chunk
-from legendary.models.manifest import Manifest, ManifestComparison
-from legendary.utils.egl_crypt import decrypt_epic_data
-from legendary.utils.savegame_helper import SaveGameHelper
+from heirloom.models.chunk import Chunk
+from heirloom.models.manifest import Manifest, ManifestComparison
+from heirloom.utils.egl_crypt import decrypt_epic_data
+from heirloom.utils.savegame_helper import SaveGameHelper
 
 
 def _make_save(root):
