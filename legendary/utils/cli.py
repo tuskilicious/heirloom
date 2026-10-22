@@ -83,3 +83,13 @@ def strtobool(val):
     else:
         raise ValueError(f"invalid truth value {val!r}")
 
+
+def format_duration(seconds: float) -> str:
+    minutes, seconds = divmod(int(seconds), 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f'{hours}h {minutes:02d}m'
+    if minutes:
+        return f'{minutes}m {seconds:02d}s'
+    return f'{seconds}s'
+

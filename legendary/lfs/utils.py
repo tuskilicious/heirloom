@@ -1,4 +1,5 @@
 
+import copy
 import hashlib
 import json
 import logging
@@ -182,7 +183,8 @@ class LockedJSONData(FileLock):
 
         if self._file_path.exists():
             self._data = json.loads(self._file_path.read_text(encoding='utf-8'))
-            self._initial_data = self._data
+            # a copy, so that changes made to data in place are detected and saved
+            self._initial_data = copy.deepcopy(self._data)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):

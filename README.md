@@ -180,6 +180,14 @@ legendary launch "world of goo"
 You can run `legendary launch <App Name> --offline --dry-run` to get a command line that will launch the game with all parameters that would be used by the Epic Launcher.
 These can then be entered into any other game launcher (e.g. Lutris/Steam) if the game requires them.
 
+`legendary launch` waits for the game to exit and records how long you played, and whether the game exited normally or crashed.
+Use `--no-wait` to return immediately instead, or set `disable_playtime_tracking = true` in the config to turn this off.
+
+Show recorded playtime (add an app name to also list its individual sessions)
+````
+legendary playtime
+````
+
 Importing a previously installed game
 ````
 legendary import Anemone /mnt/games/Epic/WorldOfGoo
@@ -236,6 +244,7 @@ Commands:
     list-installed      List installed games
     list-saves          List available cloud saves
     move                Move specified app name to a new location
+    playtime            Show playtime recorded by "legendary launch"
     status              Show legendary status information
     sync-saves          Sync cloud saves
     uninstall           Uninstall (delete) a game
@@ -515,6 +524,8 @@ optional arguments:
                         works with some titles)
   --dry-run             Print the command line that would have been used to
                         launch the game and exit
+  --no-wait             Return right after starting the game instead of
+                        waiting for it to exit (playtime will not be recorded)
   --language <two letter language code>
                         Override language for game launch (defaults to system
                         locale)
@@ -619,6 +630,17 @@ optional arguments:
                    already moved)
 
 
+Command: playtime
+usage: legendary playtime [-h] [--json] [<App Name>]
+
+positional arguments:
+  <App Name>  Only show this app, including its individual sessions
+
+optional arguments:
+  -h, --help  show this help message and exit
+  --json      Output information in JSON format
+
+
 Command: status
 usage: legendary status [-h] [--offline] [--json]
 
@@ -698,6 +720,8 @@ disable_update_check = false
 disable_update_notice = false
 ; Disable automatically-generated aliases
 disable_auto_aliasing = false
+; Do not wait for launched games to exit, and do not record playtime
+disable_playtime_tracking = false
 
 ; macOS specific settings
 ; Default application platform to use (default: Mac on macOS, Windows elsewhere)
