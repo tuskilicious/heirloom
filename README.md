@@ -167,6 +167,14 @@ legendary install Anemone
 ````
 **Note:** the name used here is generally the game's "app name" as seen in the games list rather than its title, but as of 0.20.12 legendary will try to match game names or abbreviations thereof as well. In this case `legendary install world of goo` or `legendary install wog` would also work!
 
+Limit the download speed, and slow it down further while you play a game started with `legendary launch`
+````
+legendary install Anemone --max-speed 20M --max-speed-while-playing 2M
+````
+Speeds are in MiB/s by default (`20` and `20M` are the same), `K` and `G` suffixes are also accepted.
+Set `max_download_speed` and `max_download_speed_while_playing` in the config to apply them to every download.
+The lower limit kicks in within a couple of seconds of a game starting, and only for games that `legendary launch` waits for (not with `--no-wait`).
+
 List installed games and check for updates
 ````
 legendary list-installed --check-updates
@@ -463,6 +471,13 @@ optional arguments:
                         default: 1 GiB
   --max-workers <num>   Maximum amount of download workers, default: min(2 *
                         CPUs, 16)
+  --max-speed <speed>   Limit the download speed, e.g. "5" or "5M" for 5
+                        MiB/s, "500K" for 500 KiB/s, 0 for no limit (default:
+                        max_download_speed from the config)
+  --max-speed-while-playing <speed>
+                        Lower download speed limit while a game started by
+                        "legendary launch" is running (default:
+                        max_download_speed_while_playing from the config)
   --manifest <uri>      Manifest URL or path to use instead of the CDN one
                         (e.g. for downgrading)
   --old-manifest <uri>  Manifest URL or path to use as the old one (e.g. for
@@ -840,6 +855,10 @@ log_level = debug
 max_memory = 2048
 ; maximum number of worker processes when downloading (fewer workers will be slower, but also use less system resources)
 max_workers = 8
+; download speed limit (MiB/s, or with a K/M/G suffix), 0 for none
+max_download_speed = 20
+; lower download speed limit while a game started by "legendary launch" is running
+max_download_speed_while_playing = 2
 ; default install directory
 install_dir = /mnt/tank/games
 ; locale override, must be in RFC 1766 format (e.g. "en-US")

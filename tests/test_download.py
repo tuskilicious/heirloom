@@ -1,5 +1,8 @@
 import logging
+import subprocess
+import sys
 import threading
+import time
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from logging.handlers import QueueListener
@@ -8,10 +11,12 @@ from multiprocessing import Queue
 import pytest
 
 from legendary.downloader.mp.manager import DLManager
+from legendary.downloader.throttle import SpeedLimits
 from legendary.models.manifest import Manifest
 from legendary.utils.savegame_helper import SaveGameHelper
 
 from .test_formats import _make_save
+from .test_throttle import HOLD_LOCK
 
 
 class QuietHandler(SimpleHTTPRequestHandler):
@@ -40,7 +45,7 @@ def cdn(tmp_path):
     server.shutdown()
 
 
-def _install(base_url, manifest, dest, resume_file, **analysis_kwargs):
+def _install(base_url, manifest, dest, resume_file, speed_limits=None, **analysis_kwargs):
     log_q = Queue(-1)
     records = []
     listener = QueueListener(log_q, logging.Handler())
@@ -48,7 +53,7 @@ def _install(base_url, manifest, dest, resume_file, **analysis_kwargs):
     listener.start()
     try:
         dlm = DLManager(str(dest), base_url, {}, resume_file=str(resume_file), max_workers=2,
-                        max_shared_memory=64 * 1024 * 1024)
+                        max_shared_memory=64 * 1024 * 1024, speed_limits=speed_limits)
         analysis = dlm.run_analysis(manifest=manifest, **analysis_kwargs)
         dlm.logging_queue = log_q
         dlm.start()
@@ -87,3 +92,52 @@ def test_download_manager_fills_in_missing_files_without_resume_file(cdn, tmp_pa
     analysis, _ = _install(base_url, manifest, dest, tmp_path / 'r2', old_manifest=manifest)
     assert analysis.install_size > 0
     assert (dest / 'slots' / 'two.sav').read_bytes() == files['slots/two.sav']
+
+
+def _timed_install(cdn, dest, speed_limits=None):
+    base_url, manifest, files = cdn
+    start = time.monotonic()
+    _, log = _install(base_url, manifest, dest, dest.with_suffix('.resume'), speed_limits=speed_limits)
+    elapsed = time.monotonic() - start
+    for name, data in files.items():
+        assert (dest / name).read_bytes() == data, name
+    return elapsed, log
+
+
+THROTTLED_SECONDS = 8
+
+
+def _throttled_rate(manifest):
+    """
+    A limit at which the last chunk cannot start before THROTTLED_SECONDS, however fast the machine.
+    How long an unthrottled download takes depends on process start-up and is only compared loosely.
+    """
+    return sum(chunk.file_size for chunk in manifest.chunk_data_list.elements) // THROTTLED_SECONDS
+
+
+def test_download_speed_limit_slows_the_download(cdn, tmp_path):
+    rate = _throttled_rate(cdn[1])
+    unlimited, _ = _timed_install(cdn, tmp_path / 'fast')
+    limited, log = _timed_install(cdn, tmp_path / 'slow', SpeedLimits(max_speed=rate))
+    assert limited >= THROTTLED_SECONDS - 0.5, f'took {limited:.1f}s limited'
+    assert unlimited < limited - 2, f'took {unlimited:.1f}s unlimited vs {limited:.1f}s limited'
+    assert any('Download speed limit' in msg for msg in log)
+
+
+def test_lower_limit_applies_while_a_game_is_running(cdn, tmp_path):
+    rate = _throttled_rate(cdn[1])
+    running = tmp_path / 'running'
+    running.mkdir()
+    limits = SpeedLimits(max_speed_while_playing=rate, running_games_dir=str(running))
+
+    no_game, _ = _timed_install(cdn, tmp_path / 'idle', limits)
+    game = subprocess.Popen([sys.executable, '-c', HOLD_LOCK, str(running / 'Fish-1.lock')],
+                            stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    try:
+        assert game.stdout.readline().strip() == 'held'
+        playing, _ = _timed_install(cdn, tmp_path / 'playing', limits)
+    finally:
+        game.stdin.close()
+        game.wait(timeout=30)
+    assert playing >= THROTTLED_SECONDS - 0.5, f'took {playing:.1f}s while playing'
+    assert no_game < playing - 2, f'took {no_game:.1f}s without a game vs {playing:.1f}s while playing'

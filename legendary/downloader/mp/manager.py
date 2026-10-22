@@ -15,6 +15,7 @@ from sys import exit
 from threading import Condition, Thread
 
 from legendary.downloader.mp.workers import DLWorker, FileWorker
+from legendary.downloader.throttle import SpeedLimits, Throttle, format_speed
 from legendary.models.downloading import (
     AnalysisResult,
     ChunkTask,
@@ -33,7 +34,8 @@ from legendary.models.manifest import CDL, Manifest, ManifestComparison
 class DLManager(Process):
     def __init__(self, download_dir, base_url, manifest_secrets: dict, cache_dir=None, status_q=None,
                  max_workers=0, update_interval=1.0, dl_timeout=10, resume_file=None,
-                 max_shared_memory=1024 * 1024 * 1024, bind_ip=None, case_insensitive=True):
+                 max_shared_memory=1024 * 1024 * 1024, bind_ip=None, case_insensitive=True,
+                 speed_limits: SpeedLimits | None = None):
         super().__init__(name='DLManager')
         self.log = logging.getLogger('DLM')
         self.proc_debug = False
@@ -56,6 +58,9 @@ class DLManager(Process):
         self.dl_timeout = dl_timeout
         self.bind_ips = [] if not bind_ip else bind_ip.split(',')
         self.case_insensitive = case_insensitive
+        self.speed_limits = speed_limits or SpeedLimits()
+        # created in run_real(), inside the manager process
+        self.throttle: Throttle | None = None
 
         # Analysis stuff
         self.analysis: AnalysisResult | None = None
@@ -462,6 +467,11 @@ class DLManager(Process):
 
                 c_guid = self.chunks_to_dl.popleft()
                 chunk = self.chunk_data_list.get_chunk_by_guid(c_guid)
+                if self.throttle:
+                    delay = self.throttle.reserve(chunk.file_size)
+                    while delay > 0 and self.running:
+                        time.sleep(min(delay, 0.5))
+                        delay -= 0.5
                 self.log.debug(f'Adding {chunk.guid_num} (active: {self.active_tasks})')
                 try:
                     self.dl_worker_queue.put(DownloaderTask(url=self.base_url + '/' + chunk.path,
@@ -658,6 +668,12 @@ class DLManager(Process):
 
     def run_real(self):
         assert self.analysis is not None
+        if self.speed_limits:
+            self.throttle = Throttle(self.speed_limits)
+            limits = [f'{format_speed(self.speed_limits.max_speed)}' if self.speed_limits.max_speed else 'unlimited']
+            if self.speed_limits.max_speed_while_playing:
+                limits.append(f'{format_speed(self.speed_limits.max_speed_while_playing)} while a game is running')
+            self.log.info(f'Download speed limit: {", ".join(limits)}')
         self.shared_memory = SharedMemory(create=True, size=self.max_shared_memory)
         self.log.debug(f'Created shared memory of size: {self.shared_memory.size / 1024 / 1024:.02f} MiB')
 
@@ -776,6 +792,9 @@ class DLManager(Process):
                           f'/ {dl_unc_speed / 1024 / 1024:.02f} MiB/s (decompressed)')
             self.log.info(f' + Disk\t- {w_speed / 1024 / 1024:.02f} MiB/s (write) / '
                           f'{r_speed / 1024 / 1024:.02f} MiB/s (read)')
+            if self.throttle and self.throttle.rate:
+                self.log.info(f' + Limit\t- {format_speed(self.throttle.rate)}'
+                              f'{" (a game is running)" if self.throttle.playing else ""}')
 
             # send status update to back to instantiator (if queue exists)
             if self.status_queue:

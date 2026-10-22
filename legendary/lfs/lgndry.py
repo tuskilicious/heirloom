@@ -389,6 +389,15 @@ class LGDLFS:
         with self.config_path.open('w') as cf:
             self.config.write(cf)
 
+    @property
+    def running_games_dir(self) -> Path:
+        return self.path / 'running'
+
+    def game_running_lock(self, app_name: str) -> FileLock:
+        """Held while "legendary launch" waits for a game, so downloads can tell a game is running"""
+        self.running_games_dir.mkdir(exist_ok=True)
+        return FileLock(self.running_games_dir / f'{clean_filename(app_name)}-{os.getpid()}.lock')
+
     def add_playtime_session(self, app_name: str, session: PlaytimeSession) -> None:
         # locked, since several "legendary launch" processes may finish at the same time
         with LockedJSONData(self.path / 'playtime.json') as lock:
