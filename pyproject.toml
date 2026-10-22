@@ -31,7 +31,11 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-webview = ["pywebview>=3.4"]
+webview = [
+    "pywebview>=3.4",
+    # the Windows login window needs a pythonnet that supports the running Python (3.0.x stops at 3.13)
+    "pythonnet>=3.2; sys_platform == 'win32' and python_version >= '3.11'",
+]
 webview_gtk = ["pywebview>=3.4", "PyGObject"]
 pyinstaller_build = ["pyinstaller"]
 

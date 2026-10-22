@@ -1,5 +1,8 @@
+import importlib
 import locale
+import logging
 import sys
+import types
 import warnings
 
 import pytest
@@ -101,3 +104,25 @@ def test_sdl_appname():
 
 def test_clean_filename():
     assert clean_filename('a<b>:c"d/e\\f|g?h*') == 'abcdefgh'
+
+
+def load_webview_login(monkeypatch, webview_module):
+    monkeypatch.setitem(sys.modules, 'webview', webview_module)
+    monkeypatch.delitem(sys.modules, 'heirloom.utils.webview_login', raising=False)
+    return importlib.import_module('heirloom.utils.webview_login')
+
+
+def test_broken_login_window_is_reported_and_a_missing_one_is_not(monkeypatch, caplog):
+    def initialize():
+        raise RuntimeError('Failed to initialize Python.Runtime.dll')
+
+    broken = types.ModuleType('webview')
+    broken.logger = logging.getLogger('fake-webview')
+    broken.initialize = initialize
+    assert not load_webview_login(monkeypatch, broken).webview_available
+    assert 'login window could not start' in caplog.text and 'Python.Runtime.dll' in caplog.text
+
+    caplog.clear()
+    # None in sys.modules makes "import webview" fail as if pywebview was not installed
+    assert not load_webview_login(monkeypatch, None).webview_available
+    assert not [record for record in caplog.records if record.levelno >= logging.WARNING]

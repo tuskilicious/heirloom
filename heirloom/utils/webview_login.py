@@ -17,7 +17,12 @@ try:
     if gui and os.name == 'nt' and gui.renderer not in ('edgechromium', 'cef'):
         raise NotImplementedError(f'Renderer {gui.renderer} not supported on Windows.')
 except Exception as e:
-    logger.debug(f'Webview unavailable, disabling webview login (Exception: {e!r}).')
+    if isinstance(e, ImportError) and e.name == 'webview':
+        # pywebview is optional, not having it is no problem
+        logger.debug(f'Webview unavailable, disabling webview login (Exception: {e!r}).')
+    else:
+        # installed but broken, e.g. a pythonnet too old for the running Python
+        logger.warning(f'The login window could not start, using the browser login instead (Exception: {e!r}).')
     webview_available = False
 
 login_url = 'https://www.epicgames.com/id/login'
