@@ -50,6 +50,7 @@ from legendary.plugins import (
     PluginManager,
     install_event,
 )
+from legendary.themes import DEFAULT_THEME, Theme, ThemedFormatter, load_themes
 from legendary.utils.cli import (
     format_duration,
     get_boolean_choice,
@@ -61,7 +62,7 @@ from legendary.utils.custom_parser import HiddenAliasSubparsersAction
 from legendary.utils.env import is_windows_mac_or_pyi
 from legendary.utils.selective_dl import get_sdl_appname
 
-# todo custom formatter for cli logger (clean info, highlighted error/warning)
+# replaced by the configured theme's formatter once the config is loaded
 logging.basicConfig(
     format='[%(name)s] %(levelname)s: %(message)s',
     level=logging.INFO
@@ -75,12 +76,29 @@ class LegendaryCLI:
         self.logger = logging.getLogger('cli')
         self.logging_queue = None
         self.plugins = plugins or PluginManager(config_dir() / 'plugins')
+        self.theme = DEFAULT_THEME
+
+    @property
+    def out(self) -> Theme:
+        """The theme for printing to stdout"""
+        return self.theme.for_stream(stdout)
+
+    def available_themes(self):
+        return load_themes(self.core.lgd.path / 'themes', self.plugins.theme_files())
+
+    def use_configured_theme(self):
+        themes, _ = self.available_themes()
+        name = self.core.lgd.config.get('Legendary', 'theme', fallback=DEFAULT_THEME.name)
+        if name not in themes:
+            logger.warning(f'Theme "{name}" is not available, using the default theme (see "legendary themes").')
+        self.theme = themes.get(name, DEFAULT_THEME)
+        for handler in logging.getLogger().handlers:
+            handler.setFormatter(ThemedFormatter(self.theme.for_stream(handler.stream)))
 
     def setup_threaded_logging(self):
         self.logging_queue = MPQueue(-1)
         shandler = logging.StreamHandler()
-        sformatter = logging.Formatter('[%(name)s] %(levelname)s: %(message)s')
-        shandler.setFormatter(sformatter)
+        shandler.setFormatter(ThemedFormatter(self.theme.for_stream(shandler.stream)))
         ql = QueueListener(self.logging_queue, shandler)
         ql.start()
         return ql
@@ -266,10 +284,11 @@ class LegendaryCLI:
 
             return self._print_json(_out, args.pretty_json)
 
+        out = self.out
         print('\nAvailable games:')
         for game in games:
             version = game.app_version(args.platform)
-            print(f' * {game.app_title.strip()} (App name: {game.app_name} | Version: {version})')
+            print(f' {out.bullet(game.app_title.strip())} (App name: {game.app_name} | Version: {version})')
             # Games that "require" launching through EGL/Legendary, but have to be installed and managed through
             # a third-party application (such as Origin).
             if not version:
@@ -278,9 +297,9 @@ class LegendaryCLI:
                     print(f'  - This game has to be activated, installed, and launched via Origin, use '
                           f'"legendary launch --origin {game.app_name}" to activate and/or run the game.')
                 elif _store:
-                    print(f'  ! This game has to be installed through a third-party store ({_store}, not supported)')
+                    print('  ' + out.alert(f'This game has to be installed through a third-party store ({_store}, not supported)'))
                 else:
-                    print('  ! No version information (unknown cause)')
+                    print('  ' + out.alert('No version information (unknown cause)'))
             # Games that have assets, but only require a one-time activation before they can be independently installed
             # via a third-party platform (e.g. Uplay)
             if game.partner_link_type:
@@ -290,12 +309,12 @@ class LegendaryCLI:
                           'legendary to install/run. This game requires Ubisoft Connect to be installed. '
                           'Use "legendary activate --uplay" and follow the instructions.')
                 else:
-                    print(f'  ! This app requires linking to a third-party account (name: "{_type}", not supported)')
+                    print('  ' + out.alert(f'This app requires linking to a third-party account (name: "{_type}", not supported)'))
 
             for dlc in dlc_list.get(game.catalog_item_id, []):
                 print(f'  + {dlc.app_title} (App name: {dlc.app_name} | Version: {dlc.app_version(args.platform)})')
                 if not dlc.app_version(args.platform):
-                    print(f'   ! This DLC is either included in the base game, or not available for {args.platform}')
+                    print('   ' + out.alert(f'This DLC is either included in the base game, or not available for {args.platform}'))
 
         print(f'\nTotal: {len(games)}')
 
@@ -347,6 +366,7 @@ class LegendaryCLI:
             main_app_name = dlc.metadata['mainGameItem']['releaseInfo'][0]['appId']
             installed_dlcs[main_app_name].append(game)
 
+        out = self.out
         print('\nInstalled games:')
         for game in games:
             if game.install_size == 0 and self.core.lgd.lock_installed():
@@ -355,12 +375,12 @@ class LegendaryCLI:
                 game.install_size = sum(fm.file_size for fm in m.file_manifest_list.elements)
                 self.core.install_game(game)
 
-            print(f' * {game.title} (App name: {game.app_name} | Version: {game.version} | '
+            print(f' {out.bullet(game.title)} (App name: {game.app_name} | Version: {game.version} | '
                   f'Platform: {game.platform} | {game.install_size / (1024 * 1024 * 1024):.02f} GiB)')
             if args.include_dir:
                 print(f'  + Location: {game.install_path}')
             if not Path(game.install_path).exists():
-                print(f'  ! Game does no longer appear to be installed (directory "{game.install_path}" missing)!')
+                print('  ' + out.alert(f'Game does no longer appear to be installed (directory "{game.install_path}" missing)!'))
             elif game.app_name in versions and versions[game.app_name] != game.version:
                 print(f'  -> Update available! Installed: {game.version}, Latest: {versions[game.app_name]}')
             for dlc in installed_dlcs[game.app_name]:
@@ -809,9 +829,10 @@ class LegendaryCLI:
             print('No playtime recorded yet. Playtime is recorded for games started with "legendary launch".')
             return
 
+        out = self.out
         print('\nPlaytime recorded by "legendary launch":')
         for s in summary:
-            print(f' * {s["title"]} ({s["app_name"]}) | {format_duration(s["total_seconds"])} | '
+            print(f' {out.bullet(s["title"])} ({s["app_name"]}) | {format_duration(s["total_seconds"])} | '
                   f'{s["sessions"]} session(s) | last played {s["last_played"].astimezone():%Y-%m-%d %H:%M}')
 
         if args.app_name:
@@ -819,6 +840,28 @@ class LegendaryCLI:
             for session in sessions_by_app[summary[0]['app_name']]:
                 print(f'  - {session.start.astimezone():%Y-%m-%d %H:%M} for '
                       f'{format_duration(session.duration.total_seconds())} ({session.result})')
+
+    def manage_themes(self, args):
+        themes, errors = self.available_themes()
+        if args.action == 'use':
+            if args.theme_name not in themes:
+                logger.error(f'No theme named "{args.theme_name}" (see "legendary themes").')
+                exit(1)
+            self.core.lgd.config.set('Legendary', 'theme', args.theme_name)
+            logger.info(f'Now using the "{themes[args.theme_name].common_name}" theme.')
+            return
+
+        print(f'Themes folder: {self.core.lgd.path / "themes"}')
+        for name, theme in themes.items():
+            preview = theme.for_stream(stdout)
+            active = ' (active)' if name == self.theme.name else ''
+            print(f' {preview.bullet(theme.common_name)} ({name}){active} [{theme.source}]')
+            if theme.description:
+                print(f'     {theme.description}')
+            print('     ' + '  '.join(preview.paint(role, role) for role in ('info', 'warning', 'error', 'muted'))
+                  + '  ' + preview.alert('alert'))
+        for label, error in errors.items():
+            print(' ' + self.out.alert(f'{label}: {error}'))
 
     def manage_plugins(self, args):
         available = self.plugins.discover()
@@ -836,6 +879,7 @@ class LegendaryCLI:
             return
 
         enabled = self.plugins.enabled()
+        out = self.out
         print(f'Plugins folder: {self.plugins.folder}')
         if not available and not self.plugins.errors:
             print('No plugins installed. Put each plugin in its own folder there, then enable it with '
@@ -845,14 +889,14 @@ class LegendaryCLI:
         for name, (_, manifest) in available.items():
             status = self.plugins.errors.get(name) or ('enabled' if name in enabled else 'disabled')
             version = f' {manifest.version}' if manifest.version else ''
-            print(f' * {manifest.common_name} ({name}){version} [{status}]')
+            print(f' {out.bullet(manifest.common_name)} ({name}){version} [{status}]')
             if manifest.description:
                 print(f'     {manifest.description}')
             if commands := [c for c, (p, _) in self.plugins.commands.items() if p.manifest.name == name]:
                 print(f'     Commands: {", ".join(commands)}')
         for folder_name, error in self.plugins.errors.items():
             if folder_name not in available:
-                print(f' ! {folder_name}: {error}')
+                print(' ' + out.alert(f'{folder_name}: {error}'))
 
     def _launch_third_party(self, args):
         game = self.core.get_game(app_name=args.app_name)
@@ -1175,7 +1219,7 @@ class LegendaryCLI:
 
         if res.failures:
             for msg in sorted(res.failures):
-                print(' ! Failure:', msg)
+                print(' ' + self.out.alert(f'Failure: {msg}'))
             print()
             logger.fatal('Installation cannot proceed, exiting.')
             exit(1)
@@ -2896,6 +2940,7 @@ def main():
     move_parser = subparsers.add_parser('move', help='Move specified app name to a new location')
     playtime_parser = subparsers.add_parser('playtime', help='Show playtime recorded by "legendary launch"')
     plugins_parser = subparsers.add_parser('plugins', help='List, enable, or disable plugins')
+    themes_parser = subparsers.add_parser('themes', help='List terminal themes or switch to one')
     status_parser = subparsers.add_parser('status', help='Show legendary status information')
     sync_saves_parser = subparsers.add_parser('sync-saves', help='Sync cloud saves')
     uninstall_parser = subparsers.add_parser('uninstall', help='Uninstall (delete) a game')
@@ -3258,6 +3303,10 @@ def main():
                                 help='What to do (default: list)')
     plugins_parser.add_argument('plugin_name', nargs='?', metavar='<name>', help='Plugin to enable or disable')
 
+    themes_parser.add_argument('action', nargs='?', default='list', choices=('list', 'use'),
+                               help='What to do (default: list)')
+    themes_parser.add_argument('theme_name', nargs='?', metavar='<name>', help='Theme to use')
+
     # plugins can add commands, so they are loaded before parsing
     plugins = PluginManager(config_dir() / 'plugins')
     plugins.load(subparsers)
@@ -3292,6 +3341,7 @@ def main():
         return
 
     cli = LegendaryCLI(override_config=args.config_file, api_timeout=args.api_timeout, plugins=plugins)
+    cli.use_configured_theme()
     ql = cli.setup_threaded_logging()
 
     config_ll = cli.core.lgd.config.get('Legendary', 'log_level', fallback='info')
@@ -3368,6 +3418,8 @@ def main():
             cli.playtime(args)
         elif args.subparser_name == 'plugins':
             cli.manage_plugins(args)
+        elif args.subparser_name == 'themes':
+            cli.manage_themes(args)
         elif args.subparser_name in cli.plugins.commands:
             cli.plugins.run_command(args, cli.core)
     except KeyboardInterrupt:

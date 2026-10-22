@@ -250,6 +250,7 @@ Commands:
     move                Move specified app name to a new location
     playtime            Show playtime recorded by "legendary launch"
     plugins             List, enable, or disable plugins
+    themes              List terminal themes or switch to one
     status              Show legendary status information
     sync-saves          Sync cloud saves
     uninstall           Uninstall (delete) a game
@@ -663,6 +664,17 @@ optional arguments:
   -h, --help            show this help message and exit
 
 
+Command: themes
+usage: legendary themes [-h] [{list,use}] [<name>]
+
+positional arguments:
+  {list,use}  What to do (default: list)
+  <name>      Theme to use
+
+optional arguments:
+  -h, --help  show this help message and exit
+
+
 Command: status
 usage: legendary status [-h] [--offline] [--json]
 
@@ -771,6 +783,53 @@ A plugin that fails to load or raises in a handler is logged and skipped, it nev
 Plugin commands cannot replace Legendary's own commands.
 
 
+## Themes
+
+Themes set the colours and symbols Legendary prints with. `legendary themes` lists the available themes with a preview, and `legendary themes use <name>` switches to one.
+Legendary comes with `default`, `modern` (bright colours, Unicode symbols), `high-contrast`, and `plain` (no colours).
+
+A theme is a JSON file. Put your own in the `themes` folder of the config directory (`~/.config/legendary/themes` by default):
+
+````json
+{
+  "name": "dracula",
+  "common_name": "Dracula",
+  "description": "Purple and pink on dark backgrounds",
+  "colors": {
+    "accent": "bold #bd93f9",
+    "warning": "#f1fa8c",
+    "error": "bold #ff5555",
+    "logger": "#6272a4",
+    "muted": "#6272a4"
+  },
+  "symbols": {"bullet": "•", "alert": "!"}
+}
+````
+
+| Color      | Used for                                    |
+|------------|---------------------------------------------|
+| `debug`, `info`, `warning`, `error`, `critical` | log messages of that level |
+| `logger`   | the `[cli]` prefix of log messages          |
+| `accent`   | game and plugin names in lists              |
+| `muted`    | secondary text                              |
+
+Styles combine `bold`, `dim`, `italic`, `underline`, a colour (`black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`, or `bright_` versions of them, or `#rrggbb`), and `on <colour>` for the background.
+Symbols are 1 to 3 characters: `bullet` marks list entries, `alert` marks problems.
+Only `name` is required; anything left out comes from the default theme.
+
+Plugins can ship themes too, which are available while the plugin is enabled. A theme-only plugin needs no Python code:
+
+````json
+{
+  "name": "dracula-theme",
+  "useBackend": false,
+  "themes": ["themes/dracula.json"]
+}
+````
+
+Colours are only used when printing to a terminal, and never when `NO_COLOR` is set. Set `FORCE_COLOR=1` to keep them when piping output.
+
+
 ## Config file
 
 Legendary supports some options as well as game specific configuration in `~/.config/legendary/config.ini`:
@@ -803,6 +862,8 @@ disable_update_notice = false
 disable_auto_aliasing = false
 ; Do not wait for launched games to exit, and do not record playtime
 disable_playtime_tracking = false
+; Terminal theme (see "legendary themes")
+theme = default
 
 ; macOS specific settings
 ; Default application platform to use (default: Mac on macOS, Windows elsewhere)

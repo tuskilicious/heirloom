@@ -29,6 +29,6 @@ def fake_game(lgd_home, tmp_path):
         'app_name': 'Fish', 'app_title': 'Fish Game', 'metadata': {}, 'asset_infos': {}}))
     (lgd_home / 'installed.json').write_text(json.dumps({'Fish': {
         'app_name': 'Fish', 'title': 'Fish Game', 'version': '1', 'install_path': str(game_dir),
-        'executable': exe.name, 'platform': 'Linux', 'can_run_offline': True}}))
+        'executable': exe.name, 'platform': 'Linux', 'can_run_offline': True, 'install_size': 1024 ** 3}}))
     (lgd_home / 'user.json').write_text(json.dumps({'account_id': 'abc', 'displayName': 'Tester'}))
     return lgd_home
