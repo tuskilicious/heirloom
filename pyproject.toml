@@ -9,6 +9,8 @@ dependencies = [
     "requests",
     "filelock",
     "pycryptodomex",
+    # Windows keeps the login with DPAPI instead
+    "keyring; sys_platform != 'win32'",
 ]
 requires-python = ">= 3.10"
 authors = [
@@ -43,6 +45,8 @@ upstream = "https://github.com/derrod/legendary"
 
 [dependency-groups]
 dev = [
+    # for the keyring tests and type checks on Windows too
+    "keyring",
     "mypy>=2.4.0",
     "pytest>=9.1.1",
     "ruff>=0.15.10",

@@ -113,6 +113,10 @@ The login page should open in your browser and after logging in you should be pr
 Alternatively you can use the `--import` flag to import the authentication from the Epic Games Launcher (manually specifying the used WINE prefix may be required on Linux).
 Note that this will log you out of the Epic Launcher.
 
+Your login tokens are not saved in plain text: on Windows they are encrypted for your user account with DPAPI (in `user.dpapi`, like the Epic Games Launcher does), on macOS and Linux they go into the system keyring (Keychain, or GNOME Keyring/KWallet through Secret Service).
+A login saved by an older version is moved there the next time Heirloom runs.
+Without a usable keyring, for example on a headless machine, they stay in `user.json` as before; `PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring` does that on purpose.
+
 Listing your games
 ````
 heirloom list

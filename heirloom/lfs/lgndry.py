@@ -6,6 +6,7 @@ import shutil
 from collections import defaultdict
 from collections.abc import Iterator
 from contextlib import contextmanager
+from functools import cached_property
 from pathlib import Path
 from time import time
 from typing import Any
@@ -17,6 +18,7 @@ from heirloom.models.game import Game, GameAsset, InstalledGame, PlaytimeSession
 from heirloom.utils.aliasing import generate_aliases
 from heirloom.utils.env import is_windows_mac_or_pyi
 
+from .credentials import CredentialStore, UserDataLock, default_credential_store
 from .utils import LockedJSONData, clean_filename
 
 FILELOCK_DEBUG = False
@@ -194,11 +196,18 @@ class LGDLFS:
     def _save_json(self, name: str, data: Any, **kwargs: Any) -> None:
         (self.path / name).write_text(json.dumps(data, indent=2, sort_keys=True, **kwargs), encoding='utf-8')
 
+    @cached_property
+    def credential_store(self) -> CredentialStore | None:
+        """Where the login tokens are kept, None keeps them in user.json"""
+        return default_credential_store(self.path)
+
     @property
     @contextmanager
-    def userdata_lock(self) -> Iterator[LockedJSONData]:
+    def userdata_lock(self) -> Iterator[UserDataLock]:
         """Wrapper around the lock to automatically update user data when it is released"""
-        with LockedJSONData(self.path / 'user.json') as lock:
+        lock = UserDataLock(self.path / 'user.json')
+        lock.store = self.credential_store
+        with lock:
             try:
                 yield lock
             finally:

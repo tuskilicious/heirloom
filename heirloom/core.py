@@ -224,7 +224,7 @@ class HeirloomCore:
 
         raises ValueError if no existing credentials or InvalidCredentialsError if the API return an error
         """
-        if not lock.data:
+        if not lock.data or 'refresh_token' not in lock.data:
             raise ValueError('No saved credentials')
         elif self.logged_in and lock.data['expires_at']:
             dt_exp = datetime.fromisoformat(lock.data['expires_at'][:-1]).replace(tzinfo=timezone.utc)
