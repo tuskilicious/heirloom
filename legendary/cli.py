@@ -21,6 +21,7 @@ from sys import platform as sys_platform
 
 from legendary import __codename__, __version__
 from legendary.core import LegendaryCore
+from legendary.downloader.throttle import parse_speed
 from legendary.lfs.crossover import (
     mac_find_crossover_apps,
     mac_get_bottle_path,
@@ -786,10 +787,13 @@ class LegendaryCLI:
         # Only the launched process is watched, so games whose own launcher exits right after starting
         # the real game get a too-short session (the EGL can't observe some of those either).
         logger.info('Waiting for the game to exit to record playtime (use --no-wait to return immediately)...')
-        try:
-            exit_code = game_process.wait()
-        except KeyboardInterrupt:
-            exit_code = None
+        running_lock = self.core.lgd.game_running_lock(app_name)
+        with running_lock:
+            try:
+                exit_code = game_process.wait()
+            except KeyboardInterrupt:
+                exit_code = None
+        Path(running_lock.lock_file).unlink(missing_ok=True)
 
         session = PlaytimeSession(start=started, end=datetime.now(timezone.utc), exit_code=exit_code)
         self.core.lgd.add_playtime_session(app_name, session)
@@ -1162,7 +1166,9 @@ class LegendaryCLI:
                                                           override_delta_manifest=args.override_delta_manifest,
                                                           preferred_cdn=args.preferred_cdn,
                                                           disable_https=args.disable_https,
-                                                          bind_ip=args.bind_ip)
+                                                          bind_ip=args.bind_ip,
+                                                          max_speed=args.max_speed,
+                                                          max_speed_while_playing=args.max_speed_while_playing)
 
         # game is either up-to-date or hasn't changed, so we have nothing to do
         if not analysis.dl_size:
@@ -2890,6 +2896,13 @@ class LegendaryCLI:
         return
 
 
+def _speed_argument(text):
+    try:
+        return parse_speed(text)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(str(e)) from e
+
+
 def main():
     # Set output encoding to UTF-8 if not outputting to a terminal
     if not stdout.isatty():
@@ -3009,6 +3022,14 @@ def main():
                                 type=int, help='Maximum amount of shared memory to use (in MiB), default: 1 GiB')
     install_parser.add_argument('--max-workers', dest='max_workers', action='store', metavar='<num>',
                                 type=int, help='Maximum amount of download workers, default: min(2 * CPUs, 16)')
+    install_parser.add_argument('--max-speed', dest='max_speed', action='store', metavar='<speed>',
+                                type=_speed_argument,
+                                help='Limit the download speed, e.g. "5" or "5M" for 5 MiB/s, "500K" for 500 KiB/s, '
+                                     '0 for no limit (default: max_download_speed from the config)')
+    install_parser.add_argument('--max-speed-while-playing', dest='max_speed_while_playing', action='store',
+                                metavar='<speed>', type=_speed_argument,
+                                help='Lower download speed limit while a game started by "legendary launch" is '
+                                     'running (default: max_download_speed_while_playing from the config)')
     install_parser.add_argument('--manifest', dest='override_manifest', action='store', metavar='<uri>',
                                 help='Manifest URL or path to use instead of the CDN one (e.g. for downgrading)')
     install_parser.add_argument('--old-manifest', dest='override_old_manifest', action='store', metavar='<uri>',

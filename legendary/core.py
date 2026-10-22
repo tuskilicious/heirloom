@@ -27,6 +27,7 @@ from legendary import __version__
 from legendary.api.egs import EPCAPI
 from legendary.api.lgd import LGDAPI
 from legendary.downloader.mp.manager import DLManager
+from legendary.downloader.throttle import SpeedLimits, parse_speed
 from legendary.lfs.crossover import (
     mac_find_crossover_apps,
     mac_get_bottle_path,
@@ -1484,7 +1485,9 @@ class LegendaryCore:
                          repair: bool = False, repair_use_latest: bool = False,
                          disable_delta: bool = False, override_delta_manifest: str = '',
                          egl_guid: str = '', preferred_cdn: str | None = None,
-                         disable_https: bool = False, bind_ip: str | None = None) -> tuple[DLManager, AnalysisResult, InstalledGame]:
+                         disable_https: bool = False, bind_ip: str | None = None,
+                         max_speed: int | None = None, max_speed_while_playing: int | None = None,
+                         ) -> tuple[DLManager, AnalysisResult, InstalledGame]:
         # load old manifest
         old_manifest = None
 
@@ -1654,9 +1657,15 @@ class LegendaryCore:
         if not max_workers:
             max_workers = self.lgd.config.getint('Legendary', 'max_workers', fallback=0)
 
+        speed_limits = SpeedLimits(
+            max_speed=self._speed_setting(max_speed, 'max_download_speed'),
+            max_speed_while_playing=self._speed_setting(max_speed_while_playing, 'max_download_speed_while_playing'),
+            running_games_dir=str(self.lgd.running_games_dir),
+        )
         dlm = DLManager(install_path, base_url, manifest_secrets, resume_file=resume_file, status_q=status_q,
                         max_shared_memory=max_shm * 1024 * 1024, max_workers=max_workers,
-                        dl_timeout=dl_timeout, bind_ip=bind_ip, case_insensitive=platform.startswith('Win'))
+                        dl_timeout=dl_timeout, bind_ip=bind_ip, case_insensitive=platform.startswith('Win'),
+                        speed_limits=speed_limits)
         anlres = dlm.run_analysis(manifest=new_manifest, old_manifest=old_manifest,
                                   patch=not disable_patching, resume=not force,
                                   file_prefix_filter=file_prefix_filter,
@@ -1814,6 +1823,16 @@ class LegendaryCore:
                                  'installed manually for the game to function properly.')
 
         return results
+
+    def _speed_setting(self, speed: int | None, option: str) -> int:
+        """speed if it was given, otherwise the option from the config; in bytes per second, 0 for no limit"""
+        if speed is not None:
+            return speed
+        try:
+            return parse_speed(self.lgd.config.get('Legendary', option, fallback='0'))
+        except ValueError as e:
+            self.log.error(f'Ignoring "{option}" in the config: {e}')
+            return 0
 
     def get_default_install_dir(self, platform='Windows'):
         if platform == 'Mac':
