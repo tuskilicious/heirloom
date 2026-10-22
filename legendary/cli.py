@@ -1538,7 +1538,16 @@ class LegendaryCLI:
             logger.info('Migration enabled, this will remove the games from EGL, but not uninstall them.')
             args.import_only = args.one_shot = True
 
-        if not self.core.egl.programdata_path:
+        if args.egl_installations:
+            if not Path(args.egl_installations).is_file():
+                logger.fatal(f'"{args.egl_installations}" does not exist.')
+                exit(1)
+            self.core.egl.installations_path = args.egl_installations
+            self.core.lgd.config.set('Legendary', 'egl_installations', args.egl_installations)
+
+        if self.core.egl.installations_path:
+            logger.info(f'Using the new Epic Games Launcher\'s install list "{self.core.egl.installations_path}"')
+        elif not self.core.egl.programdata_path:
             if not args.egl_manifest_path and not args.egl_wine_prefix:
                 # search default Lutris install path
                 lutris_data_path = Path.home() / 'Games/epic-games-store/drive_c/ProgramData/Epic/EpicGamesLauncher/Data'
@@ -1615,6 +1624,19 @@ class LegendaryCLI:
                         self.core.egl_import(egl_game.app_name)
             else:
                 print('Nothing to import.')
+
+        new_launcher = bool(self.core.egl.installations_path)
+        if new_launcher:
+            print('\nExporting games to the new Epic Games Launcher and automatic sync with it are not supported '
+                  'yet. Run this command again to import games you install there later, games that are already '
+                  'in Legendary are left as they are.')
+            if args.migrate:
+                logger.info('Unlinking imported games, the Epic Games Launcher keeps listing them.')
+                for igame in self.core.get_installed_list():
+                    if igame.egl_guid:
+                        igame.egl_guid = ''
+                        self.core.install_game(igame)
+            return
 
         if not args.import_only:
             print('\nChecking for exportable games...')
@@ -3084,6 +3106,9 @@ def main():
                                       'point to /ProgramData/Epic/EpicGamesLauncher/Data/Manifests')
     egl_sync_parser.add_argument('--egl-wine-prefix', dest='egl_wine_prefix', action='store',
                                  help='Path to the WINE prefix the Epic Games Launcher is installed in')
+    egl_sync_parser.add_argument('--egl-installations', dest='egl_installations', action='store', metavar='<path>',
+                                 help='Path to the new Epic Games Launcher\'s installations.jsonl, if it is not '
+                                      'found automatically (e.g. in a WINE prefix)')
     egl_sync_parser.add_argument('--enable-sync', dest='enable_sync', action='store_true',
                                  help='Enable automatic EGL <-> Legendary sync')
     egl_sync_parser.add_argument('--disable-sync', dest='disable_sync', action='store_true',

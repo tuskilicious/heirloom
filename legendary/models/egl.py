@@ -100,6 +100,29 @@ class EGLManifest:
         tmp.remainder = json.copy()
         return tmp
 
+    @classmethod
+    def from_v2_installation(cls, record: dict, main_game_appname: str):
+        """
+        From a record in the new (Tauri-based) Epic Games Launcher's installations.jsonl.
+        It does not store the title, install size, offline support or ownership token requirement,
+        those stay None for the importer to fill in from the game's metadata and manifest.
+        """
+        tmp = cls()
+        tmp.app_name = record['artifactId']
+        tmp.app_version_string = record.get('version', '')
+        tmp.base_urls = []
+        tmp.catalog_item_id = record.get('itemId', '')
+        tmp.namespace = record.get('namespace', '')
+        tmp.install_location = record['dir']
+        tmp.install_tags = record.get('tags') or []
+        tmp.installation_guid = record['installationId']
+        tmp.launch_command = record.get('launchCommand', '')
+        tmp.executable = record.get('launchExecutable', '')
+        tmp.main_game_appname = main_game_appname
+        tmp.is_incomplete_install = not record.get('complete', False)
+        tmp.needs_validation = False
+        return tmp
+
     def to_json(self) -> dict:
         out = _template.copy()
         out.update(self.remainder)
