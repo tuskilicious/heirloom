@@ -201,7 +201,7 @@ class Game:
         return tmp
 
     @property
-    def __dict__(self):
+    def __dict__(self):  # type: ignore[override]
         """This is just here so asset_infos gets turned into a dict as well"""
         assets_dictified = {k: v.__dict__ for k, v in self.asset_infos.items()}
         sidecar_dictified = self.sidecar.__dict__ if self.sidecar else None

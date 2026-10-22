@@ -1,4 +1,6 @@
 
+from __future__ import annotations
+
 import contextlib
 import json
 import logging
@@ -10,10 +12,11 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from hashlib import sha1
-from locale import getdefaultlocale
 from multiprocessing import Queue
+from pathlib import Path
 from platform import system
 from sys import platform as sys_platform
+from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlparse
 from uuid import uuid4
 
@@ -59,9 +62,9 @@ from legendary.models.game import (
     Sidecar,
 )
 from legendary.models.json_manifest import JSONManifest
-from legendary.models.manifest import Manifest, ManifestMeta
+from legendary.models.manifest import Manifest
 from legendary.utils.egl_crypt import decrypt_epic_data
-from legendary.utils.env import is_windows_mac_or_pyi
+from legendary.utils.env import get_system_locale, is_windows_mac_or_pyi
 from legendary.utils.game_workarounds import (
     get_exe_override,
     is_opt_enabled,
@@ -92,7 +95,7 @@ class LegendaryCore:
         # on non-Windows load the programdata path from config
         if os.name != 'nt':
             self.egl.programdata_path = self.lgd.config.get('Legendary', 'egl_programdata', fallback=None)
-            if self.egl.programdata_path and not os.path.exists(self.egl.programdata_path):
+            if self.egl.programdata_path and not Path(self.egl.programdata_path).exists():
                 self.log.error(f'Config EGL path ("{self.egl.programdata_path}") is invalid! Disabling sync...')
                 self.egl.programdata_path = None
                 self.lgd.config.remove_option('Legendary', 'egl_programdata')
@@ -103,7 +106,7 @@ class LegendaryCore:
         self.language_code, self.country_code = ('en', 'US')
 
         if locale := self.lgd.config.get('Legendary', 'locale',
-                                         fallback=getdefaultlocale(('LANG', 'LANGUAGE', 'LC_ALL', 'LC_CTYPE'))[0]):
+                                         fallback=get_system_locale()):
             try:
                 self.language_code, self.country_code = locale.split('-' if '-' in locale else '_')
                 self.log.debug(f'Set locale to {self.language_code}-{self.country_code}')
@@ -217,8 +220,8 @@ class LegendaryCore:
         if not lock.data:
             raise ValueError('No saved credentials')
         elif self.logged_in and lock.data['expires_at']:
-            dt_exp = datetime.fromisoformat(lock.data['expires_at'][:-1])
-            dt_now = datetime.utcnow()
+            dt_exp = datetime.fromisoformat(lock.data['expires_at'][:-1]).replace(tzinfo=timezone.utc)
+            dt_now = datetime.now(timezone.utc)
             td = dt_now - dt_exp
 
             # if session still has at least 10 minutes left we can re-use it.
@@ -244,8 +247,8 @@ class LegendaryCore:
                 self.log.warning(f'Checking for EOS Overlay updates failed: {e!r}')
 
         if lock.data['expires_at'] and not force_refresh:
-            dt_exp = datetime.fromisoformat(lock.data['expires_at'][:-1])
-            dt_now = datetime.utcnow()
+            dt_exp = datetime.fromisoformat(lock.data['expires_at'][:-1]).replace(tzinfo=timezone.utc)
+            dt_now = datetime.now(timezone.utc)
             td = dt_now - dt_exp
 
             # if session still has at least 10 minutes left we can re-use it.
@@ -356,8 +359,8 @@ class LegendaryCore:
 
         return self.lgd.achievements[namespace]
 
-    def get_achievements(self, game: Game, update: bool = False):
-        if not game.achievements.achievements:
+    def get_achievements(self, game: Game, update: bool = False) -> dict[str, Any] | None:
+        if not game.achievements or not game.achievements.achievements:
             return None
 
         user_achievements = self.get_user_achievements(game.namespace, update)
@@ -368,7 +371,7 @@ class LegendaryCore:
                 user_achievements['playerAchievements']
             }
 
-        achievements = {
+        achievements: dict[str, Any] = {
             'total_achievements': game.achievements.total_achievements,
             'total_product_xp': game.achievements.total_product_xp,
             'achievement_sets': game.achievements.achievement_sets,
@@ -489,11 +492,9 @@ class LegendaryCore:
         return self.lgd.assets[platform]
 
     def get_asset(self, app_name, platform='Windows', update=False) -> GameAsset:
-        if update or platform not in self.lgd.assets:
-            self.get_assets(update_assets=True, platform=platform)
-
+        assets = self.get_assets(update_assets=update, platform=platform)
         try:
-            return next(i for i in self.lgd.assets[platform] if i.app_name == app_name)
+            return next(i for i in assets if i.app_name == app_name)
         except StopIteration as e:
             raise ValueError from e
 
@@ -522,8 +523,8 @@ class LegendaryCore:
 
     def get_game_and_dlc_list(self, update_assets=True, platform='Windows',
                               force_refresh=False, skip_ue=True) -> tuple[list[Game], dict[str, list[Game]]]:
-        _ret = []
-        _dlc = defaultdict(list)
+        _ret: list[Game] = []
+        _dlc: defaultdict[str, list[Game]] = defaultdict(list)
         meta_updated = False
 
         # fetch asset information for Windows, all installed platforms, and the specified one
@@ -537,7 +538,7 @@ class LegendaryCore:
         if not self.lgd.assets:
             return _ret, _dlc
 
-        assets = {}
+        assets: dict[str, dict[str, GameAsset]] = {}
         for _platform, _assets in self.lgd.assets.items():
             for _asset in _assets:
                 if _asset.app_name in assets:
@@ -735,7 +736,7 @@ class LegendaryCore:
 
     def get_app_environment(self, app_name, wine_pfx=None, cx_bottle=None, disable_wine=False) -> dict:
         # get environment overrides from config
-        env = dict()
+        env: dict[str, str] = dict()
         if 'default.env' in self.lgd.config:
             env |= {
                 k: v
@@ -796,9 +797,9 @@ class LegendaryCore:
                     self.log.debug(f'Default CrossOver found: {crossover_app} ({cx_version})')
 
             if sys_platform == 'darwin' and crossover_app:
-                wine_path = os.path.join(crossover_app, 'Contents', 'SharedSupport', 'CrossOver', 'bin', 'wine')
-                if os.path.exists(wine_path):
-                    wine_binary = wine_path
+                wine_path = Path(crossover_app, 'Contents', 'SharedSupport', 'CrossOver', 'bin', 'wine')
+                if wine_path.exists():
+                    wine_binary = str(wine_path)
                     cx_version = mac_get_crossover_version(crossover_app)
                     self.log.info(f'Using CrossOver {cx_version} ({crossover_app})')
                 else:
@@ -828,14 +829,14 @@ class LegendaryCore:
         return pre_launch_command, pre_launch_wait
 
     def get_launch_parameters(self, app_name: str, offline: bool = False,
-                              user: str = None, extra_args: list = None,
-                              wine_bin: str = None, wine_pfx: str = None,
-                              language: str = None, wrapper: str = None,
+                              user: str | None = None, extra_args: list | None = None,
+                              wine_bin: str | None = None, wine_pfx: str | None = None,
+                              language: str | None = None, wrapper: str | None = None,
                               disable_wine: bool = False,
-                              executable_override: str = None,
-                              crossover_app: str = None,
-                              crossover_bottle: str = None,
-                              addon_app_name: str = None) -> LaunchParameters:
+                              executable_override: str | None = None,
+                              crossover_app: str | None = None,
+                              crossover_bottle: str | None = None,
+                              addon_app_name: str | None = None) -> LaunchParameters:
         install = self.lgd.get_installed_game(app_name)
         game = self.lgd.get_game_meta(addon_app_name if addon_app_name else app_name)
 
@@ -850,14 +851,14 @@ class LegendaryCore:
 
         if executable_override or (executable_override := self.lgd.config.get(app_name, 'override_exe', fallback=None)):
             game_exe = executable_override.replace('\\', '/')
-            exe_path = os.path.join(install.install_path, game_exe)
-            if not os.path.exists(exe_path):
+            exe_path = Path(install.install_path, game_exe)
+            if not exe_path.exists():
                 raise ValueError(f'Executable path is invalid: {exe_path}')
         else:
             game_exe = install.executable.replace('\\', '/').lstrip('/')
-            exe_path = os.path.join(install.install_path, game_exe)
+            exe_path = Path(install.install_path, game_exe)
 
-        working_dir = os.path.split(exe_path)[0]
+        working_dir = str(exe_path.parent)
 
         params = LaunchParameters(
             game_executable=game_exe, game_directory=install.install_path, working_directory=working_dir,
@@ -906,9 +907,8 @@ class LegendaryCore:
         if install.requires_ot and not offline:
             self.log.info('Getting ownership token.')
             ovt = self.egs.get_ownership_token(game.namespace, game.catalog_item_id)
-            ovt_path = os.path.join(self.lgd.get_tmp_path(), f'{game.namespace}{game.catalog_item_id}.ovt')
-            with open(ovt_path, 'wb') as f:
-                f.write(ovt)
+            ovt_path = self.lgd.get_tmp_path() / f'{game.namespace}{game.catalog_item_id}.ovt'
+            ovt_path.write_bytes(ovt)
             params.egl_parameters.append(f'-epicovt={ovt_path}')
 
         language_code = self.lgd.config.get(app_name, 'language', fallback=language)
@@ -1023,9 +1023,9 @@ class LegendaryCore:
             path_vars |= {
                 # Note: EGL actually resolves this to "~/Library/Application Support/Epic", but the only game
                 # I could find using this (Loop Hero) expects it to be "~/Library/Application Support".
-                '{appdata}': os.path.expanduser('~/Library/Application Support'),
-                '{userdir}': os.path.expanduser('~/Documents'),
-                '{userlibrary}': os.path.expanduser('~/Library'),
+                '{appdata}': str(Path.home() / 'Library' / 'Application Support'),
+                '{userdir}': str(Path.home() / 'Documents'),
+                '{userlibrary}': str(Path.home() / 'Library'),
             }
         else:
             wine_pfx = None
@@ -1076,16 +1076,16 @@ class LegendaryCore:
 
             # if all else fails, use the WINE default
             if not wine_pfx:
-                wine_pfx = os.path.expanduser('~/.wine')
+                wine_pfx = str(Path.home() / '.wine')
 
             # if we have a prefix, read the `user.reg` file and get the proper paths.
-            if os.path.isdir(wine_pfx):
+            if Path(wine_pfx).is_dir():
                 wine_reg = read_registry(wine_pfx)
                 wine_folders = get_shell_folders(wine_reg, wine_pfx)
                 # path_vars['{userprofile}'] = user_path
                 path_vars['{appdata}'] = wine_folders['Local AppData']
                 # this maps to ~/Documents, but the name is locale-dependent so just resolve the symlink from WINE
-                path_vars['{userdir}'] = os.path.realpath(wine_folders['Personal'])
+                path_vars['{userdir}'] = str(Path(wine_folders['Personal']).resolve())
                 path_vars['{usersavedgames}'] = wine_folders['{4C5C32FF-BB9D-43B0-B5B4-2D72E54EAAA4}']
 
                 # WINE prefixes using legacy appdata paths won't correctly resolve the relative paths from
@@ -1105,19 +1105,18 @@ class LegendaryCore:
 
         # these paths should always use a forward slash
         new_save_path = [path_vars.get(p.lower(), p) for p in save_path.split('/')]
-        absolute_path = os.path.realpath(os.path.join(*new_save_path))
+        absolute_path = Path(*new_save_path).resolve()
         # attempt to resolve as much as possible on case-sensitive file-systems
         if os.name != 'nt' and platform != 'Mac':
-            absolute_path = case_insensitive_path_search(absolute_path)
+            absolute_path = case_insensitive_path_search(str(absolute_path))
 
-        return absolute_path
+        return str(absolute_path)
 
     def check_savegame_state(self, path: str, save: SaveGameFile) -> tuple[SaveGameStatus, tuple[datetime | None, datetime | None]]:
-        latest = 0
-        for _dir, _, _files in os.walk(path):
-            for _file in _files:
-                s = os.stat(os.path.join(_dir, _file))
-                latest = max(latest, s.st_mtime)
+        latest = 0.0
+        for f in Path(path).rglob('*'):
+            if f.is_file():
+                latest = max(latest, f.stat().st_mtime)
 
         if not latest and not save:
             return SaveGameStatus.NO_SAVE, (None, None)
@@ -1142,7 +1141,7 @@ class LegendaryCore:
         else:
             return SaveGameStatus.REMOTE_NEWER, (dt_local, dt_remote)
 
-    def upload_save(self, app_name, save_dir, local_dt: datetime = None,
+    def upload_save(self, app_name, save_dir, local_dt: datetime | None = None,
                     disable_filtering: bool = False):
         game = self.lgd.get_game_meta(app_name)
         custom_attr = game.metadata['customAttributes']
@@ -1180,11 +1179,10 @@ class LegendaryCore:
         self.log.info('Finished uploading savegame.')
 
     def download_saves(self, app_name='', manifest_name='', save_dir='', clean_dir=False):
-        save_path = os.path.join(self.get_default_install_dir(), '.saves')
-        if not os.path.exists(save_path):
-            os.makedirs(save_path)
+        save_path = Path(self.get_default_install_dir(), '.saves')
+        save_path.mkdir(parents=True, exist_ok=True)
 
-        _save_dir = save_dir
+        _save_dir = Path(save_dir)
         savegames = self.egs.get_user_cloud_saves(app_name=app_name)
         files = savegames['files']
         for fname, f in files.items():
@@ -1195,9 +1193,8 @@ class LegendaryCore:
             if manifest_name and f_parts[4] != manifest_name:
                 continue
             if not save_dir:
-                _save_dir = os.path.join(save_path, f'{f_parts[2]}/{f_parts[4].rpartition(".")[0]}')
-                if not os.path.exists(_save_dir):
-                    os.makedirs(_save_dir)
+                _save_dir = save_path / f_parts[2] / f_parts[4].rpartition('.')[0]
+                _save_dir.mkdir(parents=True, exist_ok=True)
 
             if app_name and clean_dir:
                 game = self.lgd.get_game_meta(app_name)
@@ -1258,17 +1255,14 @@ class LegendaryCore:
                     continue
 
             for fm in m.file_manifest_list.elements:
-                dirs, fname = os.path.split(fm.filename)
-                fdir = os.path.join(_save_dir, dirs)
-                fpath = os.path.join(fdir, fname)
-                if not os.path.exists(fdir):
-                    os.makedirs(fdir)
+                fpath = _save_dir / fm.filename
+                fpath.parent.mkdir(parents=True, exist_ok=True)
 
                 self.log.debug(f'Writing "{fpath}"...')
-                with open(fpath, 'wb') as fh:
+                with fpath.open('wb') as fh:
                     for cp in fm.chunk_parts:
                         if cp.guid_num not in chunks:
-                            self.log.error(f'Chunk part for {fname} is missing, file may be corrupted!')
+                            self.log.error(f'Chunk part for {fpath.name} is missing, file may be corrupted!')
                         else:
                             fh.write(chunks[cp.guid_num][cp.offset:cp.offset + cp.size])
 
@@ -1460,8 +1454,7 @@ class LegendaryCore:
             base_urls = [r.url.rpartition('/')[0]]
         else:
             base_urls = []
-            with open(uri, 'rb') as f:
-                new_manifest_data = f.read()
+            new_manifest_data = Path(uri).read_bytes()
 
         return new_manifest_data, base_urls
 
@@ -1473,18 +1466,18 @@ class LegendaryCore:
         r = self.egs.unauth_session.get(f'{base_url}/Deltas/{new_build_id}/{old_build_id}.delta')
         return r.content if r.status_code == 200 else None
 
-    def prepare_download(self, game: Game, base_game: Game = None, base_path: str = '',
-                         status_q: Queue = None, max_shm: int = 0, max_workers: int = 0,
+    def prepare_download(self, game: Game, base_game: Game | None = None, base_path: str = '',
+                         status_q: Queue | None = None, max_shm: int = 0, max_workers: int = 0,
                          force: bool = False, disable_patching: bool = False,
                          game_folder: str = '', override_manifest: str = '',
                          override_old_manifest: str = '', override_base_url: str = '',
-                         platform: str = 'Windows', file_prefix_filter: list = None,
-                         file_exclude_filter: list = None, file_install_tag: list = None,
+                         platform: str = 'Windows', file_prefix_filter: list | None = None,
+                         file_exclude_filter: list | None = None, file_install_tag: list | None = None,
                          dl_optimizations: bool = False, dl_timeout: int = 10,
                          repair: bool = False, repair_use_latest: bool = False,
                          disable_delta: bool = False, override_delta_manifest: str = '',
-                         egl_guid: str = '', preferred_cdn: str = None,
-                         disable_https: bool = False, bind_ip: str = None) -> (DLManager, AnalysisResult, ManifestMeta):
+                         egl_guid: str = '', preferred_cdn: str | None = None,
+                         disable_https: bool = False, bind_ip: str | None = None) -> tuple[DLManager, AnalysisResult, InstalledGame]:
         # load old manifest
         old_manifest = None
 
@@ -1536,7 +1529,7 @@ class LegendaryCore:
                                platform=platform)
 
         # check if we should use a delta manifest or not
-        disable_delta = disable_delta or ((override_old_manifest or override_manifest) and not override_delta_manifest)
+        disable_delta = disable_delta or bool((override_old_manifest or override_manifest) and not override_delta_manifest)
         if old_manifest and new_manifest:
             disable_delta = disable_delta or (old_manifest.meta.build_id == new_manifest.meta.build_id)
         if old_manifest and new_manifest and not disable_delta:
@@ -1565,6 +1558,8 @@ class LegendaryCore:
         else:
             if not game_folder:
                 if game.is_dlc:
+                    if not base_game:
+                        raise ValueError(f'Metadata for the base game of DLC "{game.app_name}" is missing')
                     game_folder = base_game.metadata.get('customAttributes', {}). \
                         get('FolderName', {}).get('value', base_game.app_name)
                 else:
@@ -1586,18 +1581,18 @@ class LegendaryCore:
                         base_path = self.get_default_install_dir(platform='Windows')
 
             # make sure base directory actually exists (but do not create game dir)
-            if not os.path.exists(base_path):
+            if not Path(base_path).exists():
                 self.log.info(f'"{base_path}" does not exist, creating...')
-                os.makedirs(base_path)
+                Path(base_path).mkdir(parents=True)
 
-            install_path = os.path.normpath(os.path.join(base_path, game_folder.strip()))
+            install_path = os.path.normpath(Path(base_path, game_folder.strip()))
 
         # check for write access on the install path or its parent directory if it doesn't exist yet
-        base_path = os.path.dirname(install_path)
-        if os.path.exists(install_path) and not os.access(install_path, os.W_OK):
+        parent_dir = Path(install_path).parent
+        if Path(install_path).exists() and not os.access(install_path, os.W_OK):
             raise PermissionError(f'No write access to "{install_path}"')
-        elif not os.access(base_path, os.W_OK):
-            raise PermissionError(f'No write access to "{base_path}"')
+        elif not os.access(parent_dir, os.W_OK):
+            raise PermissionError(f'No write access to "{parent_dir}"')
 
         self.log.info(f'Install path: {install_path}')
 
@@ -1607,12 +1602,10 @@ class LegendaryCore:
                 new_manifest = old_manifest
             old_manifest = None
 
-            filename = clean_filename(f'{game.app_name}.repair')
-            resume_file = os.path.join(self.lgd.get_tmp_path(), filename)
+            resume_file = self.lgd.get_tmp_path() / clean_filename(f'{game.app_name}.repair')
             force = False
         elif not force:
-            filename = clean_filename(f'{game.app_name}.resume')
-            resume_file = os.path.join(self.lgd.get_tmp_path(), filename)
+            resume_file = self.lgd.get_tmp_path() / clean_filename(f'{game.app_name}.resume')
         else:
             resume_file = None
 
@@ -1707,7 +1700,7 @@ class LegendaryCore:
                                       game: Game,
                                       updating: bool = False,
                                       ignore_space_req: bool = False) -> ConditionCheckResult:
-        results = ConditionCheckResult(failures=set(), warnings=set())
+        results = ConditionCheckResult()
 
         # if on linux, check for eac in the files
         if os.name != 'nt':
@@ -1727,8 +1720,8 @@ class LegendaryCore:
         if not install.can_run_offline:
             results.warnings.add('This game is not marked for offline use (may still work).')
 
-        base_path = os.path.split(install.install_path)[0]
-        if os.path.exists(base_path):
+        base_path = Path(install.install_path).parent
+        if base_path.exists():
             # Ensure that we have enough disk space for the installation process, as calculated by the analyser
             min_disk_space = analysis.disk_space_delta
             _, _, free = shutil.disk_usage(base_path)
@@ -1817,9 +1810,10 @@ class LegendaryCore:
 
     def get_default_install_dir(self, platform='Windows'):
         if platform == 'Mac':
-            return os.path.expanduser(self.lgd.config.get('Legendary', 'mac_install_dir', fallback='~/Applications'))
+            install_dir = self.lgd.config.get('Legendary', 'mac_install_dir', fallback='~/Applications')
         else:
-            return os.path.expanduser(self.lgd.config.get('Legendary', 'install_dir', fallback='~/Games'))
+            install_dir = self.lgd.config.get('Legendary', 'install_dir', fallback='~/Games')
+        return str(Path(install_dir).expanduser())
 
     def install_game(self, installed_game: InstalledGame) -> dict:
         if self.egl_sync_enabled and not installed_game.is_dlc and installed_game.platform.startswith('Win'):
@@ -1873,7 +1867,7 @@ class LegendaryCore:
         filelist = [
             fm.filename for fm in manifest.file_manifest_list.elements if
             not any(((fit in fm.install_tags) or (not fit and not fm.install_tags)) for fit in tags)
-            and os.path.exists(os.path.join(installed_game.install_path, fm.filename))
+            and Path(installed_game.install_path, fm.filename).exists()
         ]
 
         if not delete_filelist(
@@ -1887,38 +1881,35 @@ class LegendaryCore:
         igame.prereq_info['installed'] = True
         self.lgd.set_installed_game(app_name, igame)
 
-    def import_game(self, game: Game, app_path: str, egl_guid='', platform='Windows') -> (Manifest, InstalledGame):
+    def import_game(self, game: Game, app_path: str, egl_guid='', platform='Windows') -> tuple[Manifest, InstalledGame]:
         needs_verify = True
         manifest_data = None
 
         # check if the game is from an EGL installation, load manifest if possible
-        if not game.is_dlc and os.path.exists(os.path.join(app_path, '.egstore')):
+        egstore = Path(app_path, '.egstore')
+        if not game.is_dlc and egstore.exists():
             mf = None
             if not egl_guid:
-                for f in os.listdir(os.path.join(app_path, '.egstore')):
-                    if not f.endswith('.mancpn'):
-                        continue
-
-                    self.log.debug(f'Checking mancpn file "{f}"...')
-                    mancpn = json.load(open(os.path.join(app_path, '.egstore', f), 'rb'))
+                for f in egstore.glob('*.mancpn'):
+                    self.log.debug(f'Checking mancpn file "{f.name}"...')
+                    mancpn = json.loads(f.read_bytes())
                     if mancpn['AppName'] == game.app_name:
                         self.log.info('Found EGL install metadata, verifying...')
-                        mf = f.replace('.mancpn', '.manifest')
+                        mf = f.with_suffix('.manifest').name
                         break
             else:
                 mf = f'{egl_guid}.manifest'
 
-            if mf and os.path.exists(os.path.join(app_path, '.egstore', mf)):
-                manifest_data = open(os.path.join(app_path, '.egstore', mf), 'rb').read()
+            if mf and (egstore / mf).exists():
+                manifest_data = (egstore / mf).read_bytes()
             else:
                 self.log.warning('.egstore folder exists but manifest file is missing, continuing as regular import...')
 
             # If there's no in-progress installation assume the game doesn't need to be verified
-            if mf and not os.path.exists(os.path.join(app_path, '.egstore', 'bps')):
+            if mf and not (egstore / 'bps').exists():
                 needs_verify = False
-                if os.path.exists(os.path.join(app_path, '.egstore', 'Pending')):
-                    if os.listdir(os.path.join(app_path, '.egstore', 'Pending')):
-                        needs_verify = True
+                if (egstore / 'Pending').exists() and any((egstore / 'Pending').iterdir()):
+                    needs_verify = True
 
                 if not needs_verify:
                     self.log.debug('No in-progress installation found, assuming complete...')
@@ -1990,27 +1981,26 @@ class LegendaryCore:
         if os.name != 'nt' and not lgd_igame.install_path.startswith('/'):
             drive_letter = lgd_igame.install_path[:2].lower()
             drive_c_path = self.egl.programdata_path.partition('ProgramData')[0]
-            wine_pfx = os.path.realpath(os.path.join(drive_c_path, '..'))
-            mapped_path = os.path.realpath(os.path.join(wine_pfx, 'dosdevices', drive_letter))
-            if 'dosdevices' in mapped_path:
+            wine_pfx = Path(drive_c_path, '..').resolve()
+            mapped_path = (wine_pfx / 'dosdevices' / drive_letter).resolve()
+            if 'dosdevices' in mapped_path.parts:
                 self.log.error(f'Unable to resolve path for mapped drive "{drive_letter}" '
                                f'for WINE prefix at "{wine_pfx}"')
                 return
 
             game_path = lgd_igame.install_path[2:].replace('\\', '/').lstrip('/')
-            new_path = os.path.realpath(os.path.join(mapped_path, game_path))
+            new_path = str((mapped_path / game_path).resolve())
             self.log.info(f'Adjusted game install path from "{lgd_igame.install_path}" to "{new_path}"')
             lgd_igame.install_path = new_path
 
         # check if manifest exists
-        manifest_filename = os.path.join(lgd_igame.install_path, '.egstore', f'{lgd_igame.egl_guid}.manifest')
-        if not os.path.exists(manifest_filename):
+        manifest_filename = Path(lgd_igame.install_path, '.egstore', f'{lgd_igame.egl_guid}.manifest')
+        if not manifest_filename.exists():
             self.log.warning(f'Game Manifest "{manifest_filename}" not found, cannot import!')
             return
 
         # load manifest file and copy it over
-        with open(manifest_filename, 'rb') as f:
-            manifest_data = f.read()
+        manifest_data = manifest_filename.read_bytes()
         new_manifest = self.load_manifest(manifest_data)
         self.lgd.save_manifest(lgd_igame.app_name, new_manifest,
                                version=new_manifest.meta.build_version,
@@ -2045,19 +2035,17 @@ class LegendaryCore:
         egl_game = EGLManifest.from_lgd_game(lgd_game, lgd_igame)
 
         # make sure .egstore folder exists
-        egstore_folder = os.path.join(lgd_igame.install_path, '.egstore')
-        if not os.path.exists(egstore_folder):
-            os.makedirs(egstore_folder)
+        egstore_folder = Path(lgd_igame.install_path, '.egstore')
+        egstore_folder.mkdir(parents=True, exist_ok=True)
 
         # copy manifest and create mancpn file in .egstore folder
-        with open(os.path.join(egstore_folder, f'{egl_game.installation_guid}.manifest', ), 'wb') as mf:
-            mf.write(manifest_data)
+        (egstore_folder / f'{egl_game.installation_guid}.manifest').write_bytes(manifest_data)
 
         mancpn = dict(FormatVersion=0, AppName=app_name,
                       CatalogItemId=lgd_game.catalog_item_id,
                       CatalogNamespace=lgd_game.namespace)
-        with open(os.path.join(egstore_folder, f'{egl_game.installation_guid}.mancpn', ), 'w') as mcpnf:
-            json.dump(mancpn, mcpnf, indent=4, sort_keys=True)
+        (egstore_folder / f'{egl_game.installation_guid}.mancpn').write_text(
+            json.dumps(mancpn, indent=4, sort_keys=True), encoding='utf-8')
 
         # And finally, write the file for EGL
         self.egl.set_manifest(egl_game)
@@ -2072,12 +2060,11 @@ class LegendaryCore:
                              ' please disable and unlink EGL Sync.')
 
         if delete_files:
-            delete_folder(os.path.join(igame.install_path, '.egstore'))
+            delete_folder(Path(igame.install_path, '.egstore'))
 
     def egl_restore_or_uninstall(self, igame):
         # check if game binary is still present, if not; uninstall
-        if not os.path.exists(os.path.join(igame.install_path,
-                                           igame.executable.lstrip('/'))):
+        if not Path(igame.install_path, igame.executable.lstrip('/')).exists():
             self.log.warning('Synced game\'s files no longer exists, assuming it has been uninstalled.')
             igame.egl_guid = ''
             return self.uninstall_game(igame, delete_files=False)
@@ -2161,7 +2148,7 @@ class LegendaryCore:
 
     @staticmethod
     def is_overlay_install(path):
-        return os.path.exists(os.path.join(path, 'EOSOVH-Win64-Shipping.dll'))
+        return Path(path, 'EOSOVH-Win64-Shipping.dll').exists()
 
     def search_overlay_installs(self, prefix=None):
         locations = []
@@ -2177,11 +2164,11 @@ class LegendaryCore:
                                                 f'\\managedArtifacts\\{EOSOverlayApp.app_name}'))
         else:
             # Launcher path
-            locations.append(os.path.join(prefix, 'drive_c', 'Program Files (x86)',
-                                          'Epic Games/Launcher/Portal/Extras/Overlay'))
+            locations.append(str(Path(prefix, 'drive_c', 'Program Files (x86)',
+                                      'Epic Games/Launcher/Portal/Extras/Overlay')))
             # EOSH path
-            locations.append(os.path.join(prefix, 'drive_c', 'Program Files (x86)',
-                                          f'Epic Games/Epic Online Services/managedArtifacts/{EOSOverlayApp.app_name}'))
+            locations.append(str(Path(prefix, 'drive_c', 'Program Files (x86)',
+                                      f'Epic Games/Epic Online Services/managedArtifacts/{EOSOverlayApp.app_name}')))
 
         # normalise all paths
         locations = [os.path.normpath(x) for x in locations]
@@ -2210,19 +2197,17 @@ class LegendaryCore:
         if igame := self.lgd.get_overlay_install_info():
             path = igame.install_path
         else:
-            path = path or os.path.join(self.get_default_install_dir(), '.overlay')
+            path = path or str(Path(self.get_default_install_dir(), '.overlay'))
 
         dlm = DLManager(path, base_urls[0], manifest_secrets)
         analysis_result = dlm.run_analysis(manifest=manifest)
 
         install_size = analysis_result.install_size
-        if os.path.exists(path):
+        if Path(path).exists():
             current_size = get_dir_size(path)
             install_size = min(0, install_size - current_size)
 
-        parent_dir = path
-        while not os.path.exists(parent_dir):
-            parent_dir, _ = os.path.split(parent_dir)
+        parent_dir = next(p for p in (Path(path), *Path(path).parents) if p.exists())
 
         _, _, free = shutil.disk_usage(parent_dir)
         if free < install_size:
@@ -2240,7 +2225,7 @@ class LegendaryCore:
 
     def remove_overlay_install(self):
         igame = self.lgd.get_overlay_install_info()
-        if os.path.exists(igame.install_path):
+        if Path(igame.install_path).exists():
             delete_folder(igame.install_path, recursive=True)
         self.lgd.remove_overlay_install_info()
 
@@ -2258,7 +2243,7 @@ class LegendaryCore:
             base_url = manifest_url.rpartition('/')[0]
 
         path = mac_get_bottle_path(bottle_name)
-        if os.path.exists(path):
+        if Path(path).exists():
             raise FileExistsError(f'Bottle {bottle_name} already exists')
 
         dlm = DLManager(path, base_url, dict())
@@ -2266,9 +2251,7 @@ class LegendaryCore:
 
         install_size = analysis_result.install_size
 
-        parent_dir = path
-        while not os.path.exists(parent_dir):
-            parent_dir, _ = os.path.split(parent_dir)
+        parent_dir = next(p for p in (Path(path), *Path(path).parents) if p.exists())
 
         _, _, free = shutil.disk_usage(parent_dir)
         if free < install_size:
@@ -2283,32 +2266,30 @@ class LegendaryCore:
         self.log.info('Creating bottle symlinks...')
         symlinks = [
             ('dosdevices/c:', '../drive_c'),
-            ('dosdevices/y:', os.path.expanduser('~')),
+            ('dosdevices/y:', str(Path.home())),
             ('dosdevices/z:', '/'),
-            ('drive_c/users/crossover/Desktop/My Mac Desktop', os.path.expanduser('~/Desktop')),
-            ('drive_c/users/crossover/Downloads', os.path.expanduser('~/Downloads')),
-            ('drive_c/users/crossover/My Documents', os.path.expanduser('~/Documents')),
-            ('drive_c/users/crossover/My Music', os.path.expanduser('~/Music')),
-            ('drive_c/users/crossover/My Pictures', os.path.expanduser('~/Pictures')),
-            ('drive_c/users/crossover/My Videos', os.path.expanduser('~/Movies')),
-            ('drive_c/users/crossover/Templates', os.path.join(path, 'dosdevices/c:/users/crossover/My Documents')),
+            ('drive_c/users/crossover/Desktop/My Mac Desktop', str(Path.home() / 'Desktop')),
+            ('drive_c/users/crossover/Downloads', str(Path.home() / 'Downloads')),
+            ('drive_c/users/crossover/My Documents', str(Path.home() / 'Documents')),
+            ('drive_c/users/crossover/My Music', str(Path.home() / 'Music')),
+            ('drive_c/users/crossover/My Pictures', str(Path.home() / 'Pictures')),
+            ('drive_c/users/crossover/My Videos', str(Path.home() / 'Movies')),
+            ('drive_c/users/crossover/Templates', str(Path(path, 'dosdevices/c:/users/crossover/My Documents'))),
         ]
 
         for link, target in symlinks:
-            _link = os.path.join(path, link)
-            _parent = os.path.split(_link)[0]
-            if not os.path.exists(_parent):
-                os.makedirs(_parent, exist_ok=True)
+            _link = Path(path, link)
+            _link.parent.mkdir(parents=True, exist_ok=True)
 
             try:
-                os.symlink(target, _link)
+                _link.symlink_to(target)
             except Exception as e:
                 self.log.error(f'Failed to create symlink {_link} -> {target}: {e!r}')
 
     @staticmethod
     def remove_bottle(bottle_name):
         path = mac_get_bottle_path(bottle_name)
-        if os.path.exists(path):
+        if Path(path).exists():
             delete_folder(path, recursive=True)
 
     def exit(self):

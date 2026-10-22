@@ -1,6 +1,10 @@
 import ctypes
 import logging
-import winreg
+import sys
+
+assert sys.platform == 'win32', 'windows_helpers is only imported on Windows'
+
+import winreg  # noqa: E402
 
 _logger = logging.getLogger('WindowsHelpers')
 

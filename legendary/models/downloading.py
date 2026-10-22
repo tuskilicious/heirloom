@@ -1,5 +1,5 @@
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Flag, auto
 from typing import Optional
 
@@ -140,7 +140,7 @@ class AnalysisResult:
     added: int = 0
     changed: int = 0
     unchanged: int = 0
-    manifest_comparison: Optional[ManifestComparison] = None
+    manifest_comparison: ManifestComparison = field(default_factory=ManifestComparison)
 
 
 @dataclass
@@ -148,8 +148,8 @@ class ConditionCheckResult:
     """
     Result of install condition checks
     """
-    failures: Optional[set] = None
-    warnings: Optional[set] = None
+    failures: set[str] = field(default_factory=set)
+    warnings: set[str] = field(default_factory=set)
 
 
 class TerminateWorkerTask:

@@ -1,10 +1,10 @@
 
 import logging
-import os
 import time
 from logging.handlers import QueueHandler
 from multiprocessing import Process
 from multiprocessing.shared_memory import SharedMemory
+from pathlib import Path
 from queue import Empty
 
 import requests
@@ -158,7 +158,7 @@ class FileWorker(Process):
         self.q = queue
         self.o_q = out_queue
         self.base_path = base_path
-        self.cache_path = cache_path or os.path.join(base_path, '.cache')
+        self.cache_path = Path(cache_path or Path(base_path, '.cache'))
         self.shm = SharedMemory(name=shm)
         self.log_level = logging.getLogger().level
         self.logging_queue = logging_queue
@@ -194,17 +194,15 @@ class FileWorker(Process):
                     break
 
                 # make directories if required
-                path, filename = os.path.split(j.filename)
-                file_dir = os.path.join(self.base_path, path)
+                file_dir = Path(self.base_path, j.filename).parent
                 if self.case_insensitive:
                     file_dir = case_insensitive_file_search(file_dir)
-                if not os.path.exists(file_dir):
-                    os.makedirs(file_dir)
+                file_dir.mkdir(parents=True, exist_ok=True)
 
-                full_path = os.path.join(file_dir, filename)
+                full_path = file_dir / Path(j.filename).name
 
                 if j.flags & TaskFlags.CREATE_EMPTY_FILE:  # just create an empty file
-                    open(full_path, 'a').close()
+                    full_path.open('a').close()
                     self.o_q.put(WriterTaskResult(success=True, **j.__dict__))
                     continue
                 if j.flags & TaskFlags.CREATE_SYMLINK:
@@ -214,11 +212,11 @@ class FileWorker(Process):
                         current_file = None
 
                     try:
-                        os.symlink(j.old_file, full_path)
+                        full_path.symlink_to(j.old_file)
                     except FileExistsError:
                         try:
-                            os.remove(full_path)
-                            os.symlink(j.old_file, full_path)
+                            full_path.unlink()
+                            full_path.symlink_to(j.old_file)
                         except OSError as e:
                             logger.error(f'Creating symlink failed: {e!r}')
                             self.o_q.put(WriterTaskResult(success=False, **j.__dict__))
@@ -235,7 +233,7 @@ class FileWorker(Process):
                         logger.warning(f'Opening new file {j.filename} without closing previous! {last_filename}')
                         current_file.close()
 
-                    current_file = open(full_path, 'wb')
+                    current_file = full_path.open('wb')
                     last_filename = j.filename
 
                     self.o_q.put(WriterTaskResult(success=True, **j.__dict__))
@@ -256,15 +254,15 @@ class FileWorker(Process):
                         current_file = None
                     if j.flags & TaskFlags.DELETE_FILE:
                         try:
-                            os.remove(full_path)
+                            full_path.unlink()
                         except OSError as e:
                             logger.error(f'Removing file failed: {e!r}')
                             self.o_q.put(WriterTaskResult(success=False, **j.__dict__))
                             continue
 
                     try:
-                        old_path = case_insensitive_file_search(os.path.join(self.base_path, j.old_file))
-                        os.rename(old_path, full_path)
+                        old_path = case_insensitive_file_search(Path(self.base_path, j.old_file))
+                        old_path.rename(full_path)
                     except OSError as e:
                         logger.error(f'Renaming file failed: {e!r}')
                         self.o_q.put(WriterTaskResult(success=False, **j.__dict__))
@@ -279,7 +277,7 @@ class FileWorker(Process):
                         current_file = None
 
                     try:
-                        os.remove(full_path)
+                        full_path.unlink()
                     except OSError as e:
                         if not j.flags & TaskFlags.SILENT:
                             logger.error(f'Removing file failed: {e!r}')
@@ -293,8 +291,7 @@ class FileWorker(Process):
                         current_file = None
 
                     try:
-                        st = os.stat(full_path)
-                        os.chmod(full_path, st.st_mode | 0o111)
+                        full_path.chmod(full_path.stat().st_mode | 0o111)
                     except OSError as e:
                         if not j.flags & TaskFlags.SILENT:
                             logger.error(f'chmod\'ing file failed: {e!r}')
@@ -308,12 +305,12 @@ class FileWorker(Process):
                         shm_end = shm_offset + j.chunk_size
                         current_file.write(self.shm.buf[shm_offset:shm_end])
                     elif j.cache_file:
-                        with open(os.path.join(self.cache_path, j.cache_file), 'rb') as f:
+                        with (self.cache_path / j.cache_file).open('rb') as f:
                             if j.chunk_offset:
                                 f.seek(j.chunk_offset)
                             current_file.write(f.read(j.chunk_size))
                     elif j.old_file:
-                        with open(os.path.join(self.base_path, j.old_file), 'rb') as f:
+                        with Path(self.base_path, j.old_file).open('rb') as f:
                             if j.chunk_offset:
                                 f.seek(j.chunk_offset)
                             current_file.write(f.read(j.chunk_size))

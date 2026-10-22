@@ -13,6 +13,7 @@ from collections import defaultdict, namedtuple
 from logging.handlers import QueueListener
 from multiprocessing import Queue as MPQueue
 from multiprocessing import freeze_support
+from pathlib import Path
 from platform import platform
 from sys import exit, stdout
 from sys import platform as sys_platform
@@ -116,8 +117,8 @@ class LegendaryCLI:
             # get appdata path on Linux
             if not self.core.egl.appdata_path:
                 egl_wine_pfx = None
-                lutris_wine_pfx = os.path.expanduser('~/Games/epic-games-store')
-                if os.path.exists(lutris_wine_pfx):
+                lutris_wine_pfx = str(Path.home() / 'Games' / 'epic-games-store')
+                if Path(lutris_wine_pfx).exists():
                     logger.info(f'Found Lutris EGL WINE prefix at "{lutris_wine_pfx}"')
                     if args.yes or get_boolean_choice('Do you want to use the Lutris install?'):
                         egl_wine_pfx = lutris_wine_pfx
@@ -128,21 +129,20 @@ class LegendaryCLI:
                     if not egl_wine_pfx:
                         print('Empty input, quitting...')
                         exit(0)
-                    if not os.path.exists(egl_wine_pfx) and os.path.isdir(egl_wine_pfx):
+                    if not Path(egl_wine_pfx).is_dir():
                         print('Path is invalid (does not exist)!')
                         exit(1)
 
                 try:
                     wine_folders = get_shell_folders(read_registry(egl_wine_pfx), egl_wine_pfx)
-                    egl_appdata = os.path.realpath(os.path.join(wine_folders['Local AppData'],
-                                                                'EpicGamesLauncher', 'Saved',
-                                                                'Config', 'Windows'))
+                    egl_appdata = str(Path(wine_folders['Local AppData'], 'EpicGamesLauncher', 'Saved',
+                                           'Config', 'Windows').resolve())
                 except Exception as e:
                     logger.error(f'Got exception when trying to read WINE registry: {e!r}')
                     logger.error('Make sure you are specifying a valid wine prefix.')
                     exit(1)
 
-                if not os.path.exists(egl_appdata):
+                if not Path(egl_appdata).exists():
                     logger.error(f'Wine prefix does not have EGL appdata path at "{egl_appdata}"')
                     exit(0)
                 else:
@@ -348,7 +348,7 @@ class LegendaryCLI:
                   f'Platform: {game.platform} | {game.install_size / (1024 * 1024 * 1024):.02f} GiB)')
             if args.include_dir:
                 print(f'  + Location: {game.install_path}')
-            if not os.path.exists(game.install_path):
+            if not Path(game.install_path).exists():
                 print(f'  ! Game does no longer appear to be installed (directory "{game.install_path}" missing)!')
             elif game.app_name in versions and versions[game.app_name] != game.version:
                 print(f'  -> Update available! Installed: {game.version}, Latest: {versions[game.app_name]}')
@@ -535,8 +535,8 @@ class LegendaryCLI:
                         logger.info('Empty input, skipping...')
                         continue
 
-                if not os.path.exists(save_path):
-                    os.makedirs(save_path)
+                if not Path(save_path).exists():
+                    Path(save_path).mkdir(parents=True)
                 igame.save_path = save_path
                 self.core.lgd.set_installed_game(igame.app_name, igame)
 
@@ -619,7 +619,7 @@ class LegendaryCLI:
             logger.error(f'{app_name} is DLC without an executable; please launch the base game instead!')
             exit(1)
 
-        if not os.path.exists(igame.install_path):
+        if not Path(igame.install_path).exists():
             logger.fatal(f'Install directory "{igame.install_path}" appears to be deleted, cannot launch {app_name}!')
             exit(1)
 
@@ -695,7 +695,7 @@ class LegendaryCLI:
         full_params.extend(params.launch_command)
         if 'LEGENDARY_WRAPPER_EXE' in full_env:
             full_params.append(full_env['LEGENDARY_WRAPPER_EXE'].strip())
-        full_params.append(os.path.join(params.game_directory, params.game_executable))
+        full_params.append(str(Path(params.game_directory, params.game_executable)))
         full_params.extend(params.game_parameters)
         full_params.extend(params.user_parameters)
         full_params.extend(params.egl_parameters)
@@ -862,7 +862,7 @@ class LegendaryCLI:
         elif args.subparser_name == 'repair' or args.repair_mode:
             args.repair_mode = True
             args.no_install = args.repair_and_update is False
-            repair_file = os.path.join(self.core.lgd.get_tmp_path(), f'{args.app_name}.repair')
+            repair_file = self.core.lgd.get_tmp_path() / f'{args.app_name}.repair'
 
         if not self.core.login():
             logger.error('Login failed! Cannot continue with download process.')
@@ -922,7 +922,7 @@ class LegendaryCLI:
                 logger.error(f'Game "{game.app_title}" ({game.app_name}) is not installed!')
                 exit(0)
 
-            if not os.path.exists(repair_file):
+            if not Path(repair_file).exists():
                 logger.info('Game has not been verified yet.')
                 if not args.yes:
                     if not get_boolean_choice(f'Verify "{game.app_name}" now ("no" will abort repair)?'):
@@ -1013,13 +1013,13 @@ class LegendaryCLI:
         if not analysis.dl_size:
             old_igame = self.core.get_installed_game(game.app_name)
             logger.info('Download size is 0, the game is either already up to date or has not changed. Exiting...')
-            if old_igame and args.repair_mode and os.path.exists(repair_file):
+            if old_igame and args.repair_mode and Path(repair_file).exists():
                 if old_igame.needs_verification:
                     old_igame.needs_verification = False
                     self.core.install_game(old_igame)
 
                 logger.debug('Removing repair file.')
-                os.remove(repair_file)
+                Path(repair_file).unlink()
 
             # check if install tags have changed, if they did; try deleting files that are no longer required.
             if old_igame and old_igame.install_tags != igame.install_tags:
@@ -1137,13 +1137,13 @@ class LegendaryCLI:
                     print(f'\nThis game may require additional setup, see: {tip_url}\n')
 
             old_igame = self.core.get_installed_game(game.app_name)
-            if old_igame and args.repair_mode and os.path.exists(repair_file):
+            if old_igame and args.repair_mode and Path(repair_file).exists():
                 if old_igame.needs_verification:
                     old_igame.needs_verification = False
                     self.core.install_game(old_igame)
 
                 logger.debug('Removing repair file.')
-                os.remove(repair_file)
+                Path(repair_file).unlink()
 
             # check if install tags have changed, if they did; try deleting files that are no longer required.
             if old_igame and old_igame.install_tags != igame.install_tags:
@@ -1173,11 +1173,9 @@ class LegendaryCLI:
             elif c == 'y':  # set to installed and launch installation
                 logger.info('Launching prerequisite executable..')
                 self.core.prereq_installed(igame.app_name)
-                req_path, req_exec = os.path.split(postinstall['path'])
-                work_dir = os.path.join(igame.install_path, req_path)
-                fullpath = os.path.join(work_dir, req_exec)
+                fullpath = Path(igame.install_path, postinstall['path'])
                 try:
-                    p = subprocess.Popen([fullpath, postinstall['args']], cwd=work_dir, shell=True)
+                    p = subprocess.Popen([str(fullpath), postinstall['args']], cwd=fullpath.parent, shell=True)
                     p.wait()
                 except Exception as e:
                     logger.error(f'Failed to run prereq executable with: {e!r}')
@@ -1228,11 +1226,9 @@ class LegendaryCLI:
         
         if yes or get_boolean_choice('Do you wish to run the uninstaller?', default=True):
             logger.info('Running uninstaller...')
-            req_path, req_exec = os.path.split(uninstaller['path'])
-            work_dir = os.path.join(igame.install_path, req_path)
-            fullpath = os.path.join(work_dir, req_exec)
+            fullpath = Path(igame.install_path, uninstaller['path'])
             try:
-                p = subprocess.Popen([fullpath, uninstaller['args']], cwd=work_dir, shell=True)
+                p = subprocess.Popen([str(fullpath), uninstaller['args']], cwd=fullpath.parent, shell=True)
                 p.wait()
             except Exception as e:
                 logger.error(f'Failed to run uninstaller: {e!r}')
@@ -1245,7 +1241,7 @@ class LegendaryCLI:
 
         logger.info(f'Loading installed manifest for "{args.app_name}"')
         igame = self.core.get_installed_game(args.app_name)
-        if not os.path.exists(igame.install_path):
+        if not Path(igame.install_path).exists():
             logger.error(f'Install path "{igame.install_path}" does not exist, make sure all necessary mounts '
                          f'are available. If you previously deleted the game folder without uninstalling, run '
                          f'"legendary uninstall -y {igame.app_name}" and reinstall from scratch.')
@@ -1333,9 +1329,8 @@ class LegendaryCLI:
 
         # always write repair file, even if all match
         if repair_file:
-            repair_filename = os.path.join(self.core.lgd.get_tmp_path(), f'{args.app_name}.repair')
-            with open(repair_filename, 'w', encoding='utf-8') as f:
-                f.write('\n'.join(repair_file))
+            repair_filename = self.core.lgd.get_tmp_path() / f'{args.app_name}.repair'
+            repair_filename.write_text('\n'.join(repair_file), encoding='utf-8')
             logger.debug(f'Written repair file to "{repair_filename}"')
 
         if not missing and not failed:
@@ -1352,10 +1347,10 @@ class LegendaryCLI:
             return
 
         # make sure path is absolute
-        args.app_path = os.path.abspath(args.app_path)
+        args.app_path = os.path.normpath(Path(args.app_path).absolute())
         args.app_name = self._resolve_aliases(args.app_name)
 
-        if not os.path.exists(args.app_path):
+        if not Path(args.app_path).exists():
             logger.error(f'Specified path "{args.app_path}" does not exist!')
             return
 
@@ -1388,12 +1383,12 @@ class LegendaryCLI:
 
         # get everything needed for import from core, then run additional checks.
         manifest, igame = self.core.import_game(game, args.app_path, platform=args.platform)
-        exe_path = os.path.join(args.app_path, manifest.meta.launch_exe.lstrip('/'))
+        exe_path = Path(args.app_path, manifest.meta.launch_exe.lstrip('/'))
         if os.name != 'nt':
             exe_path = case_insensitive_file_search(exe_path)
         # check if most files at least exist or if user might have specified the wrong directory
         total = len(manifest.file_manifest_list.elements)
-        found = sum(os.path.exists(os.path.join(args.app_path, f.filename))
+        found = sum(Path(args.app_path, f.filename).exists()
                     for f in manifest.file_manifest_list.elements)
         ratio = found / total
 
@@ -1404,11 +1399,11 @@ class LegendaryCLI:
                 # check if game folder is in path, suggest alternative
                 folder = game.metadata.get('customAttributes', {}).get('FolderName', {}).get('value', game.app_name)
                 if folder and folder not in args.app_path:
-                    new_path = os.path.join(args.app_path, folder)
+                    new_path = Path(args.app_path, folder)
                     logger.info(f'Did you mean "{new_path}"?')
             return
 
-        if not game.is_dlc and not os.path.exists(exe_path) and not args.disable_check:
+        if not game.is_dlc and not Path(exe_path).exists() and not args.disable_check:
             logger.error(f'Game executable could not be found at "{exe_path}", '
                          f'please verify that the specified path is correct.')
             return
@@ -1482,57 +1477,55 @@ class LegendaryCLI:
         if not self.core.egl.programdata_path:
             if not args.egl_manifest_path and not args.egl_wine_prefix:
                 # search default Lutris install path
-                lutris_data_path = os.path.expanduser('~/Games/epic-games-store/drive_c/ProgramData'
-                                                      '/Epic/EpicGamesLauncher/Data')
+                lutris_data_path = Path.home() / 'Games/epic-games-store/drive_c/ProgramData/Epic/EpicGamesLauncher/Data'
                 egl_path = None
-                if os.path.exists(lutris_data_path):
+                if lutris_data_path.exists():
                     logger.info(f'Found Lutris EGL install at "{lutris_data_path}"')
 
                     if args.yes or get_boolean_choice('Do you want to use the Lutris install?'):
-                        egl_path = os.path.join(lutris_data_path, 'Manifests')
-                        if not os.path.exists(egl_path):
+                        egl_path = lutris_data_path / 'Manifests'
+                        if not egl_path.exists():
                             print('EGL Data path exists but Manifests directory is missing, creating...')
-                            os.makedirs(egl_path)
+                            egl_path.mkdir(parents=True)
 
                 if not egl_path:
                     print('EGL path not found, please manually provide the path to the WINE prefix it is installed in')
-                    egl_path = input('Path [empty input to quit]: ').strip()
-                    if not egl_path:
+                    egl_prefix = input('Path [empty input to quit]: ').strip()
+                    if not egl_prefix:
                         print('Empty input, quitting...')
                         exit(0)
-                    if not os.path.exists(egl_path):
+                    if not Path(egl_prefix).exists():
                         print('Path is invalid (does not exist)!')
                         exit(1)
-                    egl_data_path = os.path.join(egl_path, 'drive_c/ProgramData/Epic/EpicGamesLauncher/Data')
-                    egl_path = os.path.join(egl_data_path, 'Manifests')
-                    if not os.path.exists(egl_path):
-                        if not os.path.exists(egl_data_path):
+                    egl_data_path = Path(egl_prefix, 'drive_c/ProgramData/Epic/EpicGamesLauncher/Data')
+                    egl_path = egl_data_path / 'Manifests'
+                    if not egl_path.exists():
+                        if not egl_data_path.exists():
                             print('Invalid path (wrong directory, WINE prefix, or EGL not installed/launched)')
                             exit(1)
                         print('EGL Data path exists but Manifests directory is missing, creating...')
-                        os.makedirs(egl_path)
+                        egl_path.mkdir(parents=True)
 
-                if not os.listdir(egl_path):
+                if not any(egl_path.iterdir()):
                     logger.warning('Folder is empty, this may be fine if nothing has been installed yet.')
-                self.core.egl.programdata_path = egl_path
-                self.core.lgd.config.set('Legendary', 'egl_programdata', egl_path)
+                self.core.egl.programdata_path = str(egl_path)
+                self.core.lgd.config.set('Legendary', 'egl_programdata', str(egl_path))
             elif args.egl_wine_prefix:
-                egl_data_path = os.path.join(args.egl_wine_prefix,
-                                             'drive_c/ProgramData/Epic/EpicGamesLauncher/Data')
-                egl_path = os.path.join(egl_data_path, 'Manifests')
-                if not os.path.exists(egl_path):
-                    if not os.path.exists(egl_data_path):
+                egl_data_path = Path(args.egl_wine_prefix, 'drive_c/ProgramData/Epic/EpicGamesLauncher/Data')
+                egl_path = egl_data_path / 'Manifests'
+                if not egl_path.exists():
+                    if not egl_data_path.exists():
                         print('Invalid path (wrong directory, WINE prefix, or EGL not installed/launched)')
                         exit(1)
                     print('EGL Data path exists but Manifests directory is missing, creating...')
-                    os.makedirs(egl_path)
+                    egl_path.mkdir(parents=True)
 
-                if not os.listdir(egl_path):
+                if not any(egl_path.iterdir()):
                     logger.warning('Folder is empty, this may be fine if nothing has been installed yet.')
-                self.core.egl.programdata_path = egl_path
-                self.core.lgd.config.set('Legendary', 'egl_programdata', egl_path)
+                self.core.egl.programdata_path = str(egl_path)
+                self.core.lgd.config.set('Legendary', 'egl_programdata', str(egl_path))
             else:
-                if not os.path.exists(args.egl_manifest_path):
+                if not Path(args.egl_manifest_path).exists():
                     logger.fatal('Path specified via --egl-manifest-path does not exist')
                     exit(1)
                 self.core.egl.programdata_path = args.egl_manifest_path
@@ -1646,7 +1639,7 @@ class LegendaryCLI:
     def info(self, args):
         name_or_path = args.app_name_or_manifest
         app_name = manifest_uri = None
-        if os.path.exists(name_or_path) or name_or_path.startswith('http'):
+        if Path(name_or_path).exists() or name_or_path.startswith('http'):
             manifest_uri = name_or_path
         else:
             app_name = self._resolve_aliases(name_or_path)
@@ -1688,9 +1681,8 @@ class LegendaryCLI:
                 r = self.core.egs.unauth_session.get(manifest_uri)
                 r.raise_for_status()
                 manifest_data = r.content
-            elif manifest_uri and os.path.exists(manifest_uri):
-                with open(manifest_uri, 'rb') as f:
-                    manifest_data = f.read()
+            elif manifest_uri and Path(manifest_uri).exists():
+                manifest_data = Path(manifest_uri).read_bytes()
             else:
                 logger.info('Game not installed and offline mode enabled, cannot load manifest.')
         elif game:
@@ -2256,7 +2248,7 @@ class LegendaryCLI:
                     return
                 prefix = mac_get_bottle_path(args.bottle)
             elif args.prefix:
-                if not os.path.exists(args.prefix):
+                if not Path(args.prefix).exists():
                     logger.error(f'Prefix "{args.prefix}" does not exist.')
                     return
                 prefix = args.prefix
@@ -2265,7 +2257,7 @@ class LegendaryCLI:
                 return
 
             if prefix:
-                if not os.path.exists(prefix):
+                if not Path(prefix).exists():
                     logger.error(f'Prefix "{prefix}" does not exist.')
                     return
                 else:
@@ -2640,15 +2632,15 @@ class LegendaryCLI:
             return
 
         old_base, game_folder = os.path.split(igame.install_path.replace('\\', '/'))
-        new_path = os.path.join(args.new_path, game_folder)
+        new_path = str(Path(args.new_path, game_folder))
         logger.info(f'Moving "{game_folder}" from "{old_base}" to "{args.new_path}"')
 
         if not args.skip_move:
             try:
-                if not os.path.exists(args.new_path):
-                    os.makedirs(args.new_path)
+                if not Path(args.new_path).exists():
+                    Path(args.new_path).mkdir(parents=True)
 
-                os.rename(igame.install_path, new_path)
+                Path(igame.install_path).rename(new_path)
             except Exception as e:
                 if isinstance(e, OSError) and e.errno == 18:
                     logger.error(f'Moving to a different drive is not supported. Move the folder manually to '

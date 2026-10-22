@@ -97,8 +97,8 @@ class EPCAPI:
         self.user = session
         return self.user
 
-    def start_session(self, refresh_token: str = None, exchange_token: str = None,
-                      authorization_code: str = None, client_credentials: bool = False) -> dict:
+    def start_session(self, refresh_token: str | None = None, exchange_token: str | None = None,
+                      authorization_code: str | None = None, client_credentials: bool = False) -> dict:
         if refresh_token:
             params = dict(grant_type='refresh_token',
                           refresh_token=refresh_token,

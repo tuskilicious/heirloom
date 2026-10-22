@@ -5,9 +5,10 @@ import logging
 import os
 import shutil
 from collections.abc import Iterator
-from pathlib import Path
+from pathlib import Path, PurePath
 from sys import stdout
 from time import perf_counter
+from typing import Any
 
 from filelock import FileLock
 
@@ -16,8 +17,10 @@ from legendary.models.game import VerifyResult
 
 logger = logging.getLogger('LFS Utils')
 
+StrPath = str | os.PathLike[str]
 
-def delete_folder(path: str, recursive=True) -> bool:
+
+def delete_folder(path: StrPath, recursive: bool = True) -> bool:
     try:
         logger.debug(f'Deleting "{path}", recursive={recursive}...')
         if not recursive:
@@ -31,42 +34,40 @@ def delete_folder(path: str, recursive=True) -> bool:
         return True
 
 
-def delete_filelist(path: str, filenames: list[str],
+def delete_filelist(path: StrPath, filenames: list[str],
                     delete_root_directory: bool = False,
                     silent: bool = False, case_insensitive: bool = True) -> bool:
-    dirs = set()
+    path = Path(path)
+    dirs: set[PurePath] = set()
     no_error = True
 
     # delete all files that were installed
     for filename in filenames:
-        _dir, _fn = os.path.split(filename)
-        if _dir:
+        _dir = PurePath(filename).parent
+        if _dir.parts:
             dirs.add(_dir)
 
         try:
-            full_path = os.path.join(path, _dir, _fn)
+            full_path = path / filename
             if case_insensitive:
                 full_path = case_insensitive_file_search(full_path)
-            os.remove(full_path)
+            full_path.unlink()
         except Exception as e:
             if not silent:
                 logger.error(f'Failed deleting file {filename} with {e!r}')
             no_error = False
 
     # add intermediate directories that would have been missed otherwise
-    for _dir in sorted(dirs):
-        head, _ = os.path.split(_dir)
-        while head:
-            dirs.add(head)
-            head, _ = os.path.split(head)
+    for _dir in list(dirs):
+        dirs.update(p for p in _dir.parents if p.parts)
 
-    # remove all directories
-    for _dir in sorted(dirs, key=len, reverse=True):
+    # remove all directories, deepest first
+    for _dir in sorted(dirs, key=lambda d: len(d.parts), reverse=True):
         try:
-            dir_path = os.path.join(path, _dir)
+            dir_path = path / _dir
             if case_insensitive:
                 dir_path = case_insensitive_file_search(dir_path)
-            os.rmdir(dir_path)
+            dir_path.rmdir()
         except FileNotFoundError:
             # directory has already been deleted, ignore that
             continue
@@ -77,7 +78,7 @@ def delete_filelist(path: str, filenames: list[str],
 
     if delete_root_directory:
         try:
-            os.rmdir(path)
+            path.rmdir()
         except Exception as e:
             if not silent:
                 logger.error(f'Removing game directory failed with {e!r}')
@@ -85,8 +86,9 @@ def delete_filelist(path: str, filenames: list[str],
     return no_error
 
 
-def validate_files(base_path: str, filelist: list[tuple], hash_type='sha1',
-                   large_file_threshold=1024 * 1024 * 512, case_insensitive: bool = True) -> Iterator[tuple]:
+def validate_files(base_path: StrPath, filelist: list[tuple[str, str]], hash_type: str = 'sha1',
+                   large_file_threshold: int = 1024 * 1024 * 512,
+                   case_insensitive: bool = True) -> Iterator[tuple[VerifyResult, str, str, int]]:
     """
     Validates the files in filelist in path against the provided hashes
 
@@ -101,16 +103,17 @@ def validate_files(base_path: str, filelist: list[tuple], hash_type='sha1',
     if not filelist:
         raise ValueError('No files to validate!')
 
-    if not os.path.exists(base_path):
+    base_path = Path(base_path)
+    if not base_path.exists():
         raise OSError('Path does not exist')
 
     for file_path, file_hash in filelist:
-        full_path = os.path.join(base_path, file_path)
+        full_path = base_path / file_path
         if case_insensitive:
             full_path = case_insensitive_file_search(full_path)
         # logger.debug(f'Checking "{file_path}"...')
 
-        if not os.path.exists(full_path):
+        if not full_path.exists():
             yield VerifyResult.FILE_MISSING, file_path, '', 0
             continue
 
@@ -120,15 +123,15 @@ def validate_files(base_path: str, filelist: list[tuple], hash_type='sha1',
         start_time = 0.0
 
         try:
-            _size = os.path.getsize(full_path)
+            _size = full_path.stat().st_size
             if _size > large_file_threshold:
                 # enable progress indicator and go to new line
                 stdout.write('\n')
                 show_progress = True
-                interval = (_size / (1024 * 1024)) // 100
+                interval = max(1, int(_size / (1024 * 1024)) // 100)
                 start_time = perf_counter()
 
-            with open(full_path, 'rb') as f:
+            with full_path.open('rb') as f:
                 real_file_hash = hashlib.new(hash_type)
                 i = 0
                 while chunk := f.read(1024*1024):
@@ -158,29 +161,28 @@ def validate_files(base_path: str, filelist: list[tuple], hash_type='sha1',
             yield VerifyResult.OTHER_ERROR, file_path, '', 0
 
 
-def clean_filename(filename):
+def clean_filename(filename: str) -> str:
     return ''.join(i for i in filename if i not in '<>:"/\\|?*')
 
 
-def get_dir_size(path):
+def get_dir_size(path: StrPath) -> int:
     return sum(f.stat().st_size for f in Path(path).glob('**/*') if f.is_file())
 
 
 class LockedJSONData(FileLock):
-    def __init__(self, lock_file: str):
-        super().__init__(lock_file + '.lock')
+    def __init__(self, lock_file: StrPath):
+        self._file_path = Path(lock_file)
+        super().__init__(self._file_path.with_name(self._file_path.name + '.lock'))
 
-        self._file_path = lock_file
-        self._data = None
-        self._initial_data = None
+        self._data: Any = None
+        self._initial_data: Any = None
 
     def __enter__(self):
         super().__enter__()
 
-        if os.path.exists(self._file_path):
-            with open(self._file_path, 'r', encoding='utf-8') as f:
-                self._data = json.load(f)
-                self._initial_data = self._data
+        if self._file_path.exists():
+            self._data = json.loads(self._file_path.read_text(encoding='utf-8'))
+            self._initial_data = self._data
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -188,11 +190,9 @@ class LockedJSONData(FileLock):
 
         if self._data != self._initial_data:
             if self._data is not None:
-                with open(self._file_path, 'w', encoding='utf-8') as f:
-                    json.dump(self._data, f, indent=2, sort_keys=True)
+                self._file_path.write_text(json.dumps(self._data, indent=2, sort_keys=True), encoding='utf-8')
             else:
-                if os.path.exists(self._file_path):
-                    os.remove(self._file_path)
+                self._file_path.unlink(missing_ok=True)
 
     @property
     def data(self):

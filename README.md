@@ -131,6 +131,14 @@ echo 'export PATH=$PATH:~/.local/bin' >> ~/.profile && source ~/.profile
 
 This installs `legendary` in "editable" mode - any changes to the source code will take effect next time the `legendary` executable runs.
 
+Before opening a pull request, run the same checks as CI:
+
+```
+uv run ruff check
+uv run mypy
+uv run pytest
+```
+
 ## Quickstart
 
 **Tip:** When using PowerShell with the standalone executable, you may need to replace `legendary` with `.\legendary` in the commands below.

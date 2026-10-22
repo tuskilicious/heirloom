@@ -41,7 +41,10 @@ source = "https://github.com/derrod/legendary"
 
 [dependency-groups]
 dev = [
+    "mypy>=2.4.0",
+    "pytest>=9.1.1",
     "ruff>=0.15.10",
+    "types-requests>=2.33.0.20261006",
 ]
 
 [tool.uv]
@@ -55,8 +58,39 @@ module-root = ""
 extend-exclude = ["zipapp_main.py"]
 
 [tool.ruff.lint]
-select = [ "E",  "F",  "UP",  "B",  "SIM",  "I" ]
+select = [ "E",  "F",  "UP",  "B",  "SIM",  "I",  "PTH" ]
 ignore = [ "E501", "UP015", "SIM102", "SIM115", "B905", "UP045" ]
 
 [tool.ruff.format]
 quote-style = "single"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# fail on deprecated stdlib calls in our own code before they are removed
+filterwarnings = ["error::DeprecationWarning:legendary.*"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["legendary"]
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+[[tool.mypy.overrides]]
+module = ["webview", "webview.*"]
+ignore_missing_imports = true
+
+# Ratchet: these still set attributes to None and fill them in later, which mypy can't
+# follow inside unannotated functions. Remove a module from this list once it passes.
+[[tool.mypy.overrides]]
+module = [
+    "legendary.api.egs",
+    "legendary.cli",
+    "legendary.core",
+    "legendary.downloader.mp.workers",
+    "legendary.models.chunk",
+    "legendary.models.egl",
+    "legendary.models.manifest",
+    "legendary.utils.webview_login",
+]
+check_untyped_defs = false
