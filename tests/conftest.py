@@ -4,6 +4,12 @@ import sys
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def no_system_keyring(monkeypatch):
+    """Tests never touch the real keyring, the ones about it set their own"""
+    monkeypatch.setenv('PYTHON_KEYRING_BACKEND', 'keyring.backends.null.Keyring')
+
+
 @pytest.fixture
 def lgd_home(tmp_path, monkeypatch):
     home = tmp_path / 'heirloom'
