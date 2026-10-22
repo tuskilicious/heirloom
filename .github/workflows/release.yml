@@ -9,6 +9,8 @@ jobs:
     uses: ./.github/workflows/build-base.yml
 
   pypi:
+    # opt-in: set the PUBLISH_TO_PYPI repository variable to "true" once a PyPI trusted publisher is set up
+    if: vars.PUBLISH_TO_PYPI == 'true'
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
@@ -37,7 +39,7 @@ jobs:
     permissions:
       contents: write
     runs-on: ubuntu-slim
-    needs: [build, pypi]
+    needs: [build]
     steps:
       - name: Download builds
         uses: actions/download-artifact@v8
