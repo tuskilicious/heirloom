@@ -7,6 +7,9 @@
   with any `install` options. `heirloom queue run` downloads them one after another, optionally only inside a daily time
   window (`--window 01:00-07:00` or `download_window` in the config). When the window closes, the current download stops
   as with CTRL-C and continues in the next window.
+- **Discord Rich Presence plugin** in `plugins/discord-presence`. While a game started with `heirloom launch` runs,
+  your Discord status shows it with the time played, using Heirloom's Discord application unless you set your own.
+  Copy it into your plugins folder and enable it; see its README.
 
 ### Fixed
 - A download that fails now makes `heirloom install` exit with an error instead of reporting success.

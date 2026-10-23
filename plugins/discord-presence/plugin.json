@@ -1,0 +1,6 @@
+{
+  "name": "discord-presence",
+  "common_name": "Discord Rich Presence",
+  "description": "Shows the game you started with \"heirloom launch\" in your Discord status while you play",
+  "version": "1.0.0"
+}
