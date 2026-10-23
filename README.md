@@ -138,6 +138,19 @@ Speeds are in MiB/s by default (`20` and `20M` are the same), `K` and `G` suffix
 Set `max_download_speed` and `max_download_speed_while_playing` in the config to apply them to every download.
 The lower limit kicks in within a couple of seconds of a game starting, and only for games that `heirloom launch` waits for (not with `--no-wait`).
 
+Queue installs and updates to download later, e.g. overnight
+````
+heirloom queue add Anemone
+heirloom queue add --updates
+heirloom queue run --window 01:00-07:00
+````
+`queue add` takes the same options as `install` (e.g. `--platform Mac` or `--max-speed 5M`); `--updates` queues every installed game that has an update.
+`queue run` downloads the queued games one after another, each as its own `heirloom install`, and only inside the time window, which may cross midnight (e.g. `23:00-07:00`).
+When the window closes, the current download stops as it would with CTRL-C and continues where it stopped once the window opens again; downloads that fail stay queued.
+Leave `queue run` running, or start it from Task Scheduler or cron. Set `download_window` in the config to use a window without `--window`.
+`heirloom queue` shows the queue, `queue remove <App Name>` and `queue clear` change it.
+Games that ask which optional parts to install (selective downloads) can't ask while queued: install them once yourself, or pass `--install-tag` or `--skip-sdl` when queueing.
+
 List installed games and check for updates
 ````
 heirloom list-installed --check-updates
@@ -221,6 +234,8 @@ Commands:
     move                Move specified app name to a new location
     playtime            Show playtime recorded by "heirloom launch"
     plugins             List, enable, or disable plugins
+    queue               Queue installs and updates to run later, e.g.
+                        overnight
     themes              List terminal themes or switch to one
     status              Show heirloom status information
     sync-saves          Sync cloud saves
@@ -642,6 +657,27 @@ optional arguments:
   -h, --help            show this help message and exit
 
 
+Command: queue
+usage: heirloom queue [list|add|remove|clear|run] [<App Name> ...] [options]
+
+"add" also takes "heirloom install" options for the queued downloads, e.g.
+"heirloom queue add Anemone --platform Mac"
+
+positional arguments:
+  {list,add,remove,clear,run}
+                        What to do (default: list)
+  <App Name>            Games to add or remove
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --updates             With "add": queue every installed game that has an
+                        update
+  --window <HH:MM-HH:MM>
+                        With "run": only download in this daily time window,
+                        e.g. "01:00-07:00" (default: download_window from the
+                        config, otherwise any time)
+
+
 Command: themes
 usage: heirloom themes [-h] [{list,use}] [<name>]
 
@@ -822,6 +858,8 @@ max_workers = 8
 max_download_speed = 20
 ; lower download speed limit while a game started by "heirloom launch" is running
 max_download_speed_while_playing = 2
+; daily time window for "heirloom queue run" (may cross midnight, e.g. 23:00-07:00)
+download_window = 01:00-07:00
 ; default install directory
 install_dir = /mnt/tank/games
 ; locale override, must be in RFC 1766 format (e.g. "en-US")

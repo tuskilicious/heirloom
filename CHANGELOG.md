@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### New
+- **Download queue.** `heirloom queue add <App Name>` (or `--updates` for every update) queues installs and updates,
+  with any `install` options. `heirloom queue run` downloads them one after another, optionally only inside a daily time
+  window (`--window 01:00-07:00` or `download_window` in the config). When the window closes, the current download stops
+  as with CTRL-C and continues in the next window.
+
+### Fixed
+- A download that fails now makes `heirloom install` exit with an error instead of reporting success.
+
 ## 0.22.0 "Keepsake" (2026-10-22)
 
 The first Heirloom release. Heirloom is a fork of [Legendary](https://github.com/derrod/legendary):
