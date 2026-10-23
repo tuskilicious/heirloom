@@ -19,8 +19,18 @@ from platform import platform
 from sys import exit, stdout
 from sys import platform as sys_platform
 
+from filelock import FileLock, Timeout
+
 from heirloom import __codename__, __version__
 from heirloom.core import HeirloomCore
+from heirloom.downloader.queue import (
+    DownloadQueue,
+    QueuedDownload,
+    QueueRunner,
+    TimeWindow,
+    handle_ctrl_break_as_ctrl_c,
+    heirloom_command,
+)
 from heirloom.downloader.throttle import parse_speed
 from heirloom.lfs.crossover import (
     mac_find_crossover_apps,
@@ -902,6 +912,97 @@ class HeirloomCLI:
         for folder_name, error in self.plugins.errors.items():
             if folder_name not in available:
                 print(' ' + out.alert(f'{folder_name}: {error}'))
+
+    def manage_queue(self, args, install_options):
+        queue = DownloadQueue(self.core.lgd.path / 'queue.json')
+
+        if args.action == 'add':
+            app_names = [self._resolve_aliases(name) for name in args.app_names]
+            if args.updates:
+                app_names += self._games_with_updates()
+            elif not app_names:
+                logger.error('Name the games to queue, or use --updates to queue every update.')
+                exit(1)
+            for app_name in app_names:
+                if not self.core.is_installed(app_name) and not self.core.get_game(app_name):
+                    logger.warning(f'"{app_name}" is not in your game list here yet, it is checked when the '
+                                   f'queue runs.')
+                new = queue.add(QueuedDownload(app_name, install_options))
+                logger.info(f'Queued "{app_name}".' if new else f'Updated the queued download of "{app_name}".')
+            return
+
+        if args.action == 'remove':
+            for app_name in map(self._resolve_aliases, args.app_names):
+                if queue.remove(app_name):
+                    logger.info(f'Removed "{app_name}" from the queue.')
+                else:
+                    logger.warning(f'"{app_name}" is not queued.')
+            return
+
+        if args.action == 'clear':
+            queue.clear()
+            logger.info('Cleared the queue.')
+            return
+
+        window_text = args.window or self.core.lgd.config.get('Heirloom', 'download_window', fallback='')
+        try:
+            window = TimeWindow.parse(window_text) if window_text else None
+        except ValueError as e:
+            logger.error(e)
+            exit(1)
+
+        if args.action == 'run':
+            self._run_queue(queue, window, args.config_file)
+            return
+
+        jobs = queue.jobs()
+        if not jobs:
+            print('The queue is empty. Queue downloads with "heirloom queue add <App Name>".')
+            return
+        print(f'Queued downloads ({len(jobs)}), run them with "heirloom queue run":')
+        for number, job in enumerate(jobs, 1):
+            options = f' {shlex.join(job.options)}' if job.options else ''
+            print(f' {number}. {job.app_name}{options}')
+        print(f'Download window: {window or "any time"}')
+
+    def _games_with_updates(self):
+        logger.info('Logging in to check for updates...')
+        if not self.core.login():
+            logger.error('Login failed! Cannot check for updates.')
+            exit(1)
+        for app_platform in self.core.get_installed_platforms():
+            self.core.get_assets(True, platform=app_platform)
+
+        updates = []
+        for game in self.core.get_installed_list(include_dlc=True):
+            try:
+                if self.core.get_asset(game.app_name, platform=game.platform).build_version != game.version:
+                    updates.append(game.app_name)
+            except ValueError:
+                logger.warning(f'Could not check "{game.app_name}" for updates, its metadata is missing.')
+        logger.info(f'Installed games with an update: {len(updates)}')
+        return updates
+
+    def _run_queue(self, queue, window, config_file):
+        if not queue.jobs():
+            logger.info('The queue is empty.')
+            return
+        run_lock = FileLock(self.core.lgd.path / 'queue-run.lock')
+        try:
+            run_lock.acquire(timeout=0)
+        except Timeout:
+            logger.error('The queue is already running.')
+            exit(1)
+
+        config = ['-c', config_file] if config_file else []
+        runner = QueueRunner(queue, window, lambda job: [*heirloom_command(), *config, '-y', 'install',
+                                                         job.app_name, *job.options])
+        try:
+            result = runner.run()
+        finally:
+            run_lock.release()
+        failed = f', {len(result.failed)} failed and stay queued ({", ".join(result.failed)})' if result.failed else ''
+        logger.info(f'Queue finished: {len(result.done)} downloaded{failed}.')
 
     def _launch_third_party(self, args):
         game = self.core.get_game(app_name=args.app_name)
@@ -2906,6 +3007,7 @@ def _speed_argument(text):
 
 
 def main():
+    handle_ctrl_break_as_ctrl_c()
     # Set output encoding to UTF-8 if not outputting to a terminal
     if not stdout.isatty():
         stdout.reconfigure(encoding='utf-8')
@@ -2956,6 +3058,10 @@ def main():
     playtime_parser = subparsers.add_parser('playtime', help='Show playtime recorded by "heirloom launch"')
     plugins_parser = subparsers.add_parser('plugins', help='List, enable, or disable plugins')
     themes_parser = subparsers.add_parser('themes', help='List terminal themes or switch to one')
+    queue_parser = subparsers.add_parser('queue', help='Queue installs and updates to run later, e.g. overnight',
+                                         usage='%(prog)s [list|add|remove|clear|run] [<App Name> ...] [options]',
+                                         description='"add" also takes "heirloom install" options for the queued '
+                                                     'downloads, e.g. "heirloom queue add Anemone --platform Mac"')
     status_parser = subparsers.add_parser('status', help='Show heirloom status information')
     sync_saves_parser = subparsers.add_parser('sync-saves', help='Sync cloud saves')
     uninstall_parser = subparsers.add_parser('uninstall', help='Uninstall (delete) a game')
@@ -3330,6 +3436,15 @@ def main():
                                help='What to do (default: list)')
     themes_parser.add_argument('theme_name', nargs='?', metavar='<name>', help='Theme to use')
 
+    queue_parser.add_argument('action', nargs='?', default='list', choices=('list', 'add', 'remove', 'clear', 'run'),
+                              help='What to do (default: list)')
+    queue_parser.add_argument('app_names', nargs='*', metavar='<App Name>', help='Games to add or remove')
+    queue_parser.add_argument('--updates', dest='updates', action='store_true',
+                              help='With "add": queue every installed game that has an update')
+    queue_parser.add_argument('--window', dest='window', metavar='<HH:MM-HH:MM>',
+                              help='With "run": only download in this daily time window, e.g. "01:00-07:00" '
+                                   '(default: download_window from the config, otherwise any time)')
+
     # plugins can add commands, so they are loaded before parsing
     migrate_legendary_config()
     plugins = PluginManager(config_dir() / 'plugins')
@@ -3444,6 +3559,12 @@ def main():
             cli.manage_plugins(args)
         elif args.subparser_name == 'themes':
             cli.manage_themes(args)
+        elif args.subparser_name == 'queue':
+            if extra and args.action != 'add':
+                queue_parser.error(f'unrecognized arguments: {shlex.join(extra)}')
+            # check the options for the queued downloads now rather than when the queue runs
+            install_parser.parse_args(['<App Name>', *extra])
+            cli.manage_queue(args, extra)
         elif args.subparser_name in cli.plugins.commands:
             cli.plugins.run_command(args, cli.core)
     except KeyboardInterrupt:
