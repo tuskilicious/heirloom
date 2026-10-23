@@ -126,3 +126,12 @@ def test_broken_login_window_is_reported_and_a_missing_one_is_not(monkeypatch, c
     # None in sys.modules makes "import webview" fail as if pywebview was not installed
     assert not load_webview_login(monkeypatch, None).webview_available
     assert not [record for record in caplog.records if record.levelno >= logging.WARNING]
+
+
+def test_login_window_api_exposes_no_objects(monkeypatch):
+    # pywebview walks into objects held in the API's public attributes; walking the window froze it
+    webview_login = load_webview_login(monkeypatch, None)
+    api = webview_login.MockLauncher(callback_sid=print, callback_code=print)
+    api._window = object()
+    exposed = {name: value for name, value in vars(api).items() if not name.startswith('_')}
+    assert all(isinstance(value, bool | None) for value in exposed.values()), exposed

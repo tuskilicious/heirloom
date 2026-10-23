@@ -54,28 +54,31 @@ sid_req.send();
 
 
 class MockLauncher:
+    # pywebview exposes this object's public attributes to the page and walks into the objects they hold,
+    # so the window and callbacks are private: walking the window touches WebView2 off the UI thread,
+    # which froze the login window
     def __init__(self, callback_sid, callback_code):
-        self.callback_sid = callback_sid
-        self.callback_code = callback_code
-        self.window = None
+        self._callback_sid = callback_sid
+        self._callback_code = callback_code
+        self._window = None
         self.inject_js = True
         self.destroy_on_load = False
         self.callback_result = None
 
     def on_loaded(self):
-        url = self.window.get_current_url()
+        url = self._window.get_current_url()
         logger.debug(f'Loaded url: {url.partition("?")[0]}')
 
         if self.destroy_on_load:
             logger.info('Closing login window...')
-            self.window.destroy()
+            self._window.destroy()
             return
 
         # Inject JS so required window.ue stuff is available
         if self.inject_js:
-            self.window.evaluate_js(window_js)
+            self._window.evaluate_js(window_js)
 
-        if 'logout' in url and self.callback_sid:
+        if 'logout' in url and self._callback_sid:
             # prepare to close browser after logout redirect
             self.destroy_on_load = True
         elif 'logout' in url:
@@ -97,23 +100,23 @@ class MockLauncher:
         # On windows we have to do a little dance with the SID to create a session that
         # remains valid after logging out in the embedded browser.
         #  Update: Epic broke SID login, we'll also do this on Windows now
-        # if self.window.gui.renderer in ('gtkwebkit2', 'qtwebengine', 'qtwebkit'):
+        # if self._window.gui.renderer in ('gtkwebkit2', 'qtwebengine', 'qtwebkit'):
         self.destroy_on_load = True
         try:
-            self.callback_result = self.callback_code(exchange_code)
+            self.callback_result = self._callback_code(exchange_code)
         except Exception as e:
             logger.error(f'Logging in via exchange-code failed with {e!r}')
         finally:
             # We cannot destroy the browser from here,
             # so we'll load a small goodbye site first.
-            self.window.load_url(goodbye_url)
+            self._window.load_url(goodbye_url)
 
     def trigger_sid_exchange(self, *args, **kwargs):
         # check if code-based login hasn't already set the destroy flag
         if not self.destroy_on_load:
             logger.debug('Injecting SID JS')
             # inject JS to get SID API response and call our API
-            self.window.evaluate_js(get_sid_js)
+            self._window.evaluate_js(get_sid_js)
 
     def login_sid(self, sid_json):
         # Try SID login, then log out
@@ -121,14 +124,14 @@ class MockLauncher:
             j = json.loads(sid_json)
             sid = j['sid']
             logger.debug('Got SID (stage 2)! Executing sid login callback...')
-            exchange_code = self.callback_sid(sid)
+            exchange_code = self._callback_sid(sid)
             if exchange_code:
-                self.callback_result = self.callback_code(exchange_code)
+                self.callback_result = self._callback_code(exchange_code)
         except Exception as e:
             logger.error(f'SID login failed with {e!r}')
         finally:
             logger.debug('Starting browser logout...')
-            self.window.load_url(logout_url)
+            self._window.load_url(logout_url)
 
 
 def do_webview_login(callback_sid=None, callback_code=None, user_agent=None):
@@ -146,7 +149,7 @@ def do_webview_login(callback_sid=None, callback_code=None, user_agent=None):
     # Open logout URL first to remove existing cookies, then redirect to login.
     window = webview.create_window(f'Heirloom {__version__} - Epic Games Account Login',
                                    url=url, width=768, height=1024, js_api=api)
-    api.window = window
+    api._window = window
     window.events.loaded += api.on_loaded
 
     try:
