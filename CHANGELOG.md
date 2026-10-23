@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### New
+- **A window: `heirloom gui`.** Your library with cover art, search and filters, and Play, Install, Update and
+  Uninstall buttons, with download progress and a Stop button. Each action runs as a regular `heirloom` command.
+  Themes style it: the built-in ones have their own colours, and a theme's `gui_css` file can restyle the page.
 - **Download queue.** `heirloom queue add <App Name>` (or `--updates` for every update) queues installs and updates,
   with any `install` options. `heirloom queue run` downloads them one after another, optionally only inside a daily time
   window (`--window 01:00-07:00` or `download_window` in the config). When the window closes, the current download stops

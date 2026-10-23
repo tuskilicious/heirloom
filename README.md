@@ -11,8 +11,8 @@ If you find it useful, consider [supporting Legendary's author](https://ko-fi.co
 Please read the [config file](#config-file) and [cli usage](#usage) sections before creating an issue to avoid invalid reports.
 Report problems with Heirloom [on its GitHub](https://github.com/tuskilicious/heirloom/issues), not to the Legendary project.
 
-**Note:** Heirloom is currently a CLI (command-line interface) application without a graphical user interface,
-it has to be run from a terminal (e.g. PowerShell)
+**Note:** Heirloom is mainly a CLI (command-line interface) application, run from a terminal (e.g. PowerShell).
+`heirloom gui` opens a window for your library, installs, updates and playing.
 
 **Features:**
  - Authenticating with Epic's service
@@ -24,7 +24,7 @@ it has to be run from a terminal (e.g. PowerShell)
  - Importing/Exporting installed games from/to the Epic Games Launcher (unsupported for macOS version of EGL)
 
 **Planned:**
- - Simple GUI for managing/launching games
+ - More of the CLI in the window (download queue, settings)
  - Lots and lots of bug fixes, optimizations, and refactoring...
 
 ## Requirements
@@ -117,6 +117,15 @@ Note that this will log you out of the Epic Launcher.
 Your login tokens are not saved in plain text: on Windows they are encrypted for your user account with DPAPI (in `user.dpapi`, like the Epic Games Launcher does), on macOS and Linux they go into the system keyring (Keychain, or GNOME Keyring/KWallet through Secret Service).
 A login saved by an older version is moved there the next time Heirloom runs.
 Without a usable keyring, for example on a headless machine, they stay in `user.json` as before; `PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring` does that on purpose.
+
+Open the window: your library with cover art, and Play, Install, Update and Uninstall buttons
+````
+heirloom gui
+````
+It needs pywebview, which the prebuilt Windows executable includes (install the `webview` extra otherwise; on Linux this also needs GTK WebKit, and macOS is untested).
+Everything it does runs as a regular `heirloom` command, so playtime, plugins and resumable downloads work the same.
+Downloads run one at a time; Stop stops one cleanly, and installing it again continues where it stopped.
+Without a login, games are launched offline. The window uses your theme, see [Themes](#themes).
 
 Listing your games
 ````
@@ -222,6 +231,8 @@ Commands:
     download-saves      Download all cloud saves
     egl-sync            Setup or run Epic Games Launcher sync
     eos-overlay         Manage EOS Overlay install
+    gui                 Open the Heirloom window: your library, installs,
+                        updates and playing
     import              Import an already installed game
     info                Prints info about specified app name or manifest
     install (download, update, repair)
@@ -846,6 +857,37 @@ Plugins can ship themes too, which are available while the plugin is enabled. A 
 ````
 
 Colours are only used when printing to a terminal, and never when `NO_COLOR` is set. Set `FORCE_COLOR=1` to keep them when piping output.
+
+Themes also style the window of `heirloom gui`, which can switch between them too.
+Name a CSS file next to the theme in `gui_css`, and it is added to the window's page, so it can restyle anything:
+
+````json
+{
+  "name": "neon",
+  "common_name": "Neon",
+  "colors": {"accent": "bold bright_cyan"},
+  "gui_css": "neon.css"
+}
+````
+
+````css
+:root {
+  --bg: #07070d;
+  --surface: #10101c;
+  --surface-raised: #191930;
+  --border: #ff2bd6;
+  --text: #f5f5ff;
+  --muted: #b9b9ff;
+  --accent: #00f0ff;
+  --accent-text: #001014;
+  --radius: 2px;
+  --font: "Consolas", monospace;
+}
+.card { box-shadow: 0 0 18px #ff2bd633; }
+````
+
+The page's own colours, corners and font come from those CSS variables (plus `--surface-raised`, `--danger`, `--progress`, `--card-width` and `--shadow`), so most themes only need to set some of them.
+The page is in [`heirloom/gui/web`](heirloom/gui/web) for the class names to style.
 
 
 ## Config file
