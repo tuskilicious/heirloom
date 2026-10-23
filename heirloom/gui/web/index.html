@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en" data-theme="default">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Heirloom</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- the active theme's own CSS goes here -->
+  <style id="theme-css"></style>
+</head>
+<body>
+  <header class="bar">
+    <h1 class="brand">Heirloom</h1>
+    <input id="search" type="search" placeholder="Search your library" aria-label="Search your library" autocomplete="off">
+    <div class="filters" role="group" aria-label="Show">
+      <button type="button" class="chip" data-filter="all" aria-pressed="true">All</button>
+      <button type="button" class="chip" data-filter="installed" aria-pressed="false">Installed</button>
+      <button type="button" class="chip" data-filter="updates" aria-pressed="false">Updates</button>
+    </div>
+    <span class="spacer"></span>
+    <label class="theme-picker">Theme <select id="theme"></select></label>
+    <button type="button" id="refresh" class="ghost">Refresh</button>
+    <button type="button" id="account" class="ghost"></button>
+  </header>
+
+  <p id="notice" class="notice" role="status" hidden></p>
+  <main id="library" class="grid" aria-label="Your games"></main>
+  <div id="empty" class="empty" hidden>
+    <p id="empty-text"></p>
+    <button type="button" id="empty-login" class="primary" hidden>Log in</button>
+  </div>
+
+  <aside id="activity" class="activity" aria-label="Activity" hidden>
+    <h2><button type="button" id="activity-toggle" aria-expanded="true">Activity</button></h2>
+    <ul id="jobs" aria-live="polite"></ul>
+  </aside>
+
+  <script src="app.js"></script>
+</body>
+</html>

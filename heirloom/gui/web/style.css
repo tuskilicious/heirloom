@@ -1,0 +1,232 @@
+/*
+  Heirloom's window. Themes restyle it by overriding these variables (and anything else) in their gui_css file;
+  the built-in themes below are just sets of variables, selected by <html data-theme="...">.
+*/
+:root {
+  --bg: #111318;
+  --surface: #1a1d24;
+  --surface-raised: #232731;
+  --border: #2c313c;
+  --text: #e9ebf0;
+  --muted: #98a1b0;
+  --accent: #4fd1c5;
+  --accent-text: #062421;
+  --danger: #ff7a7a;
+  --progress: var(--accent);
+  --radius: 10px;
+  --font: system-ui, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --card-width: 172px;
+  --shadow: 0 10px 30px rgb(0 0 0 / 35%);
+  color-scheme: dark;
+}
+
+:root[data-theme="modern"] {
+  --bg: #0a0c16;
+  --surface: #131830;
+  --surface-raised: #1c2342;
+  --border: #283158;
+  --text: #f1f3ff;
+  --muted: #a3abd6;
+  --accent: #8b6cff;
+  --accent-text: #ffffff;
+  --progress: linear-gradient(90deg, #8b6cff, #22d3ee);
+  --radius: 16px;
+  --shadow: 0 14px 40px rgb(10 6 40 / 55%);
+}
+
+:root[data-theme="high-contrast"] {
+  --bg: #000000;
+  --surface: #000000;
+  --surface-raised: #000000;
+  --border: #ffffff;
+  --text: #ffffff;
+  --muted: #ffffff;
+  --accent: #ffd400;
+  --accent-text: #000000;
+  --danger: #ff5c5c;
+  --radius: 4px;
+  --shadow: none;
+}
+
+:root[data-theme="plain"] {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --border: #d9dde4;
+  --text: #1c2029;
+  --muted: #5d6676;
+  --accent: #2f6fed;
+  --accent-text: #ffffff;
+  --danger: #c62828;
+  --shadow: 0 4px 14px rgb(20 30 50 / 10%);
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 var(--font);
+}
+
+button, input, select { font: inherit; color: inherit; }
+
+button {
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius) - 3px);
+  padding: 6px 14px;
+  cursor: pointer;
+  background: var(--surface-raised);
+}
+
+button:disabled { opacity: .55; cursor: default; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.primary { background: var(--accent); color: var(--accent-text); font-weight: 600; }
+.ghost { background: transparent; border-color: var(--border); }
+.danger { color: var(--danger); }
+
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 24px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand { margin: 0 8px 0 0; font-size: 18px; letter-spacing: .02em; }
+
+#search {
+  width: min(320px, 40vw);
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 3px);
+  background: var(--surface);
+}
+
+.filters { display: flex; gap: 6px; }
+.chip { padding: 5px 12px; background: transparent; border-color: var(--border); color: var(--muted); }
+.chip[aria-pressed="true"] { background: var(--surface-raised); color: var(--text); border-color: var(--accent); }
+
+.spacer { flex: 1; }
+
+.theme-picker { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.theme-picker select {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 3px);
+  background: var(--surface);
+}
+
+.notice {
+  margin: 16px 24px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--card-width), 1fr));
+  gap: 22px;
+  padding: 24px 24px 160px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+
+.cover {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  background: var(--surface-raised);
+  display: grid;
+  place-items: center;
+}
+
+.cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.cover .initials { font-size: 34px; font-weight: 700; color: var(--muted); }
+
+.badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.info { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px 12px; flex: 1; }
+.title { margin: 0; font-size: 14px; line-height: 1.3; overflow-wrap: anywhere; }
+.status { margin: 0; font-size: 12px; color: var(--muted); }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; padding-top: 4px; }
+.actions button { padding: 5px 11px; font-size: 13px; }
+
+.bar-track { height: 4px; background: var(--surface-raised); border-radius: 999px; overflow: hidden; }
+.bar-fill { height: 100%; width: 0; background: var(--progress); transition: width .4s ease; }
+
+.empty { display: grid; place-items: center; gap: 12px; padding: 80px 24px; color: var(--muted); text-align: center; }
+.empty p { margin: 0; font-size: 16px; }
+
+.activity {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  width: min(380px, calc(100vw - 40px));
+  max-height: 45vh;
+  overflow: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.activity h2 { margin: 0 0 8px; font-size: 13px; }
+.activity h2 button {
+  padding: 0;
+  background: none;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+}
+.activity h2 button::after { content: " \25BE"; }
+.activity.collapsed h2 { margin: 0; }
+.activity.collapsed h2 button::after { content: " \25B8"; }
+.activity.collapsed #jobs { display: none; }
+
+#account:disabled { opacity: 1; }
+#jobs { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.job { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; }
+.job .what { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.job .detail { grid-column: 1; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.job .bar-track { grid-column: 1 / -1; }
+.job.failed .detail { color: var(--danger); }
+.job button { padding: 3px 10px; font-size: 12px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .card, .bar-fill { transition: none; }
+}

@@ -17,6 +17,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
 from datetime import time as daytime
 from pathlib import Path
+from typing import Any
 
 import heirloom
 from heirloom.lfs.utils import LockedJSONData
@@ -108,11 +109,12 @@ def heirloom_command() -> list[str]:
     return [sys.executable, '-m', 'heirloom.cli']
 
 
-def start_job(command: list[str]) -> subprocess.Popen:
+def start_job(command: list[str], **popen_options: Any) -> subprocess.Popen:
     # in its own process group, so it can be stopped without stopping the queue; a prompt fails instead of waiting
     if sys.platform == 'win32':
-        return subprocess.Popen(command, stdin=subprocess.DEVNULL, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
-    return subprocess.Popen(command, stdin=subprocess.DEVNULL, start_new_session=True)
+        return subprocess.Popen(command, stdin=subprocess.DEVNULL, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+                                **popen_options)
+    return subprocess.Popen(command, stdin=subprocess.DEVNULL, start_new_session=True, **popen_options)
 
 
 def interrupt_job(job: subprocess.Popen) -> None:
@@ -134,6 +136,18 @@ def kill_job(job: subprocess.Popen) -> None:
     job.wait()
 
 
+def stop_job(job: subprocess.Popen, seconds: float = 60.0) -> None:
+    """Stops the job as a Ctrl-C would, so a download keeps its resume file; ends it if that doesn't work in time"""
+    if job.poll() is not None:
+        return
+    try:
+        interrupt_job(job)
+        job.wait(timeout=seconds)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        log.warning(f'The download did not stop ({e!r}), ending it.')
+        kill_job(job)
+
+
 def handle_ctrl_break_as_ctrl_c() -> None:
     if sys.platform == 'win32':
         signal.signal(signal.SIGBREAK, signal.default_int_handler)
@@ -151,16 +165,12 @@ class QueueRunner:
 
     def __init__(self, queue: DownloadQueue, window: TimeWindow | None,
                  command: Callable[[QueuedDownload], list[str]],
-                 now: Callable[[], datetime] = datetime.now, sleep: Callable[[float], None] = time.sleep,
-                 start: Callable[[list[str]], subprocess.Popen] = start_job,
-                 interrupt: Callable[[subprocess.Popen], None] = interrupt_job):
+                 now: Callable[[], datetime] = datetime.now, sleep: Callable[[float], None] = time.sleep):
         self.queue = queue
         self.window = window
         self.command = command
         self.now = now
         self.sleep = sleep
-        self.start = start
-        self.interrupt = interrupt
 
     def run(self) -> QueueRun:
         """Runs queued downloads until none are left, except ones that failed in this run"""
@@ -190,18 +200,18 @@ class QueueRunner:
     def _run_job(self, job: QueuedDownload) -> int | None:
         """The job's exit code, or None if it was stopped because the window closed"""
         log.info(f'Downloading "{job.app_name}"...')
-        process = self.start(self.command(job))
+        process = start_job(self.command(job))
         try:
             while (exit_code := self._wait(process)) is None:
                 if self.window and not self.window.contains(self.now()):
                     log.info(f'The download window {self.window} closed, stopping "{job.app_name}" until it opens '
                              f'again.')
-                    self._stop(process)
+                    stop_job(process, self.STOP_SECONDS)
                     return None
             return exit_code
         except BaseException:
             # e.g. a Ctrl-C of the queue: never leave a download running on its own
-            self._stop(process)
+            stop_job(process, self.STOP_SECONDS)
             raise
 
     def _wait(self, process: subprocess.Popen) -> int | None:
@@ -209,13 +219,3 @@ class QueueRunner:
             return process.wait(timeout=self.POLL_SECONDS)
         except subprocess.TimeoutExpired:
             return None
-
-    def _stop(self, process: subprocess.Popen) -> None:
-        if process.poll() is not None:
-            return
-        try:
-            self.interrupt(process)
-            process.wait(timeout=self.STOP_SECONDS)
-        except (OSError, subprocess.TimeoutExpired) as e:
-            log.warning(f'The download did not stop ({e!r}), ending it.')
-            kill_job(process)
