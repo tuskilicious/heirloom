@@ -9,7 +9,7 @@ It adds playtime tracking, plugins, terminal themes, download speed limits, encr
 If you find it useful, consider [supporting Legendary's author](https://ko-fi.com/derrod), whose work it is built on.
 
 Please read the [config file](#config-file) and [cli usage](#usage) sections before creating an issue to avoid invalid reports.
-Report problems with Heirloom [on its GitHub](https://github.com/tuskilicious/legendary/issues), not to the Legendary project.
+Report problems with Heirloom [on its GitHub](https://github.com/tuskilicious/heirloom/issues), not to the Legendary project.
 
 **Note:** Heirloom is currently a CLI (command-line interface) application without a graphical user interface,
 it has to be run from a terminal (e.g. PowerShell)
@@ -42,17 +42,18 @@ it has to be run from a terminal (e.g. PowerShell)
 
 ## How to run/install
 
-Heirloom is not on PyPI or in Linux package managers yet, and has no prebuilt binaries yet: install it from this repository.
+Prebuilt executables for Windows, macOS, and Linux are on the [releases page](https://github.com/tuskilicious/heirloom/releases/latest).
+Heirloom is not on PyPI or in Linux package managers yet; to run it with your own Python, install it from this repository.
 
 ### With pip
 
 ```bash
-pip install "heirloom-gl @ git+https://github.com/tuskilicious/legendary"
+pip install "heirloom-gl @ git+https://github.com/tuskilicious/heirloom"
 ```
 
 Optionally, for logging in through an embedded web view:
 ```bash
-pip install "heirloom-gl[webview] @ git+https://github.com/tuskilicious/legendary"
+pip install "heirloom-gl[webview] @ git+https://github.com/tuskilicious/heirloom"
 ```
 On Linux this may also require a supported web engine and its Python bindings (on Ubuntu: `sudo apt install python3-gi-cairo`).
 Using pywebview's Qt engine may not work correctly, and pywebview is currently unsupported on macOS.
@@ -62,7 +63,7 @@ Using pywebview's Qt engine may not work correctly, and pywebview is currently u
 `uv` has various methods of installation. See <https://docs.astral.sh/uv/getting-started/installation/> and choose one.
 
 ````bash
-git clone https://github.com/tuskilicious/legendary.git heirloom
+git clone https://github.com/tuskilicious/heirloom.git
 cd heirloom
 uv sync --no-editable
 ````
