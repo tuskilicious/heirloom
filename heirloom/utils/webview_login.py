@@ -30,7 +30,7 @@ login_url = 'https://www.epicgames.com/id/login'
 sid_url = 'https://www.epicgames.com/id/api/redirect?'
 logout_url = f'https://www.epicgames.com/id/logout?productName=epic-games&redirectUrl={login_url}'
 goodbye_url = 'https://legendary.gl/goodbye'
-# Epic's login page hands the login to a launcher by redirecting here with an authorization code
+# Epic's login page opens this once signed in, without an authorization code (or with one in "code")
 launcher_redirect_url = 'https://localhost/launcher/authorized'
 window_js = '''
 window.ue = {
@@ -60,10 +60,12 @@ class MockLauncher:
     # pywebview exposes this object's public attributes to the page and walks into the objects they hold,
     # so the window and callbacks are private: walking the window touches WebView2 off the UI thread,
     # which froze the login window
-    def __init__(self, callback_sid, callback_code, callback_auth_code=None):
+    def __init__(self, callback_sid, callback_code, callback_auth_code=None, auth_code_url=None):
         self._callback_sid = callback_sid
         self._callback_code = callback_code
         self._callback_auth_code = callback_auth_code
+        self._auth_code_url = auth_code_url
+        self._requested_auth_code = False
         self._window = None
         self.inject_js = True
         self.destroy_on_load = False
@@ -73,10 +75,24 @@ class MockLauncher:
         url = self._window.get_current_url()
         logger.debug(f'Loaded url: {url.partition("?")[0]}')
 
+        # pywebview reports some pages more than once, so each step only runs the first time
         if url.startswith(launcher_redirect_url):
-            # pywebview reports the (failed) redirect page more than once, only log in the first time
+            if auth_code := parse_qs(urlsplit(url).query).get('code', [''])[0]:
+                if not self.destroy_on_load:
+                    self._login_auth_code(auth_code=auth_code)
+            elif not self._requested_auth_code:
+                # ask Epic for an authorization code with the session the window now has
+                self._requested_auth_code = True
+                self.inject_js = False
+                logger.debug('Signed in, requesting an authorization code...')
+                if self._auth_code_url:
+                    self._window.load_url(self._auth_code_url)
+                else:
+                    self._login_auth_code()
+            return
+        if self._requested_auth_code and self._auth_code_url and url.startswith(self._auth_code_url.partition('?')[0]):
             if not self.destroy_on_load:
-                self._login_auth_code(parse_qs(urlsplit(url).query).get('code', [''])[0])
+                self._login_auth_code(response=self._window.evaluate_js('document.body.innerText'))
             return
 
         if self.destroy_on_load:
@@ -121,14 +137,16 @@ class MockLauncher:
             # so we'll load a small goodbye site first.
             self._window.load_url(goodbye_url)
 
-    def _login_auth_code(self, auth_code):
+    def _login_auth_code(self, auth_code=None, response=None):
         # private, so the page can't call it with a code of its choosing
-        self.inject_js = False
         self.destroy_on_load = True
-        logger.debug('Got authorization code from the launcher redirect!')
         try:
+            if response:
+                # the browser may show its own controls (e.g. "Pretty-print") around the JSON
+                auth_code = json.loads(response[response.find('{'):response.rfind('}') + 1]).get('authorizationCode')
             if not auth_code or not self._callback_auth_code:
-                raise ValueError('no authorization code in the redirect')
+                raise ValueError('no authorization code')
+            logger.debug('Got authorization code!')
             self.callback_result = self._callback_auth_code(auth_code)
         except Exception as e:
             logger.error(f'Logging in via authorization code failed with {e!r}')
@@ -158,8 +176,10 @@ class MockLauncher:
             self._window.load_url(logout_url)
 
 
-def do_webview_login(callback_sid=None, callback_code=None, callback_auth_code=None, user_agent=None):
-    api = MockLauncher(callback_sid=callback_sid, callback_code=callback_code, callback_auth_code=callback_auth_code)
+def do_webview_login(callback_sid=None, callback_code=None, callback_auth_code=None, auth_code_url=None,
+                     user_agent=None):
+    api = MockLauncher(callback_sid=callback_sid, callback_code=callback_code, callback_auth_code=callback_auth_code,
+                       auth_code_url=auth_code_url)
     url = login_url
 
     if os.name == 'nt':
