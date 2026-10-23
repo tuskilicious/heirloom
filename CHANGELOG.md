@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.23.0 "Locket" (2026-10-23)
+
+Heirloom gets a window, a download queue for overnight installs and updates, and a Discord Rich Presence plugin.
 
 ### New
 - **A window: `heirloom gui`.** Your library with cover art, search and filters, and Play, Install, Update and
