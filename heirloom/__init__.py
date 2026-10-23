@@ -2,4 +2,4 @@
 from importlib.metadata import version
 
 __version__ = version('heirloom-gl')
-__codename__ = 'Keepsake'
+__codename__ = 'Locket'
