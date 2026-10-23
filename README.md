@@ -796,6 +796,10 @@ A backend can import other files in its folder with relative imports (`from . im
 A plugin that fails to load or raises in a handler is logged and skipped, it never stops Heirloom; run with `-v` to see the traceback.
 Plugin commands cannot replace Heirloom's own commands.
 
+The [`plugins`](plugins) folder of this repository has plugins ready to copy into yours:
+
+- [Discord Rich Presence](plugins/discord-presence) shows the game you're playing in your Discord status.
+
 
 ## Themes
 
