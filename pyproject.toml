@@ -44,7 +44,7 @@ heirloom = "heirloom.cli:main"
 legendary = "heirloom.cli:main"
 
 [project.urls]
-source = "https://github.com/tuskilicious/legendary"
+source = "https://github.com/tuskilicious/heirloom"
 upstream = "https://github.com/derrod/legendary"
 
 [dependency-groups]
