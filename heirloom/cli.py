@@ -1255,6 +1255,7 @@ class HeirloomCLI:
             logger.warning(f'The following exception occurred while waiting for the downloader to finish: {e!r}. '
                            f'Try restarting the process, the resume file will be used to start where it failed. '
                            f'If it continues to fail please open an issue on GitHub.')
+            exit(1)
         else:
             end_t = time.time()
             if not args.no_install:
