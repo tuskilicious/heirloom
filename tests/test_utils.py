@@ -142,6 +142,7 @@ class FakeLoginWindow:
         self.url = url
         self.navigations = []
         self.destroyed = False
+        self.body = None
 
     def get_current_url(self):
         return self.url
@@ -150,7 +151,7 @@ class FakeLoginWindow:
         self.navigations.append(url)
 
     def evaluate_js(self, script):
-        pass
+        return self.body
 
     def destroy(self):
         self.destroyed = True
@@ -172,3 +173,25 @@ def test_login_window_logs_in_with_the_code_from_the_launcher_redirect(monkeypat
     api._window.url = webview_login.goodbye_url
     api.on_loaded()
     assert api._window.destroyed
+
+
+def test_login_window_gets_an_authorization_code_after_signing_in(monkeypatch):
+    webview_login = load_webview_login(monkeypatch, None)
+    codes = []
+    code_url = 'https://www.epicgames.com/id/api/redirect?clientId=abc&responseType=code'
+    api = webview_login.MockLauncher(callback_sid=None, callback_code=None, auth_code_url=code_url,
+                                     callback_auth_code=lambda code: codes.append(code) or True)
+    window = api._window = FakeLoginWindow('https://localhost/launcher/authorized')
+    # signed in: Epic opens the launcher address without a code, Heirloom asks for one
+    api.on_loaded()
+    api.on_loaded()
+    assert window.navigations == [code_url]
+
+    window.url = code_url
+    window.body = ('Pretty-print\n{"redirectUrl": "https://localhost/launcher/authorized?code=0123abcd", '
+                   '"authorizationCode": "0123abcd", "exchangeCode": null, "sid": null}')
+    api.on_loaded()
+    api.on_loaded()
+    assert codes == ['0123abcd']
+    assert api.callback_result is True
+    assert window.navigations == [code_url, webview_login.goodbye_url]

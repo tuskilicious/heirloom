@@ -59,10 +59,13 @@ class EPCAPI:
 
         self.request_timeout = timeout if timeout > 0 else None
 
+    def get_auth_code_url(self):
+        """Gives a JSON object with an authorization code when opened by a browser signed in to Epic"""
+        return f'https://www.epicgames.com/id/api/redirect?clientId={self._user_basic}&responseType=code'
+
     def get_auth_url(self):
         login_url = 'https://www.epicgames.com/id/login?redirectUrl='
-        redirect_url = f'https://www.epicgames.com/id/api/redirect?clientId={self._user_basic}&responseType=code'
-        return login_url + urllib.parse.quote(redirect_url)
+        return login_url + urllib.parse.quote(self.get_auth_code_url())
 
     def update_egs_params(self, egs_params):
         # update user-agent
