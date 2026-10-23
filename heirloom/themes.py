@@ -73,6 +73,8 @@ class Theme:
     styles: dict[str, str]
     symbols: dict[str, str]
     source: str = 'built-in'
+    # extra CSS for "heirloom gui", from the file the theme's "gui_css" names
+    css: str = ''
 
     @classmethod
     def from_json(cls, data: dict[str, Any], source: str) -> Theme:
@@ -152,7 +154,13 @@ def load_themes(user_dir: Path, plugin_themes: list[tuple[str, Path]]) -> tuple[
     for source, path in candidates:
         label = f'{path.name} ({source})'
         try:
-            theme = Theme.from_json(json.loads(path.read_text(encoding='utf-8')), source)
+            data = json.loads(path.read_text(encoding='utf-8'))
+            theme = Theme.from_json(data, source)
+            if css_file := data.get('gui_css'):
+                css_path = path.parent / css_file
+                if not css_path.resolve().is_relative_to(path.parent.resolve()):
+                    raise ValueError(f'"gui_css" must name a file next to the theme, got {css_file!r}')
+                theme = replace(theme, css=css_path.read_text(encoding='utf-8'))
         except Exception as e:
             errors[label] = str(e)
             continue

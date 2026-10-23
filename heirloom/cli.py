@@ -913,6 +913,16 @@ class HeirloomCLI:
             if folder_name not in available:
                 print(' ' + out.alert(f'{folder_name}: {error}'))
 
+    def gui(self, args):
+        try:
+            import webview  # noqa: F401
+        except ImportError:
+            logger.error('The window needs pywebview: use the Windows executable, or install Heirloom with its '
+                         '"webview" extra (pip install "heirloom-gl[webview]").')
+            exit(1)
+        from heirloom.gui.app import run
+        run(args.config_file, lambda: self.available_themes()[0])
+
     def manage_queue(self, args, install_options):
         queue = DownloadQueue(self.core.lgd.path / 'queue.json')
 
@@ -3039,6 +3049,7 @@ def main():
     cx_parser = subparsers.add_parser('crossover', help='Setup CrossOver for launching games (macOS only)')
     download_saves_parser = subparsers.add_parser('download-saves', help='Download all cloud saves')
     egl_sync_parser = subparsers.add_parser('egl-sync', help='Setup or run Epic Games Launcher sync')
+    subparsers.add_parser('gui', help='Open the Heirloom window: your library, installs, updates and playing')
     eos_overlay_parser = subparsers.add_parser('eos-overlay', help='Manage EOS Overlay install')
     import_parser = subparsers.add_parser('import', help='Import an already installed game',
                                           aliases=('import-game',), hide_aliases=True)
@@ -3559,6 +3570,8 @@ def main():
             cli.manage_plugins(args)
         elif args.subparser_name == 'themes':
             cli.manage_themes(args)
+        elif args.subparser_name == 'gui':
+            cli.gui(args)
         elif args.subparser_name == 'queue':
             if extra and args.action != 'add':
                 queue_parser.error(f'unrecognized arguments: {shlex.join(extra)}')

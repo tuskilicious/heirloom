@@ -46,6 +46,7 @@ jobs:
       run: uv run --module PyInstaller
         --onefile
         --name heirloom
+        --add-data gui/web:heirloom/gui/web
         ${{ steps.strip.outputs.option }}
         -i ../assets/windows_icon.ico
         cli.py
