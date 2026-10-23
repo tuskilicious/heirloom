@@ -135,3 +135,40 @@ def test_login_window_api_exposes_no_objects(monkeypatch):
     api._window = object()
     exposed = {name: value for name, value in vars(api).items() if not name.startswith('_')}
     assert all(isinstance(value, bool | None) for value in exposed.values()), exposed
+
+
+class FakeLoginWindow:
+    def __init__(self, url):
+        self.url = url
+        self.navigations = []
+        self.destroyed = False
+
+    def get_current_url(self):
+        return self.url
+
+    def load_url(self, url):
+        self.navigations.append(url)
+
+    def evaluate_js(self, script):
+        pass
+
+    def destroy(self):
+        self.destroyed = True
+
+
+def test_login_window_logs_in_with_the_code_from_the_launcher_redirect(monkeypatch):
+    webview_login = load_webview_login(monkeypatch, None)
+    codes = []
+    api = webview_login.MockLauncher(callback_sid=None, callback_code=None,
+                                     callback_auth_code=lambda code: codes.append(code) or True)
+    api._window = FakeLoginWindow('https://localhost/launcher/authorized?code=0123abcd')
+    # the failed redirect page is reported twice
+    api.on_loaded()
+    api.on_loaded()
+    assert codes == ['0123abcd']
+    assert api.callback_result is True
+    assert api._window.navigations == [webview_login.goodbye_url]
+
+    api._window.url = webview_login.goodbye_url
+    api.on_loaded()
+    assert api._window.destroyed

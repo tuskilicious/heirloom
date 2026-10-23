@@ -215,7 +215,7 @@ class HeirloomCLI:
                 else:
                     auth_code = auth_code.strip('"')
             else:
-                if do_webview_login(callback_code=self.core.auth_ex_token,
+                if do_webview_login(callback_code=self.core.auth_ex_token, callback_auth_code=self.core.auth_code,
                                     user_agent=f'EpicGamesLauncher/{self.core.get_egl_version()}'):
                     logger.info(f'Successfully logged in as "{self.core.lgd.userdata["displayName"]}" via WebView')
                 else:
