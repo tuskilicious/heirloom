@@ -1,4 +1,9 @@
-# Heirloom
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/heirloom-horizontal-citron.svg">
+    <img src="assets/brand/heirloom-horizontal-evergreen.svg" alt="Heirloom" width="300">
+  </picture>
+</h1>
 ## A free and open-source Epic Games Launcher alternative
 
 Heirloom is an open-source game launcher that can download and install games from the Epic Games platform on Linux, macOS, and Windows.
@@ -886,7 +891,7 @@ Name a CSS file next to the theme in `gui_css`, and it is added to the window's 
 .card { box-shadow: 0 0 18px #ff2bd633; }
 ````
 
-The page's own colours, corners and font come from those CSS variables (plus `--surface-raised`, `--danger`, `--progress`, `--card-width` and `--shadow`), so most themes only need to set some of them.
+The page's own colours, corners and font come from those CSS variables (plus `--surface-raised`, `--danger`, `--progress`, `--radius-control` for buttons and fields, `--logo` for the logo's colour, `--card-width` and `--shadow`), so most themes only need to set some of them.
 The page is in [`heirloom/gui/web`](heirloom/gui/web) for the class names to style.
 
 

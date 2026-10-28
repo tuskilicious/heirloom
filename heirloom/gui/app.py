@@ -294,7 +294,7 @@ def run(config_file: str | None, load_themes: Callable[[], dict[str, Theme]]) ->
 
     api = GuiApi(config_file, load_themes)
     webview.create_window('Heirloom', url=str(WEB / 'index.html'), js_api=api, width=1280, height=820,
-                          min_size=(760, 560), background_color='#111318')
+                          min_size=(760, 560), background_color='#01211a')
     try:
         webview.start()
     finally:
