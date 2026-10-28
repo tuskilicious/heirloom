@@ -2066,9 +2066,8 @@ class HeirloomCore:
         # load manifest file and copy it over
         manifest_data = manifest_filename.read_bytes()
         new_manifest = self.load_manifest(manifest_data)
-        self.lgd.save_manifest(lgd_igame.app_name, new_manifest,
-                               version=new_manifest.meta.build_version,
-                               platform='Windows')
+        # saved under the installed version, as get_installed_manifest looks it up by that
+        self.lgd.save_manifest(lgd_igame.app_name, new_manifest, version=lgd_igame.version, platform='Windows')
 
         # the new Epic Games Launcher does not store these, take them from the metadata like "import" does
         game = self.get_game(app_name)
