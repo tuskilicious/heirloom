@@ -7,6 +7,10 @@
   GitHub. When a newer one is out, the window's sidebar links to its download page, and commands mention it when they
   finish, with the download for your platform (the installer on Windows). `disable_update_notice = true` hides it, and
   `disable_update_check = true` stops the check.
+- **Games from the Epic Games Launcher come along by themselves.** Each time the window refreshes your library it adds
+  the games the Epic Games Launcher installed that Heirloom doesn't have yet, as `egl-sync --import-only` does, and
+  says which. `heirloom install` (and so Install in the window and the download queue) adds a game from there instead
+  of downloading it again. No more downloading a game twice.
 
 ## 0.25.0 "Strongbox" (2026-10-28)
 

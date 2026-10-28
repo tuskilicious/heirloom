@@ -221,6 +221,7 @@ Automatically sync all games with the Epic Games Launcher
 ````
 heirloom -y egl-sync
 ````
+You rarely need to run this to bring games over: games the Epic Games Launcher installed are added by themselves, each time the window refreshes your library, and `heirloom install` adds a game from there instead of downloading it again.
 **Note:** With the new Epic Games Launcher (the 2026 rewrite, whose data lives in `%LOCALAPPDATA%\com.epicgames.eglv2`), `egl-sync` can only *import*:
 it reads the launcher's `installations.jsonl` and adds games installed there that Heirloom doesn't have yet; games already in Heirloom are left as they are.
 Exporting games to it, removing games from it, and automatic sync are not supported yet, so run `egl-sync` again to import games you install there later.
