@@ -405,7 +405,7 @@ wheels = [
 
 [[package]]
 name = "heirloom-gl"
-version = "0.26.0"
+version = "0.26.1"
 source = { editable = "." }
 dependencies = [
     { name = "filelock" },
