@@ -1154,6 +1154,16 @@ class HeirloomCore:
         return (include.split(',') if include is not None else None,
                 exclude.split(',') if exclude is not None else None)
 
+    def backup_saves(self, app_name: str, save_dir: str, backup_dir: Path) -> None:
+        """Copies the save files a cloud save download would replace to backup_dir, replacing an older copy"""
+        files = SaveGameHelper().get_deletion_list(save_dir, *self.get_save_filters(app_name))
+        if not files:
+            return
+        shutil.rmtree(backup_dir, ignore_errors=True)
+        for name in files:
+            (backup_dir / name).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(Path(save_dir, name), backup_dir / name)
+
     def upload_save(self, app_name, save_dir, local_dt: datetime | None = None,
                     disable_filtering: bool = False):
         game = self.lgd.get_game_meta(app_name)

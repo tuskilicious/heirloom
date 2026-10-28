@@ -54,7 +54,13 @@ from heirloom.lfs.wine_helpers import (
     read_registry,
 )
 from heirloom.models.exceptions import InvalidCredentialsError
-from heirloom.models.game import Game, PlaytimeSession, SaveGameStatus, VerifyResult
+from heirloom.models.game import (
+    Game,
+    InstalledGame,
+    PlaytimeSession,
+    SaveGameStatus,
+    VerifyResult,
+)
 from heirloom.plugins import (
     GameExited,
     GameLaunching,
@@ -769,6 +775,11 @@ class HeirloomCLI:
                 logger.info('Environment overrides: {}'.format(', '.join(
                     f'{k}={v}' for k, v in params.environment.items())))
         else:
+            sync_saves = not args.offline and not args.no_sync_saves and not self.core.lgd.config.getboolean(
+                'Heirloom', 'disable_cloud_save_sync', fallback=False)
+            if sync_saves:
+                self._sync_saves_around_launch(igame, before_launch=True)
+
             logger.info(f'Launching {app_name}...')
             launching = GameLaunching(app_name, igame, full_params, full_env, params.working_directory)
             self.plugins.emit(launching)
@@ -791,14 +802,63 @@ class HeirloomCLI:
             started = datetime.now(timezone.utc)
             game_process = subprocess.Popen(full_params, cwd=launching.working_directory, env=full_env,
                                             shell=os.name == 'nt')
-            if not args.no_wait and not self.core.lgd.config.getboolean('Heirloom', 'disable_playtime_tracking',
-                                                                         fallback=False):
-                self._track_playtime(app_name, game_process, started)
+            record_playtime = not self.core.lgd.config.getboolean('Heirloom', 'disable_playtime_tracking',
+                                                                  fallback=False)
+            if args.no_wait or not (record_playtime or sync_saves):
+                return
+            exit_code = self._wait_for_game(app_name, game_process, started, record_playtime)
+            if not sync_saves:
+                return
+            if exit_code is None:
+                logger.info('Not uploading saves while the game may still be running.')
+            else:
+                self._sync_saves_around_launch(igame, before_launch=False)
 
-    def _track_playtime(self, app_name: str, game_process: subprocess.Popen, started: datetime) -> None:
+    def _sync_saves_around_launch(self, igame: InstalledGame, before_launch: bool) -> None:
+        """
+        Downloads a newer cloud save before the game starts, and uploads a newer local save after it exits.
+        A failure is only logged: it never stops the game from launching.
+        """
+        game = self.core.get_game(igame.app_name)
+        if not game or not (game.supports_cloud_saves or game.supports_mac_cloud_saves):
+            return
+        try:
+            if not igame.save_path:
+                save_path = self.core.get_save_path(igame.app_name, platform=igame.platform)
+                if '%' in save_path or '{' in save_path:
+                    logger.warning(f'Not syncing saves, the save folder of "{igame.title}" is not known. Run '
+                                   f'"heirloom sync-saves {igame.app_name}" once to set it.')
+                    return
+                logger.info(f'Syncing saves in "{save_path}"')
+                Path(save_path).mkdir(parents=True, exist_ok=True)
+                igame.save_path = save_path
+                if self.core.lgd.lock_installed():
+                    self.core.lgd.set_installed_game(igame.app_name, igame)
+
+            # after a long session the login may need refreshing
+            if not self.core.login():
+                raise ValueError('login failed')
+            latest = max(self.core.get_save_games(igame.app_name), key=lambda save: save.datetime or datetime.min,
+                         default=None)
+            state, (local_dt, _) = self.core.check_savegame_state(igame.save_path, latest)
+            if before_launch and state == SaveGameStatus.REMOTE_NEWER and latest:
+                backup_dir = self.core.lgd.path / 'save-backups' / clean_filename(igame.app_name)
+                self.core.backup_saves(igame.app_name, igame.save_path, backup_dir)
+                logger.info(f'Downloading the newer cloud save (the replaced files are kept in "{backup_dir}")...')
+                self.core.download_saves(igame.app_name, manifest_name=latest.manifest_name,
+                                         save_dir=igame.save_path, clean_dir=True)
+            elif not before_launch and state == SaveGameStatus.LOCAL_NEWER:
+                logger.info('Uploading the new save to the cloud...')
+                self.core.upload_save(igame.app_name, igame.save_path, local_dt)
+        except Exception as e:
+            logger.warning(f'Syncing the cloud save of "{igame.title}" failed: {e!r}')
+
+    def _wait_for_game(self, app_name: str, game_process: subprocess.Popen, started: datetime,
+                        record: bool) -> int | None:
+        """Waits for the game to exit and returns its exit code, or None if heirloom stopped watching it first"""
         # Only the launched process is watched, so games whose own launcher exits right after starting
         # the real game get a too-short session (the EGL can't observe some of those either).
-        logger.info('Waiting for the game to exit to record playtime (use --no-wait to return immediately)...')
+        logger.info('Waiting for the game to exit (use --no-wait to return immediately)...')
         running_lock = self.core.lgd.game_running_lock(app_name)
         with running_lock:
             try:
@@ -808,7 +868,8 @@ class HeirloomCLI:
         Path(running_lock.lock_file).unlink(missing_ok=True)
 
         session = PlaytimeSession(start=started, end=datetime.now(timezone.utc), exit_code=exit_code)
-        self.core.lgd.add_playtime_session(app_name, session)
+        if record:
+            self.core.lgd.add_playtime_session(app_name, session)
         self.plugins.emit(GameExited(app_name, session))
 
         played = format_duration(session.duration.total_seconds())
@@ -818,6 +879,7 @@ class HeirloomCLI:
             logger.warning(f'{app_name} crashed after {played} (exit code {exit_code & 0xFFFFFFFF:#010x}).')
         else:
             logger.info(f'{app_name} exited after {played}.')
+        return exit_code
 
     def playtime(self, args):
         sessions_by_app = self.core.lgd.get_playtime()
@@ -3236,7 +3298,10 @@ def main():
                                help='Print the command line that would have been used to launch the game and exit')
     launch_parser.add_argument('--no-wait', dest='no_wait', action='store_true',
                                help='Return right after starting the game instead of waiting for it to exit '
-                                    '(playtime will not be recorded)')
+                                    '(playtime will not be recorded, and saves not uploaded)')
+    launch_parser.add_argument('--no-sync-saves', dest='no_sync_saves', action='store_true',
+                               help='Do not download a newer cloud save before the game starts, or upload a newer '
+                                    'local save after it exits')
     launch_parser.add_argument('--language', dest='language', action='store', metavar='<two letter language code>',
                                help='Override language for game launch (defaults to system locale)')
     launch_parser.add_argument('--wrapper', dest='wrapper', action='store', metavar='<wrapper command>',
