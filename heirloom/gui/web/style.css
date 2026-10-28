@@ -202,6 +202,7 @@ button:disabled { opacity: .55; cursor: default; }
 .rail-foot select { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
 .rail-foot label:has(select:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
 #account:disabled { opacity: 1; color: var(--text); }
+.rail-item.update { color: var(--accent); font-weight: 600; text-decoration: none; }
 #refresh.busy .icon { animation: spin 1s linear infinite; }
 
 .rail.collapsed { width: 68px; }

@@ -56,6 +56,7 @@ Download `heirloom_windows_x64_setup.exe` from the [releases page](https://githu
 It installs Heirloom for your user (no administrator rights needed) and adds a Start menu shortcut that opens the window (`heirloom gui`).
 It can also add a desktop shortcut and add Heirloom to `PATH`, so the `heirloom` command works in a terminal.
 Running a newer installer updates Heirloom; uninstalling it (Settings > Apps) keeps your config folder, with your login and game list.
+When a newer Heirloom is out, the window's sidebar links to it and commands that log in mention it when they finish (checked once a day).
 Windows may warn about an unrecognized app the first time, because the installer isn't code-signed: choose "More info" and "Run anyway".
 
 ### With pip
@@ -947,7 +948,7 @@ preferred_cdn = epicgames-download1.akamaized.net
 disable_https = false
 ; Disables the automatic update check
 disable_update_check = false
-; Disables the notice about an available update on exit
+; Disables the notice about a newer Heirloom release, on exit and in the window
 disable_update_notice = false
 ; Disable automatically-generated aliases
 disable_auto_aliasing = false

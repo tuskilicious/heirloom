@@ -201,13 +201,15 @@ class GuiApi:
         self._user: str | None = None
         self._refreshing = False
         self._notice = ''
+        # a newer Heirloom release: version, name and url
+        self._update: dict[str, str] | None = None
         self._jobs = Jobs(self._command, self._job_finished)
         self._read_library()
 
     def state(self) -> dict[str, Any]:
         with self._lock:
             return {'user': self._user, 'refreshing': self._refreshing, 'notice': self._notice,
-                    'games': self._games, 'jobs': self._jobs.snapshot()}
+                    'update': self._update, 'games': self._games, 'jobs': self._jobs.snapshot()}
 
     def refresh(self) -> None:
         with self._lock:
@@ -279,7 +281,7 @@ class GuiApi:
             self._games, self._user = games, user
 
     def _refresh(self) -> None:
-        notice = ''
+        notice, update = '', None
         try:
             from heirloom.core import HeirloomCore
             core = HeirloomCore(override_config=self._config_file)
@@ -289,12 +291,15 @@ class GuiApi:
                 notice = 'Could not log in, try logging in again.'
             else:
                 core.get_game_and_dlc_list(update_assets=True)
+            # logging in checks for a newer Heirloom
+            if core.update_available and core.update_notice_enabled() and (release := core.get_update_info()):
+                update = {'version': release['version'], 'name': release['name'], 'url': release['gh_url']}
         except Exception as e:
             log.warning(f'Refreshing the library failed: {e!r}')
             notice = f'Refreshing the library failed: {e}'
         self._read_library()
         with self._lock:
-            self._notice, self._refreshing = notice, False
+            self._notice, self._update, self._refreshing = notice, update, False
 
 
 def run(config_file: str | None, load_themes: Callable[[], dict[str, Theme]]) -> None:
