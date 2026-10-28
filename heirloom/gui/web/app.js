@@ -185,6 +185,27 @@ function openManage(game, anchor) {
   ]);
 }
 
+// the tiles over a cover being downloaded, and the order they light up in as it goes: scattered, the same every time
+const TILES = 48;
+const scatter = (index) => Math.abs(Math.sin(index * 12.9898) * 43758.5453) % 1;
+const TILE_TURN = Array.from({length: TILES}, (_, index) => index).sort((a, b) => scatter(a) - scatter(b))
+  .reduce((turns, tile, turn) => Object.assign(turns, {[tile]: turn}), []);
+
+function assemble(entry, percent) {
+  if (percent === null) {
+    if (entry.tiles) entry.tiles.remove();
+    entry.tiles = null;
+    return;
+  }
+  if (!entry.tiles) {
+    entry.tiles = el('span', {className: 'tiles'}, ...Array.from({length: TILES}, () => el('span')));
+    entry.cover.insertBefore(entry.tiles, entry.badge);
+  }
+  [...entry.tiles.children].forEach((tile, index) => {
+    tile.classList.toggle('lit', percent >= (TILE_TURN[index] + 1) / TILES * 100);
+  });
+}
+
 // how much of the cover is lit, in percent: installed games are, the rest light up as they download
 function lighting(game, job) {
   if (job && job.kind === 'play') return ['playing', 100];
@@ -208,7 +229,6 @@ function card(game) {
     entry = {
       cover: el('div', {className: 'cover'}),
       shade: el('span', {className: 'shade'}),
-      wick: el('span', {className: 'wick'}),
       badge: el('span', {className: 'badge', hidden: true}),
       title: el('h3', {className: 'title'}),
       status: el('p', {className: 'status'}),
@@ -227,11 +247,13 @@ function card(game) {
 
   if (entry.coverUrl !== game.cover) {
     entry.coverUrl = game.cover;
-    entry.cover.replaceChildren(coverArt(game), entry.shade, entry.wick, entry.badge, entry.info, entry.buttons);
+    entry.cover.replaceChildren(coverArt(game), entry.shade, entry.badge, entry.info, entry.buttons);
+    entry.tiles = null;
   }
   const [lit, percent] = lighting(game, job);
   entry.node.dataset.state = lit;
-  entry.cover.style.setProperty('--lit', `${percent}%`);
+  entry.cover.style.setProperty('--fill', String(percent));
+  assemble(entry, lit === 'filling' ? percent : null);
   // a download that filled the cover lights it up, once it is installed
   if (lit === 'filling') entry.filling = true;
   if (lit === 'installed' && entry.filling) {

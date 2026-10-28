@@ -138,7 +138,7 @@ heirloom gui
 ````
 It needs pywebview, which the prebuilt Windows executable includes (install the `webview` extra otherwise; on Linux this also needs GTK WebKit, and macOS is untested).
 The sidebar switches between all your games, the installed ones and the ones with an update; `/` jumps to the search.
-Installed games are in colour and the others are not, until a download fills their cover from the bottom.
+Installed games are in colour and the others are not; a download assembles its game's cover tile by tile, sharpening from a blur as it goes.
 The game you played last is at the top with your time played, ready to continue.
 Each installed game's Manage button (`⋯`) opens its folder, adds a desktop shortcut that plays it (Windows), verifies and repairs its files, syncs its cloud saves and uninstalls it.
 Everything it does runs as a regular `heirloom` command, so playtime, plugins and resumable downloads work the same.
