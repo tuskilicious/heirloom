@@ -71,6 +71,7 @@ from heirloom.plugins import (
 from heirloom.themes import DEFAULT_THEME, Theme, ThemedFormatter, load_themes
 from heirloom.utils.cli import (
     format_duration,
+    format_size,
     get_boolean_choice,
     get_int_choice,
     sdl_prompt,
@@ -1485,11 +1486,7 @@ class HeirloomCLI:
                         print('')
 
                 if (game.supports_cloud_saves or game.supports_mac_cloud_saves) and not game.is_dlc:
-                    # todo option to automatically download saves after the installation
-                    #  args does not have the required attributes for sync_saves in here,
-                    #  not sure how to solve that elegantly.
-                    logger.info(f'This game supports cloud saves, syncing is handled by the "sync-saves" command. '
-                                f'To download saves for this game run "heirloom sync-saves {args.app_name}"')
+                    logger.info('This game has cloud saves: launching it with Heirloom downloads them first.')
 
                 # show tip again after installation finishes so users hopefully actually see it
                 if tip_url := self.core.get_game_tip(igame.app_name):
@@ -1512,6 +1509,21 @@ class HeirloomCLI:
                 self.core.install_game(old_igame)
 
             logger.info(f'Finished installation process in {end_t - start_t:.02f} seconds.')
+            self._remove_old_manifests()
+
+    def _remove_old_manifests(self) -> None:
+        """Removes the saved manifests of game versions that are no longer installed, as "cleanup" does"""
+        installed = [(igame.app_name, igame.version, igame.platform)
+                     for igame in [*self.core.get_installed_list(), *self.core.get_installed_dlc_list()]]
+        manifests = self.core.lgd.path / 'manifests'
+
+        def size() -> int:
+            return sum(f.stat().st_size for f in manifests.glob('*') if f.is_file()) if manifests.is_dir() else 0
+
+        before = size()
+        self.core.lgd.clean_manifests(installed)
+        if freed := before - size():
+            logger.info(f'Removed the files of versions no longer installed ({format_size(freed)}).')
 
     def _handle_postinstall(self, postinstall, igame, skip_prereqs=False):
         print('\nThis game lists the following prerequisites to be installed:')
@@ -1576,6 +1588,13 @@ class HeirloomCLI:
             logger.info('Game has been uninstalled.')
         except Exception as e:
             logger.warning(f'Removing game failed: {e!r}, please remove {igame.install_path} manually.')
+            return
+        self._remove_old_manifests()
+        # files the game made itself (settings, logs, sometimes saves) are not its own to delete
+        if not args.keep_files and not igame.is_dlc and (folder := Path(igame.install_path)).is_dir():
+            files = [f for f in folder.rglob('*') if f.is_file()]
+            logger.info(f'Still in "{folder}": {len(files)} file(s), {format_size(sum(f.stat().st_size for f in files))}, '
+                        f'such as settings or saves the game made. Delete the folder if you don\'t need them.')
 
     def _handle_uninstaller(self, igame, yes=False):
         uninstaller = igame.uninstaller

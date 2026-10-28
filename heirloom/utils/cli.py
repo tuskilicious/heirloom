@@ -93,3 +93,11 @@ def format_duration(seconds: float) -> str:
         return f'{minutes}m {seconds:02d}s'
     return f'{seconds}s'
 
+
+def format_size(size: float) -> str:
+    units = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
+    while size >= 1024 and len(units) > 1:
+        size /= 1024
+        units.pop(0)
+    return f'{size:.0f} B' if units[0] == 'B' else f'{size:.1f} {units[0]}'
+
