@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### New
+- **Windows installer.** `heirloom_windows_x64_setup.exe` installs Heirloom for your user with a Start menu shortcut to
+  the window, and optionally a desktop shortcut and the `heirloom` command on `PATH`. It updates and uninstalls cleanly
+  and keeps your config folder. Opened from a shortcut, the window no longer comes with a terminal window.
+- **The Heirloom brand.** The lantern app icon, and the brand's colours and logo in the window.
+
 ## 0.23.0 "Locket" (2026-10-23)
 
 Heirloom gets a window, a download queue for overnight installs and updates, and a Discord Rich Presence plugin.
