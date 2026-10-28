@@ -7,6 +7,7 @@ import pytest
 from heirloom.core import HeirloomCore
 from heirloom.lfs.egl import EPCLFS, read_v2_installations
 from heirloom.models.egl import EGLManifest
+from heirloom.utils.cli import format_size
 from heirloom.utils.savegame_helper import SaveGameHelper
 
 from .test_cli import run
@@ -210,3 +211,26 @@ def test_window_refresh_adds_games_from_the_new_launcher(new_launcher_game, lgd_
 def test_no_launcher_no_import(lgd_home, no_real_launcher):
     lgd_home.mkdir()
     assert HeirloomCore().egl_import_new() == []
+
+
+def test_uninstall_removes_unused_manifests_and_names_what_the_game_left(new_launcher_game, lgd_home):
+    installations, game_dir, _ = new_launcher_game
+    use_new_launcher(lgd_home, installations)
+    assert run('-y', 'install', 'Fish').returncode == 0
+    (game_dir / 'graphics.cfg').write_text('made by the game')
+    manifests = lgd_home / 'manifests'
+    (manifests / 'Gone_Windows_1.manifest').write_bytes(b'from a game uninstalled long ago')
+
+    result = run('-y', 'uninstall', 'Fish')
+    assert result.returncode == 0, result.stderr
+    assert 'Deleting failed' not in result.stderr, 'the imported game is found by its installed version'
+    assert sorted(p.relative_to(game_dir).as_posix() for p in game_dir.rglob('*') if p.is_file()) == \
+        ['graphics.cfg'], "the game's files are gone, what it made itself stays"
+    assert f'Still in "{game_dir}": 1 file(s), 16 B' in result.stderr
+    assert list(manifests.iterdir()) == [], 'manifests of games no longer installed are removed'
+
+
+@pytest.mark.parametrize(('size', 'text'), [(0, '0 B'), (1023, '1023 B'), (1536, '1.5 KiB'),
+                                            (5 * 1024 ** 3, '5.0 GiB'), (3 * 1024 ** 4, '3.0 TiB')])
+def test_format_size(size, text):
+    assert format_size(size) == text

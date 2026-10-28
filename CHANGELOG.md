@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### New
+- **Less left behind.** After an install, update or uninstall, Heirloom removes the files it kept for game versions
+  that are no longer installed, as `heirloom cleanup` does. Uninstalling a game says what is still in its folder
+  (settings, saves and such the game made itself), so you can delete it if you don't need it.
+
+### Fixed
+- Uninstalling a game imported from the new Epic Games Launcher left its files behind when the launcher's version
+  number differed from the one in the game's manifest.
+
 ## 0.26.0 "Hearth" (2026-10-28)
 
 Heirloom brings over the games the Epic Games Launcher installed by itself, and tells you when a newer Heirloom is out.
