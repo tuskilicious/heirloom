@@ -58,6 +58,52 @@ jobs:
         name: ${{ runner.os }}-${{ runner.arch }}-package
         path: heirloom/dist/*
 
+    - name: Build the installer
+      if: runner.os == 'Windows' && runner.arch == 'X64'
+      shell: pwsh
+      run: |
+        Push-Location heirloom
+        uv run --module PyInstaller --onedir --name heirloom --add-data gui/web:heirloom/gui/web `
+          -i ../assets/windows_icon.ico --distpath ../installer/build --workpath build/onedir cli.py
+        Pop-Location
+        $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+        if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y }
+        $version = python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])"
+        & $iscc "/DAppVersion=$version" installer\heirloom.iss
+        if ($LASTEXITCODE) { throw "ISCC failed with $LASTEXITCODE" }
+      env:
+        PYTHONOPTIMIZE: 1
+
+    - name: Test the installer
+      if: runner.os == 'Windows' && runner.arch == 'X64'
+      shell: pwsh
+      run: |
+        $dir = Join-Path $env:RUNNER_TEMP 'Heirloom'
+        $silent = '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'
+        $setup = Start-Process installer\Output\heirloom_windows_x64_setup.exe -ArgumentList ($silent + "/DIR=`"$dir`"") -Wait -PassThru
+        if ($setup.ExitCode) { throw "setup exited with $($setup.ExitCode)" }
+        $version = & "$dir\heirloom.exe" -V
+        if ($version -notlike '*heirloom version*') { throw "heirloom.exe -V printed: $version" }
+        $lnk = Join-Path ([Environment]::GetFolderPath('Programs')) 'Heirloom.lnk'
+        $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
+        if ($shortcut.TargetPath -ne "$dir\heirloom.exe" -or $shortcut.Arguments -ne 'gui') { throw "Start menu shortcut runs: $($shortcut.TargetPath) $($shortcut.Arguments)" }
+        if ((Get-ItemProperty HKCU:\Environment).Path -notlike "*$dir*") { throw 'not added to PATH' }
+        "installed: $version"
+
+        Start-Process "$dir\unins000.exe" -ArgumentList $silent -Wait
+        # the uninstaller finishes from a copy of itself
+        for ($i = 0; $i -lt 60 -and (Test-Path "$dir\heirloom.exe"); $i++) { Start-Sleep 1 }
+        if (Test-Path "$dir\heirloom.exe") { throw 'heirloom.exe is still there after uninstalling' }
+        if (Test-Path $lnk) { throw 'the Start menu shortcut is still there after uninstalling' }
+        if ((Get-ItemProperty HKCU:\Environment).Path -like "*$dir*") { throw 'the PATH entry is still there after uninstalling' }
+        'uninstalled cleanly'
+
+    - uses: actions/upload-artifact@v7
+      if: runner.os == 'Windows' && runner.arch == 'X64'
+      with:
+        name: Windows-X64-installer
+        path: installer/Output/*.exe
+
   zipapp:
     runs-on: ${{ matrix.os }}
     strategy:

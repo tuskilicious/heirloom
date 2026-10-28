@@ -67,6 +67,9 @@ jobs:
             done
           done
 
+      - name: Copy installer
+        run: cp ./Windows-X64-installer/*.exe ./dist/
+
       - name: Package macOS zip
         working-directory: dist
         run: 7z a heirloom_macOS.zip heirloom_macOS_*

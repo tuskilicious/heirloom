@@ -87,6 +87,11 @@ def set_registry_value(hive, key, value, data, reg_type=winreg.REG_SZ, use_32bit
         winreg.CloseKey(k)
 
 
+def has_console_window() -> bool:
+    """False in a console started without a window (CREATE_NO_WINDOW)"""
+    return bool(ctypes.windll.kernel32.GetConsoleWindow())
+
+
 def double_clicked() -> bool:
     # Thanks https://stackoverflow.com/a/55476145
 

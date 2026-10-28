@@ -50,6 +50,14 @@ Report problems with Heirloom [on its GitHub](https://github.com/tuskilicious/he
 Prebuilt executables for Windows, macOS, and Linux are on the [releases page](https://github.com/tuskilicious/heirloom/releases/latest).
 Heirloom is not on PyPI or in Linux package managers yet; to run it with your own Python, install it from this repository.
 
+### Windows installer
+
+Download `heirloom_windows_x64_setup.exe` from the [releases page](https://github.com/tuskilicious/heirloom/releases/latest) and run it.
+It installs Heirloom for your user (no administrator rights needed) and adds a Start menu shortcut that opens the window (`heirloom gui`).
+It can also add a desktop shortcut and add Heirloom to `PATH`, so the `heirloom` command works in a terminal.
+Running a newer installer updates Heirloom; uninstalling it (Settings > Apps) keeps your config folder, with your login and game list.
+Windows may warn about an unrecognized app the first time, because the installer isn't code-signed: choose "More info" and "Run anyway".
+
 ### With pip
 
 ```bash

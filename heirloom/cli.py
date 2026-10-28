@@ -7,6 +7,7 @@ import logging
 import os
 import shlex
 import subprocess
+import sys
 import time
 import webbrowser
 from collections import defaultdict, namedtuple
@@ -920,6 +921,19 @@ class HeirloomCLI:
             logger.error('The window needs pywebview: use the Windows executable, or install Heirloom with its '
                          '"webview" extra (pip install "heirloom-gl[webview]").')
             exit(1)
+        if sys.platform == 'win32':
+            from heirloom.lfs.windows_helpers import double_clicked, has_console_window
+            if double_clicked() and has_console_window():
+                # opened from a shortcut: run again in a console without a window, so no terminal shows next to
+                # the Heirloom window (the jobs it starts share that console, which stopping them cleanly needs)
+                config = ['-c', args.config_file] if args.config_file else []
+                try:
+                    # breaking away from the job the one-file executable runs in, which would end it with this one
+                    subprocess.Popen([*heirloom_command(), *config, 'gui'],
+                                     creationflags=subprocess.CREATE_NO_WINDOW | subprocess.CREATE_BREAKAWAY_FROM_JOB)
+                    return
+                except OSError as e:
+                    logger.debug(f'Could not open the window without the terminal: {e!r}')
         from heirloom.gui.app import run
         run(args.config_file, lambda: self.available_themes()[0])
 
