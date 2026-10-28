@@ -21,6 +21,9 @@
   your CSS: a `.css` file in the `themes` folder, or a theme's `gui_css`. Themes are chosen in Customize, which only
   offers a choice once there is one. High contrast follows Windows' contrast settings. The setting is `window_theme`
   in the config file.
+- **Impeccable, a second window theme.** A light, editorial-poster look to choose in Customize: cream pages beside a
+  burnt-orange sidebar, an amber accent with burnt-orange text where amber would be too faint to read, and Chakra Petch
+  with JetBrains Mono labels, bundled so it works offline. No glows; shadows are tinted warm.
 - **The Epic overlay in the window.** On Windows, Customize installs the Epic overlay (friends, invites and
   achievements in games using Epic Online Services) as a download, turns it on and off for every game, updates and
   removes it, and says when it is on from the Epic Games Launcher's own copy.

@@ -1,0 +1,96 @@
+/*
+  Impeccable: a graphic, editorial-poster look, warm and confident. Cream pages beside a burnt-orange sidebar, an
+  amber accent, Chakra Petch type with JetBrains Mono labels. A window theme that comes with Heirloom.
+
+  Amber (#CC8800) fills buttons, badges and the marker; as text on cream it fails WCAG AA (2.5:1), so accent text
+  uses a burnt-orange ink (5.1:1). No glows: shadows are tinted to the page and edges are hairlines.
+  The fonts are in fonts/, under the SIL Open Font License (OFL-*.txt).
+*/
+@font-face { font-family: "Chakra Petch"; font-weight: 400; font-display: swap; src: url("themes/fonts/chakra-petch-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Chakra Petch"; font-weight: 500; font-display: swap; src: url("themes/fonts/chakra-petch-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Chakra Petch"; font-weight: 600; font-display: swap; src: url("themes/fonts/chakra-petch-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Chakra Petch"; font-weight: 700; font-display: swap; src: url("themes/fonts/chakra-petch-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 500; font-display: swap; src: url("themes/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2"); }
+
+:root {
+  --bg: #f4ecdd;
+  --surface: #ffffff;
+  --surface-raised: #eadfc9;
+  --border: #d9c9aa;
+  --text: #111827;
+  --muted: #4b5563;
+  --accent: #cc8800;
+  --accent-text: #111827;
+  /* the accent as text: burnt orange, dark enough to read on cream and white */
+  --ink: #a8431a;
+  --logo: #fbf3e4;
+  --danger: #b91c1c;
+  --progress: var(--accent);
+  --unlit: grayscale(1) contrast(.85) brightness(1.06);
+  --radius: 8px;
+  --radius-control: 4px;
+  --font: "Chakra Petch", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  --shadow: 0 12px 28px -10px rgb(120 72 18 / 28%);
+  --glass: color-mix(in srgb, #ffffff 72%, transparent);
+  --glass-strong: color-mix(in srgb, #ffffff 86%, transparent);
+  --glass-edge: rgb(17 24 39 / 12%);
+  --glass-shine: inset 0 1px 0 rgb(255 255 255 / 70%);
+  color-scheme: light;
+}
+
+/* the burnt-orange section: the sidebar, with cream type on it */
+.rail {
+  --text: #fbf3e4;
+  --muted: #faeadf;
+  --accent: #fbf3e4;
+  --surface-raised: #93391a;
+  --border: rgb(251 243 228 / 22%);
+  --glass-edge: rgb(251 243 228 / 18%);
+  --glass-shine: none;
+  background: #a9461b;
+  border-right: 0;
+}
+
+.shelf-marker { background: #93391a; }
+.shelf-marker::before { background: var(--accent); box-shadow: none; }
+.shelves .rail-item[aria-pressed="true"] .icon { filter: none; }
+.shelves .rail-item[aria-pressed="true"] .count { background: #fbf3e4; color: #93391a; }
+.count { background: rgb(251 243 228 / 16%); color: var(--text); }
+
+/* labels in JetBrains Mono, as the brand's label caps */
+.count, .summary, kbd, .badge, .panel h3, .menu-title, .hero-note {
+  font-family: var(--mono);
+  letter-spacing: .02em;
+}
+
+.hero-note, .panel h3, .menu-title { text-transform: uppercase; font-size: 12px; }
+
+/* poster type: tight, heavy headings */
+#heading, .hero-title, .panel-head h2 { letter-spacing: -.01em; font-weight: 700; }
+
+/* accent text in ink rather than amber */
+.status.lit, .hero-note, .rail-item.update, .ring .percent { color: var(--ink); }
+
+/* no glows: tinted shadows and hairlines instead */
+.brand, .empty .mark { animation: none; }
+.primary:hover:not(:disabled) { box-shadow: 0 6px 16px -6px rgb(120 72 18 / 45%); filter: none; }
+.card:hover .cover {
+  box-shadow: var(--shadow), 0 0 0 2px var(--accent);
+}
+.switch:checked { box-shadow: none; }
+.ambient { opacity: .18; }
+
+/* the hero reads against cream, so its fade is cream too, and stronger */
+.hero::after {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--bg) 96%, transparent) 0%,
+      color-mix(in srgb, var(--bg) 78%, transparent) 46%, transparent 80%),
+    linear-gradient(0deg, color-mix(in srgb, var(--bg) 70%, transparent), transparent 55%);
+}
+
+/* the cover plates: white glass with dark type */
+.info { box-shadow: var(--glass-shine), 0 4px 12px -6px rgb(120 72 18 / 30%); }
+
+/* the tiles still to assemble are cream; each flashes amber as it snaps away */
+.tiles > span { background: color-mix(in srgb, var(--bg) 90%, transparent); box-shadow: inset 0 0 0 1px rgb(17 24 39 / 8%); }

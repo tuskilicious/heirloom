@@ -904,6 +904,7 @@ Colours are only used when printing to a terminal, and never when `NO_COLOR` is 
 
 The window of `heirloom gui` has its own look, apart from the terminal's theme. Your own CSS can restyle it: once there is a window theme besides Heirloom's own, Customize in the sidebar switches between them, and its Themes folder button opens the folder to add or remove them.
 High contrast needs no theme: the window follows Windows' contrast themes and "Increase contrast" settings by itself.
+Heirloom comes with one more window theme, Impeccable: a light, editorial-poster look with cream pages, a burnt-orange sidebar, an amber accent, and Chakra Petch with JetBrains Mono (bundled, under the SIL Open Font License). It is also a worked example of a window theme, in [`heirloom/gui/web/themes`](heirloom/gui/web/themes).
 
 The quickest window theme is a CSS file in the `themes` folder, such as `paper-white.css`, which shows as "Paper white".
 A terminal theme can bring window CSS too: name a CSS file next to the theme in `gui_css`.

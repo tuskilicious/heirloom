@@ -90,18 +90,24 @@ def open_in_file_manager(path: str | Path) -> None:
 
 def window_themes(themes: dict[str, Theme], themes_dir: Path) -> dict[str, tuple[str, str]]:
     """
-    The window's themes by name, as (title, CSS): its own look, then the themes with "gui_css", then any other CSS
-    file in the themes folder, which is a theme for the window alone
+    The window's themes by name, as (title, CSS): its own look, the ones that come with Heirloom (web/themes), then
+    the themes with "gui_css", then any other CSS file in the themes folder, which is a theme for the window alone
     """
     found = {WINDOW_THEME: ('Heirloom', '')}
-    found |= {theme.name: (theme.common_name, theme.css) for theme in themes.values() if theme.css}
+    found |= {path.stem: (_title(path), path.read_text(encoding='utf-8')) for path in sorted((WEB / 'themes').glob('*.css'))}
+    found |= {theme.name: (theme.common_name, theme.css) for theme in themes.values()
+              if theme.css and theme.name not in found}
     for path in sorted(themes_dir.glob('*.css')):
         css = path.read_text(encoding='utf-8', errors='replace')
         # the CSS of a theme above, under its own name or another
         if path.stem in found or any(css == known for _, known in found.values()):
             continue
-        found[path.stem] = (path.stem.replace('-', ' ').replace('_', ' ').capitalize(), css)
+        found[path.stem] = (_title(path), css)
     return found
+
+
+def _title(css_file: Path) -> str:
+    return css_file.stem.replace('-', ' ').replace('_', ' ').capitalize()
 
 
 def read_library(lgd: LGDLFS) -> list[dict[str, Any]]:

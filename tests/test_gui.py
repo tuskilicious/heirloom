@@ -216,9 +216,11 @@ def test_theme_css_for_the_window(lgd_home, tmp_path):
 
     api = GuiApi(None, lambda: themes)
     assert api.themes() == {'active': 'heirloom', 'css': '', 'themes': [
-        {'name': 'heirloom', 'title': 'Heirloom'}, {'name': 'neon', 'title': 'neon'},
-        {'name': 'paper_white', 'title': 'Paper white'}]}, \
-        'its own look, then themes with CSS and CSS files, not terminal themes or the same CSS twice'
+        {'name': 'heirloom', 'title': 'Heirloom'}, {'name': 'impeccable', 'title': 'Impeccable'},
+        {'name': 'neon', 'title': 'neon'}, {'name': 'paper_white', 'title': 'Paper white'}]}, \
+        "its own look and the ones that come with it, then themes with CSS and CSS files, " \
+        "not terminal themes or the same CSS twice"
+    assert 'Chakra Petch' in api.use_theme('impeccable')['css']
     switched = api.use_theme('paper_white')
     assert (switched['active'], switched['css']) == ('paper_white', ':root { --bg: #fff; }')
     config = (lgd_home / 'config.ini').read_text()
