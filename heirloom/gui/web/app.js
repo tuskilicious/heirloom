@@ -216,8 +216,8 @@ function card(game) {
       key: '',
       shown: false,
     };
-    entry.node = el('article', {className: 'card'}, entry.cover,
-      el('div', {className: 'info'}, entry.title, entry.status));
+    entry.info = el('div', {className: 'info'}, entry.title, entry.status);
+    entry.node = el('article', {className: 'card'}, entry.cover);
     cards.set(game.app_name, entry);
   }
   const job = activeJob(game.app_name);
@@ -227,13 +227,11 @@ function card(game) {
 
   if (entry.coverUrl !== game.cover) {
     entry.coverUrl = game.cover;
-    entry.cover.replaceChildren(coverArt(game), entry.shade, entry.wick, entry.badge, entry.buttons);
+    entry.cover.replaceChildren(coverArt(game), entry.shade, entry.wick, entry.badge, entry.info, entry.buttons);
   }
   const [lit, percent] = lighting(game, job);
   entry.node.dataset.state = lit;
   entry.cover.style.setProperty('--lit', `${percent}%`);
-  if (lit === 'filling') entry.wick.dataset.percent = `${Math.floor(percent)}%`;
-  else delete entry.wick.dataset.percent;
   // a download that filled the cover lights it up, once it is installed
   if (lit === 'filling') entry.filling = true;
   if (lit === 'installed' && entry.filling) {

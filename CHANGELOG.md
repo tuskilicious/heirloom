@@ -30,6 +30,9 @@
 - **Smoother.** Covers lift, the sidebar marker slides and menus open on a gentle spring; filtering and searching
   glide the cards to their new places; menus and Customize ease out as well as in; the downloads list folds up;
   loading covers shimmer, and notices slide in with a citron edge. The logged-out lantern glows.
+- **Frosted glass.** The header is a floating bar of frosted glass, each game's name and status sit on a frosted
+  plate over its cover (making way for its buttons under the pointer), and the downloads panel and menus are frosted
+  too. Under Windows' contrast settings they stay solid.
 
 ## 0.26.1 "Hearth" (2026-10-28)
 
