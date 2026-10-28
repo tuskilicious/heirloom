@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.24.0 "Lantern" (2026-10-28)
+
+Heirloom gets a Windows installer, its own brand, and a new look for the window, where your games light up.
 
 ### New
 - **Windows installer.** `heirloom_windows_x64_setup.exe` installs Heirloom for your user with a Start menu shortcut to
