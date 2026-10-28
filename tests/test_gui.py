@@ -164,10 +164,19 @@ def test_theme_css_for_the_window(lgd_home, tmp_path):
     assert themes['neon'].css == ':root { --accent: #00f0ff; }'
     assert 'sneaky' not in themes and 'next to the theme' in errors['sneaky.json (user)']
 
+    window_dir = lgd_home / 'themes'
+    window_dir.mkdir(parents=True)
+    (window_dir / 'copy-of-neon.css').write_text(':root { --accent: #00f0ff; }')
+    (window_dir / 'paper_white.css').write_text(':root { --bg: #fff; }')
+
     api = GuiApi(None, lambda: themes)
-    assert api.themes()['active'] == 'default' and api.themes()['css'] == ''
-    switched = api.use_theme('neon')
-    assert (switched['active'], switched['css']) == ('neon', ':root { --accent: #00f0ff; }')
-    assert 'theme = neon' in (lgd_home / 'config.ini').read_text(), 'the terminal uses the same theme'
+    assert api.themes() == {'active': 'heirloom', 'css': '', 'themes': [
+        {'name': 'heirloom', 'title': 'Heirloom'}, {'name': 'neon', 'title': 'neon'},
+        {'name': 'paper_white', 'title': 'Paper white'}]}, \
+        'its own look, then themes with CSS and CSS files, not terminal themes or the same CSS twice'
+    switched = api.use_theme('paper_white')
+    assert (switched['active'], switched['css']) == ('paper_white', ':root { --bg: #fff; }')
+    config = (lgd_home / 'config.ini').read_text()
+    assert 'window_theme = paper_white' in config and '\ntheme =' not in config, 'the terminal keeps its theme'
     with pytest.raises(ValueError):
-        api.use_theme('nope')
+        api.use_theme('default')

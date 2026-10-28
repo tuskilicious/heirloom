@@ -143,27 +143,19 @@ function manageButton(game) {
   return node;
 }
 
-function openManage(game, anchor) {
-  const menu = $('#manage');
-  const item = (label, iconName, onclick, className = '') => el('button', {
+// a choice in a menu: it closes the menu, then does its thing
+function menuItem(label, iconName, onclick, className = '') {
+  return el('button', {
     type: 'button', role: 'menuitem', className,
-    onclick: () => {
-      menu.hidePopover();
+    onclick: (event) => {
+      event.currentTarget.closest('.menu').hidePopover();
       onclick();
     },
   }, icon(iconName), label);
-  menu.replaceChildren(...[
-    el('p', {className: 'menu-title', textContent: game.title}),
-    game.update ? item('Play without updating', 'play', () => run(api.play(game.app_name))) : null,
-    item('Open folder', 'folder', () => run(api.open_folder(game.app_name))),
-    item('Create desktop shortcut', 'desktop', () => run(api.create_shortcut(game.app_name))),
-    item('Verify and repair', 'repair', () => run(api.repair(game.app_name))),
-    game.cloud_saves ? item('Sync cloud saves', 'cloud', () => run(api.sync_saves(game.app_name))) : null,
-    el('hr'),
-    item('Uninstall', 'trash', () => {
-      if (confirm(`Uninstall ${game.title}? Its files will be deleted.`)) run(api.uninstall(game.app_name));
-    }, 'danger'),
-  ].filter(Boolean));
+}
+
+function showMenu(menu, anchor, children) {
+  menu.replaceChildren(...children.filter(Boolean));
   // closing it with Escape or a choice puts the keyboard back on the button
   menu.onbeforetoggle = (event) => {
     if (event.newState === 'closed' && anchor.isConnected && menu.contains(document.activeElement)) anchor.focus();
@@ -175,7 +167,22 @@ function openManage(game, anchor) {
   const below = button.bottom + 6 + height <= innerHeight;
   menu.style.left = `${Math.max(8, Math.min(button.right - width, innerWidth - width - 8))}px`;
   menu.style.top = `${below ? button.bottom + 6 : Math.max(8, button.top - 6 - height)}px`;
-  menu.querySelector('[role="menuitem"]').focus();
+  (menu.querySelector('[aria-checked="true"]') || menu.querySelector('[role^="menuitem"]')).focus();
+}
+
+function openManage(game, anchor) {
+  showMenu($('#manage'), anchor, [
+    el('p', {className: 'menu-title', textContent: game.title}),
+    game.update ? menuItem('Play without updating', 'play', () => run(api.play(game.app_name))) : null,
+    menuItem('Open folder', 'folder', () => run(api.open_folder(game.app_name))),
+    menuItem('Create desktop shortcut', 'desktop', () => run(api.create_shortcut(game.app_name))),
+    menuItem('Verify and repair', 'repair', () => run(api.repair(game.app_name))),
+    game.cloud_saves ? menuItem('Sync cloud saves', 'cloud', () => run(api.sync_saves(game.app_name))) : null,
+    el('hr'),
+    menuItem('Uninstall', 'trash', () => {
+      if (confirm(`Uninstall ${game.title}? Its files will be deleted.`)) run(api.uninstall(game.app_name));
+    }, 'danger'),
+  ]);
 }
 
 // how much of the cover is lit, in percent: installed games are, the rest light up as they download
@@ -313,6 +320,7 @@ function renderHero() {
     .sort((a, b) => b.last_played.localeCompare(a.last_played));
   const game = filter === 'all' && !$('#search').value.trim() ? played[0] : null;
   $('#hero').hidden = !game;
+  $('#ambient').hidden = !game;
   if (!game) return;
   const job = activeJob(game.app_name);
   const key = JSON.stringify([game, job]);
@@ -320,8 +328,8 @@ function renderHero() {
   heroKey = key;
   const art = $('#hero-art');
   const src = game.art || game.cover;
-  if (art.getAttribute('src') !== src) art.src = src;
-  art.hidden = !src;
+  if (art.getAttribute('src') !== src) art.src = $('#ambient').src = src;
+  art.hidden = $('#ambient').hidden = !src;
   $('#hero-title').textContent = game.title;
   $('#hero-meta').textContent = job ? progressText(job)
     : `${formatPlayed(game.played)} · last played ${formatDay(game.last_played)}`;
@@ -424,10 +432,19 @@ async function showThemes(info) {
   const themes = info || await api.themes();
   document.documentElement.dataset.theme = themes.active;
   $('#theme-css').textContent = themes.css;
-  $('#theme').replaceChildren(...themes.themes.map((theme) =>
-    el('option', {value: theme.name, textContent: theme.title, selected: theme.name === themes.active})));
-  const active = themes.themes.find((theme) => theme.name === themes.active);
-  $('#theme-name').textContent = active ? `${active.title} theme` : 'Theme';
+  // only worth a place in the sidebar once there is a choice
+  $('#theme').hidden = themes.themes.length < 2;
+  $('#theme-name').textContent = `${themes.themes.find((theme) => theme.name === themes.active).title} theme`;
+  $('#theme').onclick = (event) => showMenu($('#themes'), event.currentTarget, [
+    el('p', {className: 'menu-title', textContent: 'Window theme'}),
+    ...themes.themes.map((theme) => {
+      const item = menuItem(theme.title, theme.name === themes.active ? 'done' : 'theme',
+        async () => showThemes(await api.use_theme(theme.name)));
+      item.setAttribute('role', 'menuitemradio');
+      item.setAttribute('aria-checked', String(theme.name === themes.active));
+      return item;
+    }),
+  ]);
 }
 
 function setFilter(name) {
@@ -451,7 +468,6 @@ async function start() {
     renderHero();
     renderLibrary();
   };
-  $('#theme').onchange = async (event) => showThemes(await api.use_theme(event.target.value));
   for (const item of document.querySelectorAll('[data-filter]')) item.onclick = () => setFilter(item.dataset.filter);
   $('#rail-toggle').onclick = () => {
     const collapsed = $('#rail').classList.toggle('collapsed');
@@ -470,13 +486,30 @@ async function start() {
     for (const job of state.jobs) if (!ACTIVE.has(job.status)) cleared.add(job.id);
     renderJobs();
   };
-  $('#manage').onkeydown = (event) => {
-    const items = [...$('#manage').querySelectorAll('[role="menuitem"]')];
-    const step = {ArrowDown: 1, ArrowUp: -1}[event.key];
-    if (!step) return;
-    event.preventDefault();
-    items[(items.indexOf(document.activeElement) + step + items.length) % items.length].focus();
+  const library = $('#library');
+  library.onpointermove = (event) => {
+    const cover = event.target.closest('.cover');
+    if (!cover || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const box = cover.getBoundingClientRect();
+    cover.style.setProperty('--rx', `${((event.clientX - box.left) / box.width - .5) * 10}deg`);
+    cover.style.setProperty('--ry', `${(.5 - (event.clientY - box.top) / box.height) * 10}deg`);
   };
+  library.onpointerout = (event) => {
+    const cover = event.target.closest('.cover');
+    if (cover && !cover.contains(event.relatedTarget)) {
+      cover.style.removeProperty('--rx');
+      cover.style.removeProperty('--ry');
+    }
+  };
+  for (const menu of document.querySelectorAll('.menu')) {
+    menu.onkeydown = (event) => {
+      const items = [...menu.querySelectorAll('[role^="menuitem"]')];
+      const step = {ArrowDown: 1, ArrowUp: -1}[event.key];
+      if (!step) return;
+      event.preventDefault();
+      items[(items.indexOf(document.activeElement) + step + items.length) % items.length].focus();
+    };
+  }
   document.addEventListener('keydown', (event) => {
     const typing = event.target.closest('input, select, textarea');
     if (event.key === '/' && !typing && !event.ctrlKey && !event.metaKey && !event.altKey) {

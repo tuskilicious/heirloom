@@ -19,11 +19,13 @@ from typing import Any
 from heirloom.downloader.queue import heirloom_command, start_job, stop_job
 from heirloom.lfs.lgndry import LGDLFS
 from heirloom.models.game import Game
-from heirloom.themes import DEFAULT_THEME, Theme
+from heirloom.themes import Theme
 
 log = logging.getLogger('GUI')
 
 WEB = Path(__file__).parent / 'web'
+# the window's own look, Keeper Light, in web/style.css
+WINDOW_THEME = 'heirloom'
 # portrait art first, as the library shows covers
 COVER_TYPES = ('DieselGameBoxTall', 'OfferImageTall', 'DieselStoreFrontTall', 'Thumbnail', 'DieselGameBox')
 # landscape art for the banner of the game played last
@@ -65,6 +67,22 @@ def logged_in_user(lgd: LGDLFS) -> str | None:
 def image_url(game: Game | None, kinds: tuple[str, ...]) -> str:
     images = {image.get('type'): image.get('url') for image in game.metadata.get('keyImages', [])} if game else {}
     return next((images[kind] for kind in kinds if images.get(kind)), '')
+
+
+def window_themes(themes: dict[str, Theme], themes_dir: Path) -> dict[str, tuple[str, str]]:
+    """
+    The window's themes by name, as (title, CSS): its own look, then the themes with "gui_css", then any other CSS
+    file in the themes folder, which is a theme for the window alone
+    """
+    found = {WINDOW_THEME: ('Heirloom', '')}
+    found |= {theme.name: (theme.common_name, theme.css) for theme in themes.values() if theme.css}
+    for path in sorted(themes_dir.glob('*.css')):
+        css = path.read_text(encoding='utf-8', errors='replace')
+        # the CSS of a theme above, under its own name or another
+        if path.stem in found or any(css == known for _, known in found.values()):
+            continue
+        found[path.stem] = (path.stem.replace('-', ' ').replace('_', ' ').capitalize(), css)
+    return found
 
 
 def read_library(lgd: LGDLFS) -> list[dict[str, Any]]:
@@ -294,18 +312,19 @@ class GuiApi:
         self._jobs.stop(job_id)
 
     def themes(self) -> dict[str, Any]:
-        themes = self._load_themes()
-        name = self._lgd().config.get('Heirloom', 'theme', fallback=DEFAULT_THEME.name)
-        active = themes.get(name, DEFAULT_THEME)
-        return {'active': active.name, 'css': active.css,
-                'themes': [{'name': theme.name, 'title': theme.common_name} for theme in themes.values()]}
+        lgd = self._lgd()
+        themes = window_themes(self._load_themes(), lgd.path / 'themes')
+        name = lgd.config.get('Heirloom', 'window_theme', fallback=WINDOW_THEME)
+        active = name if name in themes else WINDOW_THEME
+        return {'active': active, 'css': themes[active][1],
+                'themes': [{'name': name, 'title': title} for name, (title, _) in themes.items()]}
 
     def use_theme(self, name: str) -> dict[str, Any]:
-        if name not in self._load_themes():
-            raise ValueError(f'No theme named "{name}"')
         # a fresh read of the config, so changes heirloom made to it meanwhile are kept
         lgd = self._lgd()
-        lgd.config.set('Heirloom', 'theme', name)
+        if name not in window_themes(self._load_themes(), lgd.path / 'themes'):
+            raise ValueError(f'No theme named "{name}"')
+        lgd.config.set('Heirloom', 'window_theme', name)
         lgd.save_config()
         return self.themes()
 

@@ -6,9 +6,14 @@
 - **Manage a game from the window.** Each installed game has a Manage button (`⋯`): open its folder, add a desktop
   shortcut that plays it (Windows), verify and repair its files, sync its cloud saves, play without updating, or
   uninstall it.
-- **A calmer library.** A game's buttons appear over its cover when you point at it or reach it with the keyboard,
-  so the library reads as covers rather than rows of buttons. Updates and games being played are named in citron
-  under their covers, and covers fade under the header as you scroll.
+- **A calmer, livelier library.** A game's buttons appear over its cover when you point at it or reach it with
+  the keyboard, so the library reads as covers rather than rows of buttons. Covers lean toward the pointer, catch a
+  sweep of light and glow in the lantern's colour; the art of the game you played last lights the page behind the
+  frosted header, and the logo's lantern flickers. Scrollbars are slim and in the window's colours.
+- **The window's own theme.** The window keeps its own look whatever the terminal's theme is, and window themes are
+  your CSS: a `.css` file in the `themes` folder, or a theme's `gui_css`. The theme button only shows in the sidebar
+  once there is one to switch to, and opens a menu rather than a dropdown. High contrast follows Windows' contrast
+  settings. The setting is `window_theme` in the config file.
 
 ## 0.26.1 "Hearth" (2026-10-28)
 

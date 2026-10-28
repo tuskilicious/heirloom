@@ -143,7 +143,7 @@ The game you played last is at the top with your time played, ready to continue.
 Each installed game's Manage button (`⋯`) opens its folder, adds a desktop shortcut that plays it (Windows), verifies and repairs its files, syncs its cloud saves and uninstalls it.
 Everything it does runs as a regular `heirloom` command, so playtime, plugins and resumable downloads work the same.
 Downloads run one at a time; Stop stops one cleanly, and installing it again continues where it stopped.
-Without a login, games are launched offline. The window uses your theme, see [Themes](#themes).
+Without a login, games are launched offline. The window has its own look, and can use your own CSS, see [Window themes](#window-themes).
 
 Listing your games
 ````
@@ -886,8 +886,14 @@ Plugins can ship themes too, which are available while the plugin is enabled. A 
 
 Colours are only used when printing to a terminal, and never when `NO_COLOR` is set. Set `FORCE_COLOR=1` to keep them when piping output.
 
-Themes also style the window of `heirloom gui`, which can switch between them too.
-Name a CSS file next to the theme in `gui_css`, and it is added to the window's page, so it can restyle anything:
+### Window themes
+
+The window of `heirloom gui` has its own look, apart from the terminal's theme. Your own CSS can restyle it: once there is a window theme besides Heirloom's own, a theme button in the sidebar switches between them.
+High contrast needs no theme: the window follows Windows' contrast themes and "Increase contrast" settings by itself.
+
+The quickest window theme is a CSS file in the `themes` folder, such as `paper-white.css`, which shows as "Paper white".
+A terminal theme can bring window CSS too: name a CSS file next to the theme in `gui_css`.
+Either way it is added to the window's page, so it can restyle anything:
 
 ````json
 {
@@ -960,6 +966,8 @@ disable_playtime_tracking = false
 disable_cloud_save_sync = false
 ; Terminal theme (see "heirloom themes")
 theme = default
+; Window theme of "heirloom gui" (see "Window themes")
+window_theme = heirloom
 
 ; macOS specific settings
 ; Default application platform to use (default: Mac on macOS, Windows elsewhere)
