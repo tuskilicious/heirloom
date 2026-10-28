@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### New
+- **Heirloom tells you about new versions.** Once a day, when it logs in, Heirloom checks its latest release on
+  GitHub. When a newer one is out, the window's sidebar links to its download page, and commands mention it when they
+  finish, with the download for your platform (the installer on Windows). `disable_update_notice = true` hides it, and
+  `disable_update_check = true` stops the check.
+
 ## 0.25.0 "Strongbox" (2026-10-28)
 
 Playing a game through Heirloom now keeps its cloud saves in sync, as the Epic Games Launcher does.
