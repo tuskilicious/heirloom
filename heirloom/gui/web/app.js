@@ -7,9 +7,11 @@
 const $ = (selector) => document.querySelector(selector);
 const SVG = 'http://www.w3.org/2000/svg';
 const ACTIVE = new Set(['queued', 'running']);
-const DOWNLOADS = new Set(['install', 'uninstall']);
-const DOING = {install: 'Installing', uninstall: 'Uninstalling', play: 'Playing', login: 'Logging in'};
-const DONE = {install: 'Installed', uninstall: 'Uninstalled', play: 'Game closed', login: 'Logged in'};
+const DOWNLOADS = new Set(['install', 'uninstall', 'repair']);
+const DOING = {install: 'Installing', uninstall: 'Uninstalling', repair: 'Repairing', sync: 'Syncing saves',
+  play: 'Playing', login: 'Logging in'};
+const DONE = {install: 'Installed', uninstall: 'Uninstalled', repair: 'Repaired', sync: 'Saves synced',
+  play: 'Game closed', login: 'Logged in'};
 const SHELVES = {all: 'Library', installed: 'Installed', updates: 'Updates'};
 const RING = '<svg class="meter" viewBox="0 0 24 24" aria-hidden="true">'
   + '<circle class="track" cx="12" cy="12" r="10" pathLength="100"/>'
@@ -120,7 +122,7 @@ function statusText(game, job) {
   return parts.join(' · ');
 }
 
-function actions(game, job, uninstall = true) {
+function actions(game, job) {
   if (job) {
     return DOWNLOADS.has(job.kind) ? [button('Stop', 'ghost', () => run(api.stop(job.id)), 'x')] : [];
   }
@@ -128,14 +130,52 @@ function actions(game, job, uninstall = true) {
   const install = () => run(api.install(game.app_name));
   // citron is kept for playing and updating, so a library of uninstalled games isn't a wall of it
   if (!game.installed) return [button('Install', 'ghost', install, 'download')];
-  const play = () => run(api.play(game.app_name));
   return [
-    game.update ? button('Update', 'primary', install, 'updates') : button('Play', 'primary', play, 'play'),
-    game.update ? iconButton('play', `Play ${game.title}`, 'ghost', play) : null,
-    uninstall ? iconButton('trash', `Uninstall ${game.title}`, 'ghost danger', () => {
+    game.update ? button('Update', 'primary', install, 'updates')
+      : button('Play', 'primary', () => run(api.play(game.app_name)), 'play'),
+    manageButton(game),
+  ];
+}
+
+function manageButton(game) {
+  const node = iconButton('manage', `Manage ${game.title}`, 'ghost', (event) => openManage(game, event.currentTarget));
+  node.setAttribute('aria-haspopup', 'menu');
+  return node;
+}
+
+function openManage(game, anchor) {
+  const menu = $('#manage');
+  const item = (label, iconName, onclick, className = '') => el('button', {
+    type: 'button', role: 'menuitem', className,
+    onclick: () => {
+      menu.hidePopover();
+      onclick();
+    },
+  }, icon(iconName), label);
+  menu.replaceChildren(...[
+    el('p', {className: 'menu-title', textContent: game.title}),
+    game.update ? item('Play without updating', 'play', () => run(api.play(game.app_name))) : null,
+    item('Open folder', 'folder', () => run(api.open_folder(game.app_name))),
+    item('Create desktop shortcut', 'desktop', () => run(api.create_shortcut(game.app_name))),
+    item('Verify and repair', 'repair', () => run(api.repair(game.app_name))),
+    game.cloud_saves ? item('Sync cloud saves', 'cloud', () => run(api.sync_saves(game.app_name))) : null,
+    el('hr'),
+    item('Uninstall', 'trash', () => {
       if (confirm(`Uninstall ${game.title}? Its files will be deleted.`)) run(api.uninstall(game.app_name));
-    }) : null,
-  ].filter(Boolean);
+    }, 'danger'),
+  ].filter(Boolean));
+  // closing it with Escape or a choice puts the keyboard back on the button
+  menu.onbeforetoggle = (event) => {
+    if (event.newState === 'closed' && anchor.isConnected && menu.contains(document.activeElement)) anchor.focus();
+  };
+  menu.showPopover();
+  // below the button, or above it when there's no room, and kept inside the window
+  const button = anchor.getBoundingClientRect();
+  const {width, height} = menu.getBoundingClientRect();
+  const below = button.bottom + 6 + height <= innerHeight;
+  menu.style.left = `${Math.max(8, Math.min(button.right - width, innerWidth - width - 8))}px`;
+  menu.style.top = `${below ? button.bottom + 6 : Math.max(8, button.top - 6 - height)}px`;
+  menu.querySelector('[role="menuitem"]').focus();
 }
 
 // how much of the cover is lit, in percent: installed games are, the rest light up as they download
@@ -170,7 +210,7 @@ function card(game) {
       shown: false,
     };
     entry.node = el('article', {className: 'card'}, entry.cover,
-      el('div', {className: 'info'}, entry.title, entry.status, entry.buttons));
+      el('div', {className: 'info'}, entry.title, entry.status));
     cards.set(game.app_name, entry);
   }
   const job = activeJob(game.app_name);
@@ -180,7 +220,7 @@ function card(game) {
 
   if (entry.coverUrl !== game.cover) {
     entry.coverUrl = game.cover;
-    entry.cover.replaceChildren(coverArt(game), entry.shade, entry.wick, entry.badge);
+    entry.cover.replaceChildren(coverArt(game), entry.shade, entry.wick, entry.badge, entry.buttons);
   }
   const [lit, percent] = lighting(game, job);
   entry.node.dataset.state = lit;
@@ -192,6 +232,7 @@ function card(game) {
   entry.title.textContent = game.title;
   entry.node.title = game.version ? `${game.title} (version ${game.version})` : game.title;
   entry.status.textContent = statusText(game, job);
+  entry.status.classList.toggle('lit', Boolean(game.update && !job) || playing);
   entry.buttons.replaceChildren(...actions(game, job));
   return entry;
 }
@@ -284,7 +325,7 @@ function renderHero() {
   $('#hero-title').textContent = game.title;
   $('#hero-meta').textContent = job ? progressText(job)
     : `${formatPlayed(game.played)} · last played ${formatDay(game.last_played)}`;
-  $('#hero-actions').replaceChildren(...actions(game, job, false));
+  $('#hero-actions').replaceChildren(...actions(game, job));
 }
 
 function renderRail() {
@@ -428,6 +469,13 @@ async function start() {
   $('#activity-clear').onclick = () => {
     for (const job of state.jobs) if (!ACTIVE.has(job.status)) cleared.add(job.id);
     renderJobs();
+  };
+  $('#manage').onkeydown = (event) => {
+    const items = [...$('#manage').querySelectorAll('[role="menuitem"]')];
+    const step = {ArrowDown: 1, ArrowUp: -1}[event.key];
+    if (!step) return;
+    event.preventDefault();
+    items[(items.indexOf(document.activeElement) + step + items.length) % items.length].focus();
   };
   document.addEventListener('keydown', (event) => {
     const typing = event.target.closest('input, select, textarea');

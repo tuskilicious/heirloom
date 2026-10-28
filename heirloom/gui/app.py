@@ -9,6 +9,7 @@ import logging
 import os
 import re
 import subprocess
+import sys
 import threading
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
@@ -28,11 +29,13 @@ COVER_TYPES = ('DieselGameBoxTall', 'OfferImageTall', 'DieselStoreFrontTall', 'T
 # landscape art for the banner of the game played last
 ART_TYPES = ('DieselGameBox', 'DieselStoreFrontWide', 'OfferImageWide')
 
-# downloads (and uninstalls) run one at a time, as heirloom installs only one game at a time
-DOWNLOADS = ('install', 'uninstall')
+# downloads (and uninstalls and repairs) run one at a time, as heirloom installs only one game at a time
+DOWNLOADS = ('install', 'uninstall', 'repair')
 COMMANDS = {
     'install': ['-y', 'install'],
     'uninstall': ['-y', 'uninstall'],
+    'repair': ['-y', 'repair'],
+    'sync': ['-y', 'sync-saves'],
     'play': ['-y', 'launch'],
     'login': ['auth'],
 }
@@ -40,6 +43,17 @@ COMMANDS = {
 PROGRESS = re.compile(r'= Progress: (\d+(?:\.\d+)?)%')
 SPEED = re.compile(r'\+ Download\s+- ([\d.]+ MiB/s) \(raw\)')
 LOG_LINE = re.compile(r'^\[[\w.-]+\] [A-Z]+: (.*)$')
+
+# writes a desktop shortcut from HL_* variables, so no text from Epic is ever part of the script
+SHORTCUT = '''
+$shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut(
+    (Join-Path ([Environment]::GetFolderPath('Desktop')) "$env:HL_NAME.lnk"))
+$shortcut.TargetPath = $env:HL_TARGET
+$shortcut.Arguments = $env:HL_ARGUMENTS
+$shortcut.IconLocation = $env:HL_ICON
+$shortcut.WindowStyle = 7
+$shortcut.Save()
+'''
 
 
 def logged_in_user(lgd: LGDLFS) -> str | None:
@@ -76,6 +90,7 @@ def read_library(lgd: LGDLFS) -> list[dict[str, Any]]:
             'update': bool(igame and version and version != igame.version),
             'size': igame.install_size if igame else None,
             'store': game.third_party_store if game else None,
+            'cloud_saves': bool(game and game.supports_cloud_saves),
             # seconds played, and when the last session ended
             'played': round(sum(session.duration.total_seconds() for session in sessions)),
             'last_played': max(session.end for session in sessions).isoformat() if sessions else None,
@@ -226,6 +241,51 @@ class GuiApi:
 
     def uninstall(self, app_name: str) -> None:
         self._jobs.add('uninstall', app_name, self._title(app_name))
+
+    def repair(self, app_name: str) -> None:
+        self._jobs.add('repair', app_name, self._title(app_name))
+
+    def sync_saves(self, app_name: str) -> None:
+        self._jobs.add('sync', app_name, self._title(app_name))
+
+    def open_folder(self, app_name: str) -> None:
+        igame = self._lgd().get_installed_game(app_name)
+        if not igame or not Path(igame.install_path).is_dir():
+            notice = f'The folder of {self._title(app_name)} is gone. Repair it, or uninstall it.'
+            with self._lock:
+                self._notice = notice
+            return
+        if sys.platform == 'win32':
+            os.startfile(igame.install_path)
+        else:
+            subprocess.Popen(['open' if sys.platform == 'darwin' else 'xdg-open', igame.install_path])
+
+    def create_shortcut(self, app_name: str) -> None:
+        """A desktop shortcut that plays the game, with its icon; the terminal it runs in starts minimized"""
+        title = self._title(app_name)
+        igame = self._lgd().get_installed_game(app_name)
+        if sys.platform != 'win32' or not igame:
+            notice = 'Desktop shortcuts can only be made on Windows, for installed games.'
+        else:
+            target, *arguments = self._heirloom()
+            config = ['-c', self._config_file] if self._config_file else []
+            game_exe = Path(igame.install_path, igame.executable)
+            # what Windows allows in a file name
+            name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '', title).strip(' .') or app_name
+            try:
+                subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-Command', SHORTCUT],
+                               env=os.environ | {
+                                   'HL_NAME': name, 'HL_TARGET': target,
+                                   'HL_ARGUMENTS': subprocess.list2cmdline([*arguments, *config, '-y', 'launch', app_name]),
+                                   'HL_ICON': str(game_exe) if game_exe.is_file() else target,
+                               },
+                               creationflags=subprocess.CREATE_NO_WINDOW, capture_output=True, check=True, timeout=30)
+                notice = f'Added "{name}" to your desktop.'
+            except (OSError, subprocess.SubprocessError) as e:
+                log.warning(f'Could not create the shortcut: {e!r}')
+                notice = f'Could not add a desktop shortcut for {title}.'
+        with self._lock:
+            self._notice = notice
 
     def login(self) -> None:
         self._jobs.add('login', '', 'Epic Games account')

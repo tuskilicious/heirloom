@@ -45,7 +45,7 @@ def test_library_from_cached_files(fake_game):
         {'type': 'Thumbnail', 'url': 'https://cdn/fish-thumb.jpg'},
         {'type': 'DieselGameBoxTall', 'url': 'https://cdn/fish-tall.jpg'},
         {'type': 'DieselGameBox', 'url': 'https://cdn/fish-wide.jpg'}])
-    write_meta(fake_game, 'Goo', 'World of Goo')
+    write_meta(fake_game, 'Goo', 'World of Goo', customAttributes={'CloudSaveFolder': {'value': '{AppData}/Goo'}})
     write_meta(fake_game, 'FishDLC', 'Fish Game Soundtrack', mainGameItem={'id': 'fish'})
     lgd = LGDLFS()
     lgd.assets = {'Linux': [GameAsset(app_name='Fish', build_version='2')],
@@ -57,9 +57,9 @@ def test_library_from_cached_files(fake_game):
     fish, goo = read_library(LGDLFS())
     assert fish == {'app_name': 'Fish', 'title': 'Fish Game', 'cover': 'https://cdn/fish-tall.jpg',
                     'art': 'https://cdn/fish-wide.jpg', 'installed': True, 'version': '1', 'update': True,
-                    'size': 1024 ** 3, 'store': None, 'played': 2.5 * 3600, 'last_played': '2026-10-26T22:00:00+00:00'}
+                    'size': 1024 ** 3, 'store': None, 'cloud_saves': False, 'played': 2.5 * 3600, 'last_played': '2026-10-26T22:00:00+00:00'}
     assert goo == {'app_name': 'Goo', 'title': 'World of Goo', 'cover': '', 'art': '', 'installed': False,
-                   'version': '7', 'update': False, 'size': None, 'store': None, 'played': 0,
+                   'version': '7', 'update': False, 'size': None, 'store': None, 'cloud_saves': True, 'played': 0,
                    'last_played': None}, 'not installed, and DLC is left out'
 
 
@@ -120,12 +120,38 @@ def test_commands_for_each_action(fake_game):
     assert logged_out._command(Job(1, 'install', 'Fish', 'Fish Game')) == ['heirloom', '-c', 'custom.ini', '-y',
                                                                             'install', 'Fish']
     assert logged_out._command(Job(3, 'login', '', 'Epic Games account'))[-1] == 'auth'
+    assert logged_out._command(Job(4, 'repair', 'Fish', 'Fish Game'))[-3:] == ['-y', 'repair', 'Fish']
+    assert logged_out._command(Job(5, 'sync', 'Fish', 'Fish Game'))[-3:] == ['-y', 'sync-saves', 'Fish']
 
     (fake_game / 'user.json').write_text(json.dumps({'account_id': 'abc', 'displayName': 'Tester',
                                                      'access_token': 'a', 'refresh_token': 'r'}))
     logged_in = api()
     assert logged_in.state()['user'] == 'Tester'
     assert logged_in._command(play)[-3:] == ['-y', 'launch', 'Fish']
+
+
+def test_open_folder_of_a_game_whose_files_are_gone(fake_game, tmp_path):
+    for child in (tmp_path / 'FishGame').iterdir():
+        child.unlink()
+    (tmp_path / 'FishGame').rmdir()
+    api = GuiApi(None, lambda: {})
+    api.open_folder('Fish')
+    assert api.state()['notice'] == 'The folder of Fish Game is gone. Repair it, or uninstall it.'
+
+
+@pytest.mark.skipif(sys.platform != 'win32', reason='desktop shortcuts are made on Windows')
+def test_desktop_shortcut_plays_the_game_with_its_icon(fake_game, tmp_path, monkeypatch):
+    ran = []
+    monkeypatch.setattr('heirloom.gui.app.subprocess.run', lambda command, env, **options: ran.append(env))
+    write_meta(fake_game, 'Fish', 'Fish: The Game?')
+    api = GuiApi('my config.ini', lambda: {}, command=lambda: ['C:\\Heirloom\\heirloom.exe'])
+    api.create_shortcut('Fish')
+    env, = ran
+    assert env['HL_NAME'] == 'Fish The Game', 'without the characters Windows does not allow in file names'
+    assert env['HL_TARGET'] == 'C:\\Heirloom\\heirloom.exe'
+    assert env['HL_ARGUMENTS'] == '-c "my config.ini" -y launch Fish'
+    assert env['HL_ICON'] == str(tmp_path / 'FishGame' / 'fish.cmd')
+    assert api.state()['notice'] == 'Added "Fish The Game" to your desktop.'
 
 
 def test_theme_css_for_the_window(lgd_home, tmp_path):

@@ -226,6 +226,16 @@ button:disabled { opacity: .55; cursor: default; }
   background: var(--bg);
 }
 
+/* covers fade out under the header as they scroll, rather than meeting a hard edge */
+.top::after {
+  content: "";
+  position: absolute;
+  inset: 100% 0 auto;
+  height: 18px;
+  background: linear-gradient(var(--bg), transparent);
+  pointer-events: none;
+}
+
 #heading { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -.015em; line-height: 1.15; }
 .summary { margin: 4px 0 0; min-height: 1.45em; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
 
@@ -407,11 +417,51 @@ kbd {
 }
 
 .status { margin: 0; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.actions { display: flex; gap: 6px; margin-top: auto; padding-top: 9px; }
+.status.lit { color: var(--accent); }
+.actions { display: flex; gap: 6px; }
 .actions:empty { display: none; }
 .actions > button { flex: 1; height: 34px; padding: 0 12px; }
 .actions .icon-button { flex: none; width: 34px; border-color: var(--border); }
 .actions .icon { width: 16px; height: 16px; }
+
+/* a card's buttons rise over its cover under the pointer or the keyboard, so the library reads as covers */
+.cover .actions {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 1;
+  padding: 48px 10px 10px;
+  background: linear-gradient(transparent, color-mix(in srgb, var(--bg) 88%, transparent) 62%);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity .2s var(--ease), transform .25s var(--ease);
+}
+
+.card:is(:hover, :focus-within) .cover .actions { opacity: 1; transform: none; }
+@media (hover: none) { .cover .actions { opacity: 1; transform: none; } }
+.cover .ghost { background: color-mix(in srgb, var(--surface-raised) 80%, transparent); backdrop-filter: blur(8px); }
+.cover .ghost:hover:not(:disabled) { background: var(--surface-raised); }
+.cover .icon-button { color: var(--text); }
+
+.menu {
+  inset: auto;
+  min-width: 210px;
+  margin: 0;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.menu:popover-open { animation: rise .18s var(--ease); }
+.menu-title { margin: 0; padding: 6px 10px 8px; overflow: hidden; color: var(--muted); font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.menu button { display: flex; justify-content: flex-start; width: 100%; height: 34px; padding: 0 10px; background: transparent; }
+.menu button:is(:hover, :focus-visible) { background: var(--surface-raised); outline: none; }
+.menu button .icon { width: 16px; height: 16px; color: var(--muted); }
+.menu .danger { color: var(--danger); }
+.menu .danger .icon { color: inherit; }
+.menu hr { margin: 6px 4px; border: 0; border-top: 1px solid var(--border); }
 
 .card.skeleton { animation: pulse 1.6s ease-in-out infinite; }
 .skeleton .line { height: 10px; width: 72%; border-radius: 5px; background: var(--surface-raised); }

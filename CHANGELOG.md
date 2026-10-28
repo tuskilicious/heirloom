@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### New
+- **Manage a game from the window.** Each installed game has a Manage button (`⋯`): open its folder, add a desktop
+  shortcut that plays it (Windows), verify and repair its files, sync its cloud saves, play without updating, or
+  uninstall it.
+- **A calmer library.** A game's buttons appear over its cover when you point at it or reach it with the keyboard,
+  so the library reads as covers rather than rows of buttons. Updates and games being played are named in citron
+  under their covers, and covers fade under the header as you scroll.
+
 ## 0.26.1 "Hearth" (2026-10-28)
 
 Heirloom tidies up after installs, updates and uninstalls, and uninstalls games imported from the Epic Games Launcher properly.
