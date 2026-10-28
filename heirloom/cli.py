@@ -3689,7 +3689,8 @@ def main():
                 elif sys_platform == 'linux':
                     dl_platform = 'linux'
 
-                print(f'\n- Download URL: {update_info["downloads"][dl_platform]}')
+                if url := update_info['downloads'].get(dl_platform):
+                    print(f'\n- Download URL: {url}')
 
     if not disable_update_message and cli.core.overlay_update_available:
         old_version = cli.core.lgd.get_overlay_install_info().version

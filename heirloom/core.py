@@ -23,8 +23,9 @@ from uuid import uuid4
 from requests import session
 from requests.exceptions import ConnectionError, HTTPError
 
+from heirloom import __version__
 from heirloom.api.egs import EPCAPI
-from heirloom.api.lgd import LGDAPI
+from heirloom.api.lgd import LGDAPI, is_newer
 from heirloom.downloader.mp.manager import DLManager
 from heirloom.downloader.throttle import SpeedLimits, parse_speed
 from heirloom.lfs.crossover import (
@@ -305,11 +306,16 @@ class HeirloomCore:
         version_info = cached['data']
         if force or not version_info or (datetime.now().timestamp() - cached['last_update']) > 24*3600:
             version_info = self.lgdapi.get_version_information()
+            # The feed is upstream Legendary's: its release_info is about Legendary, but its other data
+            # (EGL settings, game workarounds) still applies. Heirloom's own release comes from GitHub.
+            try:
+                version_info['heirloom_release'] = self.lgdapi.get_heirloom_release()
+            except Exception as e:
+                self.log.debug(f'Reading the latest Heirloom release failed: {e!r}')
             self.lgd.set_cached_version(version_info)
 
-        # The version feed is upstream Legendary's, so it says nothing about Heirloom releases.
-        # Its other data (EGL settings, game workarounds) still applies.
-        self.update_available = False
+        release = version_info.get('heirloom_release')
+        self.update_available = bool(release) and is_newer(release['version'], __version__)
         self.apply_lgd_config(version_info)
 
     def apply_lgd_config(self, version_info=None):
@@ -341,7 +347,7 @@ class HeirloomCore:
         return self._egl_version
 
     def get_update_info(self):
-        return self.lgd.get_cached_version()['data'].get('release_info')
+        return self.lgd.get_cached_version()['data'].get('heirloom_release')
 
     def get_game_tip(self, app_name):
         update_info = self.lgd.get_cached_version()['data']

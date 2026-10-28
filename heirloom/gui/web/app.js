@@ -298,6 +298,15 @@ function renderRail() {
   refresh.querySelector('.label').textContent = state.refreshing ? 'Refreshing…' : 'Refresh';
   $('#notice').hidden = !state.notice;
   $('#notice').textContent = state.notice;
+  // only ever a link to a release page on GitHub
+  const update = $('#heirloom-update');
+  const release = state.update && state.update.url.startsWith('https://github.com/') ? state.update : null;
+  update.hidden = !release;
+  if (release) {
+    update.href = release.url;
+    update.title = `Heirloom ${release.version} "${release.name}" is out: open its download page`;
+    update.querySelector('.label').textContent = `Get Heirloom ${release.version}`;
+  }
 }
 
 function jobEnd(job, kind) {
