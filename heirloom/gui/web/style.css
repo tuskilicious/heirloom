@@ -158,15 +158,23 @@ button:disabled { opacity: .55; cursor: default; }
 .shelves { position: relative; display: flex; flex-direction: column; gap: 2px; }
 .shelves .rail-item { z-index: 1; }
 .shelves .rail-item[aria-pressed="true"] { color: var(--text); background: transparent; }
-.shelves .rail-item[aria-pressed="true"] .icon { color: var(--accent); }
+.shelves .rail-item[aria-pressed="true"] .icon {
+  color: var(--accent);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 45%, transparent));
+}
+.shelves .rail-item[aria-pressed="true"] .count { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.shelves .rail-item .icon { transition: color .2s, filter .3s, transform .4s var(--spring); }
+.shelves .rail-item:hover .icon { transform: translateX(2px); }
 
 /* glides to the chosen shelf; its citron edge is the lantern's light */
 .shelf-marker {
   position: absolute;
   inset: 0 0 auto;
   height: 40px;
+  border: 1px solid var(--glass-edge);
   border-radius: var(--radius-control);
-  background: var(--surface-raised);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 13%, var(--surface-raised)), var(--surface-raised) 70%);
+  box-shadow: var(--glass-shine);
   transform: translateY(var(--y, 0));
   transition: transform .5s var(--spring);
 }
@@ -174,12 +182,13 @@ button:disabled { opacity: .55; cursor: default; }
 .shelf-marker::before {
   content: "";
   position: absolute;
-  left: 0;
-  top: 10px;
-  bottom: 10px;
+  left: 5px;
+  top: 11px;
+  bottom: 11px;
   width: 3px;
-  border-radius: 0 3px 3px 0;
+  border-radius: 3px;
   background: var(--accent);
+  box-shadow: 0 0 10px 1px color-mix(in srgb, var(--accent) 70%, transparent);
 }
 
 .rail-foot { display: flex; flex-direction: column; gap: 2px; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border); }
@@ -668,14 +677,30 @@ kbd {
 .live { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: breathe 2s ease-in-out infinite; }
 
 /* the progress ring turns into a Stop button under the pointer */
-.ring { position: relative; width: 32px; height: 32px; padding: 0; border-radius: 50%; background: transparent; color: var(--text); }
-.ring .meter { width: 26px; height: 26px; transform: rotate(-90deg); transition: opacity .15s; }
-.ring circle { fill: none; stroke-width: 2.5; }
-.ring .track { stroke: var(--surface-raised); }
-.ring .value { filter: drop-shadow(0 0 3px var(--accent)); stroke: var(--accent); stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: calc(100 - var(--p, 0)); transition: stroke-dashoffset .6s var(--ease); }
+.ring { position: relative; width: 34px; height: 34px; padding: 0; border-radius: 50%; background: transparent; color: var(--text); }
+.ring .meter { width: 32px; height: 32px; transform: rotate(-90deg); transition: opacity .15s; }
+.ring circle { fill: none; stroke-width: 2; }
+.ring .track { stroke: color-mix(in srgb, var(--text) 12%, transparent); }
+.ring .value { stroke: var(--accent); stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: calc(100 - var(--p, 0)); transition: stroke-dashoffset .6s var(--ease); }
+/* how far it has got, inside the ring */
+.ring .percent {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition: opacity .15s;
+}
 .ring .icon { position: absolute; inset: 0; width: 14px; height: 14px; margin: auto; opacity: 0; transition: opacity .15s; }
-.ring:is(:hover, :focus-visible) .meter { opacity: .2; }
-.ring:is(:hover, :focus-visible) .icon { opacity: 1; }
+.ring:is(:hover, :focus-visible) { background: color-mix(in srgb, var(--danger) 14%, transparent); }
+.ring:is(:hover, :focus-visible) :is(.meter, .percent) { opacity: 0; }
+.ring:is(:hover, :focus-visible) .icon { opacity: 1; color: var(--danger); }
+/* waiting for the current download: a dashed ring, slowly turning */
+.job.queued .ring .meter { animation: spin 8s linear infinite; }
+.job.queued .ring .track { stroke: color-mix(in srgb, var(--text) 32%, transparent); stroke-dasharray: 4 6; }
 
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
 @keyframes breathe { 50% { opacity: .35; transform: scale(.75); } }

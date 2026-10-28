@@ -371,7 +371,7 @@ function jobEnd(job, kind) {
   if (kind !== 'ring') return icon({done: 'done', failed: 'failed', stopped: 'x'}[kind], 'icon state');
   const label = `Stop ${DOING[job.kind].toLowerCase()} ${job.title}`;
   const stop = el('button', {type: 'button', className: 'ring', title: label, innerHTML: RING,
-    onclick: () => run(api.stop(job.id))}, icon('x'));
+    onclick: () => run(api.stop(job.id))}, el('span', {className: 'percent', ariaHidden: 'true'}), icon('x'));
   stop.setAttribute('aria-label', label);
   return stop;
 }
@@ -395,6 +395,8 @@ function jobRow(job) {
     row.end.replaceChildren(jobEnd(job, kind));
   }
   row.end.style.setProperty('--p', String(job.progress || 0));
+  const percent = row.end.querySelector('.percent');
+  if (percent) percent.textContent = job.progress === null ? '' : String(Math.floor(job.progress));
   return row.node;
 }
 
