@@ -796,13 +796,24 @@ Each plugin is a folder in the `plugins` folder of the config directory (`~/.con
 ````
 
 Only `name` is required (lowercase letters, digits, `-` and `_`); `backend` defaults to `main.py`.
-Plugins run inside Heirloom with access to your Epic account and files, so each one stays off until you enable it:
+Plugins run inside Heirloom with access to your Epic account and files, so each one stays off until you enable it.
+In the window, Customize in the sidebar turns plugins on and off, removes them and opens the plugins folder; in a terminal:
 
 ````
 heirloom plugins
 heirloom plugins enable session-log
 heirloom plugins disable session-log
 ````
+
+Heirloom comes with a few plugins to install from Customize's plugin store, which copies one into the plugins folder and turns it on:
+
+| Plugin | What it does |
+|--------|--------------|
+| Notifications (`notifications`) | A desktop notification when a game finishes installing or updating, the window's automatic updates included |
+| High performance while playing (`power-plan`) | Switches Windows to the High performance power plan while a game runs, and back afterwards (laptops with Modern Standby have no such plan) |
+| Close the Epic Games Launcher (`close-epic-launcher`) | Closes the Epic Games Launcher when a game starts, so it doesn't run in the background while you play |
+
+They are in [`heirloom/store`](heirloom/store), and make good examples.
 
 The backend's `setup(plugin)` function subscribes to events and can add commands:
 
@@ -889,7 +900,7 @@ Colours are only used when printing to a terminal, and never when `NO_COLOR` is 
 
 ### Window themes
 
-The window of `heirloom gui` has its own look, apart from the terminal's theme. Your own CSS can restyle it: once there is a window theme besides Heirloom's own, a theme button in the sidebar switches between them.
+The window of `heirloom gui` has its own look, apart from the terminal's theme. Your own CSS can restyle it: once there is a window theme besides Heirloom's own, Customize in the sidebar switches between them, and its Themes folder button opens the folder to add or remove them.
 High contrast needs no theme: the window follows Windows' contrast themes and "Increase contrast" settings by itself.
 
 The quickest window theme is a CSS file in the `themes` folder, such as `paper-white.css`, which shows as "Paper white".

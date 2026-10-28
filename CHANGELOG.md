@@ -18,9 +18,13 @@
   light spills up into the part still unlit, and the percentage rides on it. When the game is installed, the whole
   cover flares up. The progress bar of the downloads panel glints too.
 - **The window's own theme.** The window keeps its own look whatever the terminal's theme is, and window themes are
-  your CSS: a `.css` file in the `themes` folder, or a theme's `gui_css`. The theme button only shows in the sidebar
-  once there is one to switch to, and opens a menu rather than a dropdown. High contrast follows Windows' contrast
-  settings. The setting is `window_theme` in the config file.
+  your CSS: a `.css` file in the `themes` folder, or a theme's `gui_css`. Themes are chosen in Customize, which only
+  offers a choice once there is one. High contrast follows Windows' contrast settings. The setting is `window_theme`
+  in the config file.
+- **Customize, and a plugin store.** Customize in the sidebar opens a panel to choose the window's theme, turn
+  plugins on and off, remove them, and open the themes and plugins folders to add your own. Its plugin store installs
+  the plugins that now come with Heirloom in one click: Notifications (when a game is installed or updated), High
+  performance while playing (the Windows power plan), and Close the Epic Games Launcher (when a game starts).
 
 ## 0.26.1 "Hearth" (2026-10-28)
 

@@ -442,19 +442,51 @@ async function showThemes(info) {
   const themes = info || await api.themes();
   document.documentElement.dataset.theme = themes.active;
   $('#theme-css').textContent = themes.css;
-  // only worth a place in the sidebar once there is a choice
-  $('#theme').hidden = themes.themes.length < 2;
-  $('#theme-name').textContent = `${themes.themes.find((theme) => theme.name === themes.active).title} theme`;
-  $('#theme').onclick = (event) => showMenu($('#themes'), event.currentTarget, [
-    el('p', {className: 'menu-title', textContent: 'Window theme'}),
-    ...themes.themes.map((theme) => {
-      const item = menuItem(theme.title, theme.name === themes.active ? 'done' : 'theme',
-        async () => showThemes(await api.use_theme(theme.name)));
-      item.setAttribute('role', 'menuitemradio');
-      item.setAttribute('aria-checked', String(theme.name === themes.active));
-      return item;
+  // a choice only once there is a theme besides the window's own look
+  const choice = themes.themes.length > 1;
+  $('#theme-list').hidden = !choice;
+  $('#themes-hint').hidden = choice;
+  $('#theme-list').replaceChildren(...themes.themes.map((theme) => el('label', {className: 'choice'},
+    el('input', {
+      type: 'radio', name: 'theme', value: theme.name, checked: theme.name === themes.active,
+      onchange: async () => showThemes(await api.use_theme(theme.name)),
     }),
-  ]);
+    el('span', {textContent: theme.title}))));
+}
+
+// a plugin's name and what it does, then what can be done with it
+function pluginRow(plugin, ...controls) {
+  return el('li', {className: 'row'},
+    el('span', {className: 'row-text'}, el('span', {className: 'what', textContent: plugin.title}),
+      el('span', {className: 'detail', textContent: plugin.description})),
+    ...controls);
+}
+
+function showPlugins(plugins) {
+  const update = async (call) => showPlugins(await call);
+  $('#plugins-hint').hidden = plugins.installed.length > 0;
+  $('#plugin-list').replaceChildren(...plugins.installed.map((plugin) => pluginRow(plugin,
+    el('input', {
+      type: 'checkbox', role: 'switch', className: 'switch', checked: plugin.enabled,
+      ariaLabel: `${plugin.title} on`,
+      onchange: (event) => {
+        // plugins run inside Heirloom with your Epic account and files; the store's come with Heirloom
+        const fromStore = plugins.store.some((entry) => entry.name === plugin.name);
+        if (event.target.checked && !fromStore
+          && !confirm(`Turn on ${plugin.title}? Plugins run inside Heirloom with access to your Epic account `
+            + 'and files, so only turn on ones you trust.')) {
+          event.target.checked = false;
+          return;
+        }
+        update(api.set_plugin(plugin.name, event.target.checked));
+      },
+    }),
+    iconButton('trash', `Remove ${plugin.title}`, 'danger', () => {
+      if (confirm(`Remove ${plugin.title}? Its folder is deleted.`)) update(api.remove_plugin(plugin.name));
+    }))));
+  $('#store-list').replaceChildren(...plugins.store.map((plugin) => pluginRow(plugin, plugin.installed
+    ? el('span', {className: 'installed', textContent: 'Installed'})
+    : button('Install', 'ghost', () => update(api.install_plugin(plugin.name)), 'download'))));
 }
 
 function setFilter(name) {
@@ -511,6 +543,16 @@ async function start() {
       cover.style.removeProperty('--ry');
     }
   };
+  $('#customize-open').onclick = async () => {
+    // themes and plugins added in their folders meanwhile show up too
+    await showThemes();
+    showPlugins(await api.plugins());
+    $('#customize').showModal();
+  };
+  $('#customize-close').onclick = () => $('#customize').close();
+  for (const folder of document.querySelectorAll('[data-folder]')) {
+    folder.onclick = () => api.open_config_folder(folder.dataset.folder);
+  }
   for (const menu of document.querySelectorAll('.menu')) {
     menu.onkeydown = (event) => {
       const items = [...menu.querySelectorAll('[role^="menuitem"]')];

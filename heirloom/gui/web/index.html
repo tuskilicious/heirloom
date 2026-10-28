@@ -59,9 +59,8 @@
       <button type="button" id="refresh" class="rail-item" title="Refresh the library">
         <svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg><span class="label">Refresh</span>
       </button>
-      <!-- shown once there is a theme for the window besides its own look -->
-      <button type="button" id="theme" class="rail-item" aria-haspopup="menu" title="Window theme" hidden>
-        <svg class="icon" aria-hidden="true"><use href="#i-theme"/></svg><span id="theme-name" class="label"></span>
+      <button type="button" id="customize-open" class="rail-item" aria-haspopup="dialog" title="Themes and plugins">
+        <svg class="icon" aria-hidden="true"><use href="#i-theme"/></svg><span class="label">Customize</span>
       </button>
       <button type="button" id="account" class="rail-item">
         <svg class="icon" aria-hidden="true"><use href="#i-account"/></svg><span class="label"></span>
@@ -107,7 +106,43 @@
 
   <!-- the Manage menu of whichever game opened it -->
   <div id="manage" class="menu" role="menu" popover></div>
-  <div id="themes" class="menu" role="menu" aria-label="Window theme" popover></div>
+
+  <!-- themes and plugins: added, chosen, turned on and off, removed -->
+  <dialog id="customize" class="panel" aria-labelledby="customize-title">
+    <header class="panel-head">
+      <h2 id="customize-title">Customize</h2>
+      <button type="button" id="customize-close" class="icon-button" title="Close">
+        <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>
+      </button>
+    </header>
+    <section aria-labelledby="themes-title">
+      <div class="panel-row">
+        <h3 id="themes-title">Window theme</h3>
+        <button type="button" class="ghost" data-folder="themes">
+          <svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg>Themes folder
+        </button>
+      </div>
+      <!-- only offered once there is a theme besides the window's own look -->
+      <div id="theme-list" class="choices" role="radiogroup" aria-labelledby="themes-title"></div>
+      <p id="themes-hint" class="hint">Put a CSS file in the themes folder to restyle the window, such as
+        <code>paper-white.css</code>. It shows up here as a theme to choose.</p>
+    </section>
+    <section aria-labelledby="plugins-title">
+      <div class="panel-row">
+        <h3 id="plugins-title">Your plugins</h3>
+        <button type="button" class="ghost" data-folder="plugins">
+          <svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg>Plugins folder
+        </button>
+      </div>
+      <ul id="plugin-list" class="rows"></ul>
+      <p id="plugins-hint" class="hint">No plugins yet. Install one from the store below, or put a plugin's folder
+        in the plugins folder.</p>
+    </section>
+    <section aria-labelledby="store-title">
+      <h3 id="store-title">Plugin store</h3>
+      <ul id="store-list" class="rows"></ul>
+    </section>
+  </dialog>
 
   <aside id="activity" class="dock" aria-labelledby="dock-title" hidden>
     <div class="dock-head">

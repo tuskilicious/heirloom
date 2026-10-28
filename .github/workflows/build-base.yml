@@ -47,6 +47,7 @@ jobs:
         --onefile
         --name heirloom
         --add-data gui/web:heirloom/gui/web
+        --add-data store:heirloom/store
         ${{ steps.strip.outputs.option }}
         -i ../assets/windows_icon.ico
         cli.py
@@ -63,7 +64,7 @@ jobs:
       shell: pwsh
       run: |
         Push-Location heirloom
-        uv run --module PyInstaller --onedir --name heirloom --add-data gui/web:heirloom/gui/web `
+        uv run --module PyInstaller --onedir --name heirloom --add-data gui/web:heirloom/gui/web --add-data store:heirloom/store `
           -i ../assets/windows_icon.ico --distpath ../installer/build --workpath build/onedir cli.py
         Pop-Location
         $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"

@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -19,11 +20,14 @@ from typing import Any
 from heirloom.downloader.queue import heirloom_command, start_job, stop_job
 from heirloom.lfs.lgndry import LGDLFS
 from heirloom.models.game import Game
+from heirloom.plugins import PluginManager
 from heirloom.themes import Theme
 
 log = logging.getLogger('GUI')
 
 WEB = Path(__file__).parent / 'web'
+# plugins that come with Heirloom, to install from the window
+STORE = Path(__file__).parent.parent / 'store'
 # the window's own look, Keeper Light, in web/style.css
 WINDOW_THEME = 'heirloom'
 # portrait art first, as the library shows covers
@@ -67,6 +71,13 @@ def logged_in_user(lgd: LGDLFS) -> str | None:
 def image_url(game: Game | None, kinds: tuple[str, ...]) -> str:
     images = {image.get('type'): image.get('url') for image in game.metadata.get('keyImages', [])} if game else {}
     return next((images[kind] for kind in kinds if images.get(kind)), '')
+
+
+def open_in_file_manager(path: str | Path) -> None:
+    if sys.platform == 'win32':
+        os.startfile(path)
+    else:
+        subprocess.Popen(['open' if sys.platform == 'darwin' else 'xdg-open', str(path)])
 
 
 def window_themes(themes: dict[str, Theme], themes_dir: Path) -> dict[str, tuple[str, str]]:
@@ -273,10 +284,53 @@ class GuiApi:
             with self._lock:
                 self._notice = notice
             return
-        if sys.platform == 'win32':
-            os.startfile(igame.install_path)
-        else:
-            subprocess.Popen(['open' if sys.platform == 'darwin' else 'xdg-open', igame.install_path])
+        open_in_file_manager(igame.install_path)
+
+    def open_config_folder(self, name: str) -> None:
+        """Opens the themes or plugins folder, made if there is none yet, to add or remove them"""
+        if name not in ('themes', 'plugins'):
+            raise ValueError(f'No folder named "{name}"')
+        folder = self._lgd().path / name
+        folder.mkdir(parents=True, exist_ok=True)
+        open_in_file_manager(folder)
+
+    def plugins(self) -> dict[str, Any]:
+        """The plugins in the plugins folder, and the ones of the store"""
+        manager = PluginManager(self._lgd().path / 'plugins')
+        found, enabled = manager.discover(), manager.enabled()
+        return {
+            'installed': [{'name': name, 'title': manifest.common_name, 'description': manifest.description,
+                           'enabled': name in enabled} for name, (_, manifest) in found.items()],
+            'store': [{'name': name, 'title': manifest.common_name, 'description': manifest.description,
+                       'installed': name in found} for name, (_, manifest) in PluginManager(STORE).discover().items()],
+        }
+
+    def set_plugin(self, name: str, enabled: bool) -> dict[str, Any]:
+        """Turns a plugin on or off for the heirloom commands started from now on, the window's jobs included"""
+        manager = PluginManager(self._lgd().path / 'plugins')
+        if name not in manager.discover():
+            raise ValueError(f'No plugin named "{name}"')
+        manager.set_enabled(name, enabled)
+        return self.plugins()
+
+    def install_plugin(self, name: str) -> dict[str, Any]:
+        """Copies a plugin of the store into the plugins folder and turns it on"""
+        source = PluginManager(STORE).discover().get(name)
+        manager = PluginManager(self._lgd().path / 'plugins')
+        if not source or name in manager.discover():
+            raise ValueError(f'No plugin named "{name}" to install')
+        shutil.copytree(source[0], manager.folder / source[0].name, ignore=shutil.ignore_patterns('__pycache__'))
+        manager.set_enabled(name, True)
+        return self.plugins()
+
+    def remove_plugin(self, name: str) -> dict[str, Any]:
+        """Turns a plugin off and deletes its folder"""
+        manager = PluginManager(self._lgd().path / 'plugins')
+        if not (found := manager.discover().get(name)):
+            raise ValueError(f'No plugin named "{name}"')
+        manager.set_enabled(name, False)
+        shutil.rmtree(found[0])
+        return self.plugins()
 
     def create_shortcut(self, app_name: str) -> None:
         """A desktop shortcut that plays the game, with its icon; the terminal it runs in starts minimized"""
