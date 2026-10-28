@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### New
+- **Cloud saves sync when you play.** `heirloom launch`, and so Play in the window, downloads a game's cloud save
+  before it starts when that is newer, and uploads your save after the game exits when that is newer. The local files
+  a download replaces are kept in `save-backups` in the config folder. `--no-sync-saves` or
+  `disable_cloud_save_sync = true` turns it off. With `disable_playtime_tracking = true`, launches still wait for the
+  game to exit to upload its save, unless save sync is off too.
+
 ## 0.24.0 "Lantern" (2026-10-28)
 
 Heirloom gets a Windows installer, its own brand, and a new look for the window, where your games light up.

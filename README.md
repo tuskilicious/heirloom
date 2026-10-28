@@ -192,6 +192,12 @@ These can then be entered into any other game launcher (e.g. Lutris/Steam) if th
 `heirloom launch` waits for the game to exit and records how long you played, and whether the game exited normally or crashed.
 Use `--no-wait` to return immediately instead, or set `disable_playtime_tracking = true` in the config to turn this off.
 
+It also keeps cloud saves in sync, for games that have them: before the game starts it downloads the cloud save if that is newer, and after the game exits it uploads your save if that is newer.
+The local files a download replaces are kept in the `save-backups` folder of the config folder, in case they were the ones to keep.
+This needs a login, so offline launches don't sync, and `--no-wait` launches only download.
+Use `--no-sync-saves` to skip it once, or set `disable_cloud_save_sync = true` in the config to turn it off.
+The first time, the save folder is worked out from the game's information and remembered; when that isn't possible, `heirloom sync-saves <App Name>` asks for it once.
+
 Show recorded playtime (add an app name to also list its individual sessions)
 ````
 heirloom playtime
@@ -556,7 +562,10 @@ optional arguments:
   --dry-run             Print the command line that would have been used to
                         launch the game and exit
   --no-wait             Return right after starting the game instead of
-                        waiting for it to exit (playtime will not be recorded)
+                        waiting for it to exit (playtime will not be recorded,
+                        and saves not uploaded)
+  --no-sync-saves       Do not download a newer cloud save before the game
+                        starts, or upload a newer local save after it exits
   --language <two letter language code>
                         Override language for game launch (defaults to system
                         locale)
@@ -942,8 +951,10 @@ disable_update_check = false
 disable_update_notice = false
 ; Disable automatically-generated aliases
 disable_auto_aliasing = false
-; Do not wait for launched games to exit, and do not record playtime
+; Do not record playtime (launches stop waiting for games to exit if cloud save sync is off too)
 disable_playtime_tracking = false
+; Do not download a newer cloud save before a game starts, or upload a newer local save after it exits
+disable_cloud_save_sync = false
 ; Terminal theme (see "heirloom themes")
 theme = default
 
