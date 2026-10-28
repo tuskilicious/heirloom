@@ -232,6 +232,16 @@ function card(game) {
   const [lit, percent] = lighting(game, job);
   entry.node.dataset.state = lit;
   entry.cover.style.setProperty('--lit', `${percent}%`);
+  if (lit === 'filling') entry.wick.dataset.percent = `${Math.floor(percent)}%`;
+  else delete entry.wick.dataset.percent;
+  // a download that filled the cover lights it up, once it is installed
+  if (lit === 'filling') entry.filling = true;
+  if (lit === 'installed' && entry.filling) {
+    entry.filling = false;
+    entry.cover.classList.remove('kindled');
+    void entry.cover.offsetWidth;
+    entry.cover.classList.add('kindled');
+  }
   const playing = lit === 'playing';
   entry.badge.hidden = !playing && (!game.update || job !== null);
   entry.badge.textContent = playing ? 'Playing' : 'Update';

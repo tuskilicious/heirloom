@@ -10,6 +10,9 @@
   the keyboard, so the library reads as covers rather than rows of buttons. Covers lean toward the pointer, catch a
   sweep of light and glow in the lantern's colour; the art of the game you played last lights the page behind the
   frosted header, and the logo's lantern flickers. Scrollbars are slim and in the window's colours.
+- **Downloads that glow.** A download's line across its cover is a glowing wick with a glint running along it,
+  light spills up into the part still unlit, and the percentage rides on it. When the game is installed, the whole
+  cover flares up. The progress bar of the downloads panel glints too.
 - **The window's own theme.** The window keeps its own look whatever the terminal's theme is, and window themes are
   your CSS: a `.css` file in the `themes` folder, or a theme's `gui_css`. The theme button only shows in the sidebar
   once there is one to switch to, and opens a menu rather than a dropdown. High contrast follows Windows' contrast
