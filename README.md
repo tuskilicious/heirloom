@@ -136,6 +136,9 @@ Open the window: your library with cover art, and Play, Install, Update and Unin
 heirloom gui
 ````
 It needs pywebview, which the prebuilt Windows executable includes (install the `webview` extra otherwise; on Linux this also needs GTK WebKit, and macOS is untested).
+The sidebar switches between all your games, the installed ones and the ones with an update; `/` jumps to the search.
+Installed games are in colour and the others are not, until a download fills their cover from the bottom.
+The game you played last is at the top with your time played, ready to continue.
 Everything it does runs as a regular `heirloom` command, so playtime, plugins and resumable downloads work the same.
 Downloads run one at a time; Stop stops one cleanly, and installing it again continues where it stopped.
 Without a login, games are launched offline. The window uses your theme, see [Themes](#themes).
@@ -899,7 +902,7 @@ Name a CSS file next to the theme in `gui_css`, and it is added to the window's 
 .card { box-shadow: 0 0 18px #ff2bd633; }
 ````
 
-The page's own colours, corners and font come from those CSS variables (plus `--surface-raised`, `--danger`, `--progress`, `--radius-control` for buttons and fields, `--logo` for the logo's colour, `--card-width` and `--shadow`), so most themes only need to set some of them.
+The page's own colours, corners and font come from those CSS variables (plus `--surface-raised`, `--danger`, `--progress`, `--radius-control` for buttons and fields, `--logo` for the logo's colour, `--unlit` for the CSS filter over covers of games not installed, `--card-width` and `--shadow`), so most themes only need to set some of them.
 The page is in [`heirloom/gui/web`](heirloom/gui/web) for the class names to style.
 
 

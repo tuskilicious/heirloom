@@ -25,6 +25,8 @@ log = logging.getLogger('GUI')
 WEB = Path(__file__).parent / 'web'
 # portrait art first, as the library shows covers
 COVER_TYPES = ('DieselGameBoxTall', 'OfferImageTall', 'DieselStoreFrontTall', 'Thumbnail', 'DieselGameBox')
+# landscape art for the banner of the game played last
+ART_TYPES = ('DieselGameBox', 'DieselStoreFrontWide', 'OfferImageWide')
 
 # downloads (and uninstalls) run one at a time, as heirloom installs only one game at a time
 DOWNLOADS = ('install', 'uninstall')
@@ -46,9 +48,9 @@ def logged_in_user(lgd: LGDLFS) -> str | None:
     return userdata.get('displayName') if 'refresh_token' in userdata else None
 
 
-def cover_url(game: Game) -> str:
-    images = {image.get('type'): image.get('url') for image in game.metadata.get('keyImages', [])}
-    return next((images[kind] for kind in COVER_TYPES if images.get(kind)), '')
+def image_url(game: Game | None, kinds: tuple[str, ...]) -> str:
+    images = {image.get('type'): image.get('url') for image in game.metadata.get('keyImages', [])} if game else {}
+    return next((images[kind] for kind in kinds if images.get(kind)), '')
 
 
 def read_library(lgd: LGDLFS) -> list[dict[str, Any]]:
@@ -56,21 +58,27 @@ def read_library(lgd: LGDLFS) -> list[dict[str, Any]]:
     installed = {game.app_name: game for game in lgd.get_installed_list()}
     latest = {(platform, asset.app_name): asset.build_version
               for platform, assets in (lgd.assets or {}).items() for asset in assets}
+    playtime = lgd.get_playtime()
     games = []
     for app_name in set(lgd.get_game_app_names()) | set(installed):
         game, igame = lgd.get_game_meta(app_name), installed.get(app_name)
         if game and game.is_dlc:
             continue
         version = latest.get((igame.platform if igame else 'Windows', app_name))
+        sessions = playtime.get(app_name, [])
         games.append({
             'app_name': app_name,
             'title': game.app_title if game else igame.title if igame else app_name,
-            'cover': cover_url(game) if game else '',
+            'cover': image_url(game, COVER_TYPES),
+            'art': image_url(game, ART_TYPES),
             'installed': igame is not None,
             'version': igame.version if igame else version,
             'update': bool(igame and version and version != igame.version),
             'size': igame.install_size if igame else None,
             'store': game.third_party_store if game else None,
+            # seconds played, and when the last session ended
+            'played': round(sum(session.duration.total_seconds() for session in sessions)),
+            'last_played': max(session.end for session in sessions).isoformat() if sessions else None,
         })
     return sorted(games, key=lambda game: game['title'].lower())
 

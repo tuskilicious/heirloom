@@ -7,6 +7,10 @@
   the window, and optionally a desktop shortcut and the `heirloom` command on `PATH`. It updates and uninstalls cleanly
   and keeps your config folder. Opened from a shortcut, the window no longer comes with a terminal window.
 - **The Heirloom brand.** The lantern app icon, and the brand's colours and logo in the window.
+- **A new look for the window.** A sidebar for all, installed and updatable games, with counts. Games you haven't
+  installed are shown without colour, and a download fills the cover with it as it goes. The game you played last is
+  at the top with your time played and a Play button. Downloads and other tasks are listed in a corner with progress
+  rings that stop a download when clicked. `/` jumps to the search.
 
 ## 0.23.0 "Locket" (2026-10-23)
 
