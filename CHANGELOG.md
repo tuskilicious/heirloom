@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Opening Heirloom from the Start menu or desktop shortcut no longer shows a terminal window for a moment. The
+  shortcuts run the new `heirloom-gui.exe`, a windowed program that starts the window with its terminal hidden.
+
 ## 0.26.1 "Hearth" (2026-10-28)
 
 Heirloom tidies up after installs, updates and uninstalls, and uninstalls games imported from the Epic Games Launcher properly.

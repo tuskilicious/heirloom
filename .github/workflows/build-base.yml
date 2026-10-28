@@ -62,10 +62,7 @@ jobs:
       if: runner.os == 'Windows' && runner.arch == 'X64'
       shell: pwsh
       run: |
-        Push-Location heirloom
-        uv run --module PyInstaller --onedir --name heirloom --add-data gui/web:heirloom/gui/web `
-          -i ../assets/windows_icon.ico --distpath ../installer/build --workpath build/onedir cli.py
-        Pop-Location
+        uv run --module PyInstaller --distpath installer/build --workpath build/onedir installer/heirloom.spec
         $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
         if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y }
         $version = python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])"
@@ -86,7 +83,7 @@ jobs:
         if ($version -notlike '*heirloom version*') { throw "heirloom.exe -V printed: $version" }
         $lnk = Join-Path ([Environment]::GetFolderPath('Programs')) 'Heirloom.lnk'
         $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
-        if ($shortcut.TargetPath -ne "$dir\heirloom.exe" -or $shortcut.Arguments -ne 'gui') { throw "Start menu shortcut runs: $($shortcut.TargetPath) $($shortcut.Arguments)" }
+        if ($shortcut.TargetPath -ne "$dir\heirloom-gui.exe" -or $shortcut.Arguments) { throw "Start menu shortcut runs: $($shortcut.TargetPath) $($shortcut.Arguments)" }
         if ((Get-ItemProperty HKCU:\Environment).Path -notlike "*$dir*") { throw 'not added to PATH' }
         "installed: $version"
 
