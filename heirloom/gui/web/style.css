@@ -1,20 +1,23 @@
 /*
   Heirloom's window. Themes restyle it by overriding these variables (and anything else) in their gui_css file;
   the built-in themes below are just sets of variables, selected by <html data-theme="...">.
+  The default is the brand, "Keeper Light": citron on evergreen, with paper text (assets/brand).
 */
 :root {
-  --bg: #111318;
-  --surface: #1a1d24;
-  --surface-raised: #232731;
-  --border: #2c313c;
-  --text: #e9ebf0;
-  --muted: #98a1b0;
-  --accent: #4fd1c5;
-  --accent-text: #062421;
-  --danger: #ff7a7a;
+  --bg: #01211a;
+  --surface: #0b3028;
+  --surface-raised: #134036;
+  --border: #1f4d42;
+  --text: #f7faf2;
+  --muted: #a9bdb2;
+  --accent: #f3fb88;
+  --accent-text: #01211a;
+  --logo: #f3fb88;
+  --danger: #ff8b7a;
   --progress: var(--accent);
-  --radius: 10px;
-  --font: system-ui, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --radius: 16px;
+  --radius-control: 8px;
+  --font: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --card-width: 172px;
   --shadow: 0 10px 30px rgb(0 0 0 / 35%);
   color-scheme: dark;
@@ -45,20 +48,23 @@
   --accent-text: #000000;
   --danger: #ff5c5c;
   --radius: 4px;
+  --radius-control: 4px;
   --shadow: none;
 }
 
 :root[data-theme="plain"] {
-  --bg: #f5f6f8;
+  --bg: #f7faf2;
   --surface: #ffffff;
   --surface-raised: #ffffff;
-  --border: #d9dde4;
-  --text: #1c2029;
-  --muted: #5d6676;
-  --accent: #2f6fed;
-  --accent-text: #ffffff;
-  --danger: #c62828;
-  --shadow: 0 4px 14px rgb(20 30 50 / 10%);
+  --border: #d5ded8;
+  --text: #01211a;
+  --muted: #426057;
+  --accent: #01211a;
+  --accent-text: #f3fb88;
+  /* the brand's logo on light backgrounds is evergreen, citron is for dark ones */
+  --logo: #01211a;
+  --danger: #b3261e;
+  --shadow: 0 4px 14px rgb(1 33 26 / 10%);
   color-scheme: light;
 }
 
@@ -76,7 +82,7 @@ button, input, select { font: inherit; color: inherit; }
 
 button {
   border: 1px solid transparent;
-  border-radius: calc(var(--radius) - 3px);
+  border-radius: var(--radius-control);
   padding: 6px 14px;
   cursor: pointer;
   background: var(--surface-raised);
@@ -104,13 +110,14 @@ button:disabled { opacity: .55; cursor: default; }
   border-bottom: 1px solid var(--border);
 }
 
-.brand { margin: 0 8px 0 0; font-size: 18px; letter-spacing: .02em; }
+.brand { margin: 0 8px 0 0; line-height: 0; }
+.brand .logo { height: 30px; width: auto; color: var(--logo); }
 
 #search {
   width: min(320px, 40vw);
   padding: 7px 12px;
   border: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 3px);
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 
@@ -124,7 +131,7 @@ button:disabled { opacity: .55; cursor: default; }
 .theme-picker select {
   padding: 5px 8px;
   border: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 3px);
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 
