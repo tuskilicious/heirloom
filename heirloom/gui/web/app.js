@@ -7,11 +7,11 @@
 const $ = (selector) => document.querySelector(selector);
 const SVG = 'http://www.w3.org/2000/svg';
 const ACTIVE = new Set(['queued', 'running']);
-const DOWNLOADS = new Set(['install', 'uninstall', 'repair']);
+const DOWNLOADS = new Set(['install', 'uninstall', 'repair', 'overlay']);
 const DOING = {install: 'Installing', uninstall: 'Uninstalling', repair: 'Repairing', sync: 'Syncing saves',
-  play: 'Playing', login: 'Logging in'};
+  play: 'Playing', login: 'Logging in', overlay: 'Installing', overlay_remove: 'Removing'};
 const DONE = {install: 'Installed', uninstall: 'Uninstalled', repair: 'Repaired', sync: 'Saves synced',
-  play: 'Game closed', login: 'Logged in'};
+  play: 'Game closed', login: 'Logged in', overlay: 'Installed and on', overlay_remove: 'Removed'};
 const SHELVES = {all: 'Library', installed: 'Installed', updates: 'Updates'};
 const RING = '<svg class="meter" viewBox="0 0 24 24" aria-hidden="true">'
   + '<circle class="track" cx="12" cy="12" r="10" pathLength="100"/>'
@@ -23,6 +23,8 @@ let filter = 'all';
 let libraryOrder = '';
 let jobOrder = '';
 let heroKey = '';
+// the states of the Epic overlay's jobs, to redraw Customize when one finishes
+let overlayJobs = '';
 const cards = new Map();
 const rows = new Map();
 // finished jobs taken off the list with "Clear finished"
@@ -458,6 +460,37 @@ async function poll() {
     return;
   }
   render();
+  const overlay = state.jobs.filter((job) => job.kind.startsWith('overlay')).map((job) => job.status).join();
+  if (overlay !== overlayJobs) {
+    overlayJobs = overlay;
+    if ($('#customize').open) showOverlay(await api.overlay());
+  }
+}
+
+// the Epic overlay's row in Customize: what it is, how it stands, and what can be done with it
+function showOverlay(info) {
+  $('#overlay-section').hidden = !info;
+  if (!info) return;
+  const busy = state.jobs.some((job) => job.kind.startsWith('overlay') && ACTIVE.has(job.status));
+  let detail = 'Not installed';
+  if (busy) detail = 'Working on it, see the downloads panel';
+  else if (info.installed) detail = `Version ${info.version}, ${info.enabled ? 'on' : 'off'} for every game`;
+  else if (info.enabled) detail = 'On, from the Epic Games Launcher';
+  const install = () => run(api.install_overlay()).then(() => showOverlay(info));
+  $('#overlay-row').replaceChildren(...[
+    el('span', {className: 'row-text'},
+      el('span', {className: 'what', textContent: 'Friends, invites and achievements in games'}),
+      el('span', {className: 'detail', textContent: detail})),
+    !busy && (info.installed || info.enabled) ? el('input', {
+      type: 'checkbox', role: 'switch', className: 'switch', checked: info.enabled, ariaLabel: 'Epic overlay on',
+      onchange: async (event) => showOverlay(await api.set_overlay(event.target.checked)),
+    }) : null,
+    !busy && !info.installed ? button('Install', 'ghost', install, 'download') : null,
+    !busy && info.installed ? iconButton('updates', 'Update the Epic overlay', '', install) : null,
+    !busy && info.installed ? iconButton('trash', 'Remove the Epic overlay', 'danger', () => {
+      if (confirm('Remove the Epic overlay? Games stop showing it.')) run(api.remove_overlay());
+    }) : null,
+  ].filter(Boolean));
 }
 
 async function showThemes(info) {
@@ -597,6 +630,7 @@ async function start() {
   $('#customize-open').onclick = async () => {
     // themes and plugins added in their folders meanwhile show up too
     await showThemes();
+    showOverlay(await api.overlay());
     showPlugins(await api.plugins());
     $('#customize').showModal();
   };

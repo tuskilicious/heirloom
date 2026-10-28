@@ -348,9 +348,13 @@ kbd {
   overflow: hidden;
   border-radius: var(--radius);
   background: var(--surface-raised);
+  /* the tilt toward the pointer is the transform, the lift is translate: each moves at its own pace */
   transform: perspective(700px) rotateX(var(--ry, 0deg)) rotateY(var(--rx, 0deg));
-  transition: transform .5s var(--spring), box-shadow .4s var(--ease);
+  transition: transform .7s var(--spring), translate .5s var(--spring), box-shadow .4s var(--ease);
 }
+
+/* under the pointer, the tilt follows it at once rather than trailing behind; it springs back on leaving */
+.card:hover .cover { transition: transform .08s ease-out, translate .5s var(--spring), box-shadow .4s var(--ease); }
 
 /* a sweep of light across the cover under the pointer */
 .cover::before {
@@ -376,7 +380,7 @@ kbd {
 }
 
 .card:hover .cover {
-  transform: perspective(700px) translateY(-6px) rotateX(var(--ry, 0deg)) rotateY(var(--rx, 0deg));
+  translate: 0 -6px;
   box-shadow: var(--shadow), 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent),
     0 16px 44px -14px color-mix(in srgb, var(--accent) 45%, transparent);
 }

@@ -151,6 +151,30 @@ def test_updates_start_by_themselves(fake_game, monkeypatch):
     assert api_starting(started)._update_games() == '' and not started, 'turned off'
 
 
+@pytest.mark.skipif(sys.platform != 'win32', reason='the window offers the overlay on Windows only')
+def test_epic_overlay(lgd_home, tmp_path, monkeypatch):
+    registry = {'overlay_path': None}
+    monkeypatch.setattr('heirloom.gui.app.query_registry_entries', lambda: dict(registry))
+    monkeypatch.setattr('heirloom.gui.app.remove_registry_entries', lambda: registry.update(overlay_path=None))
+    monkeypatch.setattr('heirloom.gui.app.add_registry_entries', lambda path: registry.update(overlay_path=path))
+    api = GuiApi(None, lambda: {}, command=lambda: ['heirloom'])
+    assert api.overlay() == {'installed': False, 'version': '', 'enabled': False}
+    with pytest.raises(ValueError):
+        api.set_overlay(True)
+    assert api._command(Job(1, 'overlay', '', 'Epic overlay')) == ['heirloom', '-y', 'eos-overlay', 'install']
+
+    overlay_dir = tmp_path / 'Overlay'
+    overlay_dir.mkdir()
+    (overlay_dir / 'EOSOVH-Win64-Shipping.dll').touch()
+    lgd_home.mkdir(exist_ok=True)
+    (lgd_home / 'overlay_install.json').write_text(json.dumps(
+        {'app_name': '98bc04bc842e4906993fd6d6644ffb8d', 'title': 'Epic overlay', 'version': '1.3.5',
+         'install_path': str(overlay_dir)}))
+    assert api.set_overlay(True) == {'installed': True, 'version': '1.3.5', 'enabled': True}
+    assert registry['overlay_path'] == str(overlay_dir)
+    assert api.set_overlay(False)['enabled'] is False and registry['overlay_path'] is None
+
+
 def test_open_folder_of_a_game_whose_files_are_gone(fake_game, tmp_path):
     for child in (tmp_path / 'FishGame').iterdir():
         child.unlink()

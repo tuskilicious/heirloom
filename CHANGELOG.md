@@ -21,6 +21,11 @@
   your CSS: a `.css` file in the `themes` folder, or a theme's `gui_css`. Themes are chosen in Customize, which only
   offers a choice once there is one. High contrast follows Windows' contrast settings. The setting is `window_theme`
   in the config file.
+- **The Epic overlay in the window.** On Windows, Customize installs the Epic overlay (friends, invites and
+  achievements in games using Epic Online Services) as a download, turns it on and off for every game, updates and
+  removes it, and says when it is on from the Epic Games Launcher's own copy.
+- **Covers tilt with the pointer at once.** The tilt toward the pointer no longer trails behind it; the lift keeps
+  its spring, and the tilt springs back on leaving.
 - **Customize, and a plugin store.** Customize in the sidebar opens a panel to choose the window's theme, turn
   plugins on and off, remove them, and open the themes and plugins folders to add your own. Its plugin store installs
   the plugins that now come with Heirloom in one click: Notifications (when a game is installed or updated), High

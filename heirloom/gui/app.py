@@ -18,6 +18,11 @@ from pathlib import Path
 from typing import Any
 
 from heirloom.downloader.queue import heirloom_command, start_job, stop_job
+from heirloom.lfs.eos import (
+    add_registry_entries,
+    query_registry_entries,
+    remove_registry_entries,
+)
 from heirloom.lfs.lgndry import LGDLFS
 from heirloom.models.game import Game
 from heirloom.plugins import PluginManager
@@ -36,12 +41,15 @@ COVER_TYPES = ('DieselGameBoxTall', 'OfferImageTall', 'DieselStoreFrontTall', 'T
 ART_TYPES = ('DieselGameBox', 'DieselStoreFrontWide', 'OfferImageWide')
 
 # downloads (and uninstalls and repairs) run one at a time, as heirloom installs only one game at a time
-DOWNLOADS = ('install', 'uninstall', 'repair')
+DOWNLOADS = ('install', 'uninstall', 'repair', 'overlay')
 COMMANDS = {
     'install': ['-y', 'install'],
     'uninstall': ['-y', 'uninstall'],
     'repair': ['-y', 'repair'],
     'sync': ['-y', 'sync-saves'],
+    # the Epic overlay: installing also turns it on, and installing again updates it
+    'overlay': ['-y', 'eos-overlay', 'install'],
+    'overlay_remove': ['-y', 'eos-overlay', 'remove'],
     'play': ['-y', 'launch'],
     'login': ['auth'],
 }
@@ -358,6 +366,35 @@ class GuiApi:
                 notice = f'Could not add a desktop shortcut for {title}.'
         with self._lock:
             self._notice = notice
+
+    def overlay(self) -> dict[str, Any] | None:
+        """
+        The Epic overlay, which games using Epic Online Services show friends, invites and achievements in: whether
+        Heirloom installed it, and whether it is on. None off Windows, where it needs a Wine prefix (see the CLI).
+        """
+        if sys.platform != 'win32':
+            return None
+        install = self._lgd().get_overlay_install_info()
+        path = query_registry_entries()['overlay_path']
+        return {'installed': install is not None, 'version': install.version if install else '',
+                # it may be on from the Epic Games Launcher's own copy
+                'enabled': bool(path) and Path(path, 'EOSOVH-Win64-Shipping.dll').exists()}
+
+    def set_overlay(self, enabled: bool) -> dict[str, Any] | None:
+        """Turns the overlay on or off for every game, in the registry of the current user"""
+        install = self._lgd().get_overlay_install_info()
+        if enabled and not install:
+            raise ValueError('The overlay is not installed')
+        remove_registry_entries()
+        if enabled and install:
+            add_registry_entries(os.path.normpath(install.install_path))
+        return self.overlay()
+
+    def install_overlay(self) -> None:
+        self._jobs.add('overlay', '', 'Epic overlay')
+
+    def remove_overlay(self) -> None:
+        self._jobs.add('overlay_remove', '', 'Epic overlay')
 
     def login(self) -> None:
         self._jobs.add('login', '', 'Epic Games account')

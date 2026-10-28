@@ -140,6 +140,7 @@ It needs pywebview, which the prebuilt Windows executable includes (install the 
 The sidebar switches between all your games, the installed ones and the ones with an update; `/` jumps to the search.
 Installed games are in colour and the others are not; a download assembles its game's cover tile by tile, sharpening from a blur as it goes.
 The game you played last is at the top with your time played, ready to continue.
+On Windows, Customize in the sidebar also installs the Epic overlay, which games using Epic Online Services show friends, invites and achievements in, turns it on and off for every game, updates and removes it (as `heirloom eos-overlay` does).
 Each installed game's Manage button (`⋯`) opens its folder, adds a desktop shortcut that plays it (Windows), verifies and repairs its files, syncs its cloud saves and uninstalls it.
 Everything it does runs as a regular `heirloom` command, so playtime, plugins and resumable downloads work the same.
 Downloads run one at a time; Stop stops one cleanly, and installing it again continues where it stopped.
