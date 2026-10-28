@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### New
+- **Game updates install by themselves.** Each time the window refreshes your library, when it opens and then every
+  hour, it starts the updates of installed games and says which. Games being played are left alone, and so are
+  updates you stopped or that failed since the window opened, until you press Update. `disable_auto_updates = true`
+  in the config file turns it off.
 - **Manage a game from the window.** Each installed game has a Manage button (`⋯`): open its folder, add a desktop
   shortcut that plays it (Windows), verify and repair its files, sync its cloud saves, play without updating, or
   uninstall it.

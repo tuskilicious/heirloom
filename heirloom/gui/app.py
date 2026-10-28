@@ -359,8 +359,22 @@ class GuiApi:
         with self._lock:
             self._games, self._user = games, user
 
+    def _update_games(self) -> str:
+        """Starts the updates of installed games by themselves, and says which"""
+        if self._lgd().config.getboolean('Heirloom', 'disable_auto_updates', fallback=False):
+            return ''
+        # games being played or updated, and updates stopped or failed while the window is open: Stop means stop,
+        # and a failing update (a full disk, say) waits for the Update button rather than failing every hour
+        skip = {job['app_name'] for job in self._jobs.snapshot()
+                if job['status'] in ('queued', 'running') or (job['kind'] == 'install' and job['status'] != 'done')}
+        with self._lock:
+            games = [game for game in self._games if game['update'] and game['app_name'] not in skip]
+        for game in games:
+            self._jobs.add('install', game['app_name'], game['title'])
+        return f'Updating by itself: {", ".join(game["title"] for game in games)}.' if games else ''
+
     def _refresh(self) -> None:
-        notice, update = '', None
+        notice, update, refreshed = '', None, False
         try:
             from heirloom.core import HeirloomCore
             core = HeirloomCore(override_config=self._config_file)
@@ -374,6 +388,7 @@ class GuiApi:
                 if imported := core.egl_import_new():
                     titles = ', '.join(core.get_installed_game(app_name).title for app_name in imported)
                     notice = f'Added from the Epic Games Launcher: {titles}.'
+                refreshed = True
             # logging in checks for a newer Heirloom
             if core.update_available and core.update_notice_enabled() and (release := core.get_update_info()):
                 update = {'version': release['version'], 'name': release['name'], 'url': release['gh_url']}
@@ -381,6 +396,9 @@ class GuiApi:
             log.warning(f'Refreshing the library failed: {e!r}')
             notice = f'Refreshing the library failed: {e}'
         self._read_library()
+        # only with the latest versions just fetched, which needs the login to have worked
+        if refreshed:
+            notice = ' '.join(filter(None, (notice, self._update_games())))
         with self._lock:
             self._notice, self._update, self._refreshing = notice, update, False
 

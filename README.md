@@ -143,6 +143,7 @@ The game you played last is at the top with your time played, ready to continue.
 Each installed game's Manage button (`⋯`) opens its folder, adds a desktop shortcut that plays it (Windows), verifies and repairs its files, syncs its cloud saves and uninstalls it.
 Everything it does runs as a regular `heirloom` command, so playtime, plugins and resumable downloads work the same.
 Downloads run one at a time; Stop stops one cleanly, and installing it again continues where it stopped.
+Game updates install by themselves: each time the window refreshes your library (when it opens, then every hour), it starts the updates of installed games, except games being played and updates you stopped or that failed since the window opened, which wait for their Update button. Set `disable_auto_updates = true` to update only when you choose.
 Without a login, games are launched offline. The window has its own look, and can use your own CSS, see [Window themes](#window-themes).
 
 Listing your games
@@ -964,6 +965,8 @@ disable_auto_aliasing = false
 disable_playtime_tracking = false
 ; Do not download a newer cloud save before a game starts, or upload a newer local save after it exits
 disable_cloud_save_sync = false
+; Do not install game updates by themselves when the window of "heirloom gui" finds them
+disable_auto_updates = false
 ; Terminal theme (see "heirloom themes")
 theme = default
 ; Window theme of "heirloom gui" (see "Window themes")

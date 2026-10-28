@@ -532,6 +532,8 @@ async function start() {
   await poll();
   api.refresh();
   setInterval(poll, 1000);
+  // new versions turn up while the window stays open, and their updates start by themselves
+  setInterval(() => api.refresh(), 60 * 60 * 1000);
 }
 
 if (window.pywebview && window.pywebview.api) start();

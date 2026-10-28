@@ -130,6 +130,27 @@ def test_commands_for_each_action(fake_game):
     assert logged_in._command(play)[-3:] == ['-y', 'launch', 'Fish']
 
 
+def test_updates_start_by_themselves(fake_game, monkeypatch):
+    LGDLFS().assets = {'Linux': [GameAsset(app_name='Fish', build_version='2')]}
+
+    def api_starting(started):
+        api = GuiApi(None, lambda: {})
+        monkeypatch.setattr(api._jobs, 'add', lambda kind, app_name, title: started.append((kind, app_name)))
+        return api
+
+    started = []
+    api = api_starting(started)
+    assert api._update_games() == 'Updating by itself: Fish Game.' and started == [('install', 'Fish')]
+    for status, kind in (('running', 'play'), ('stopped', 'install'), ('failed', 'install')):
+        started.clear()
+        api._jobs._jobs[:] = [Job(1, kind, 'Fish', 'Fish Game', status)]
+        assert api._update_games() == '' and not started, f'{kind} {status}: left alone'
+
+    (fake_game / 'config.ini').write_text('[Heirloom]\ndisable_auto_updates = true\n')
+    started.clear()
+    assert api_starting(started)._update_games() == '' and not started, 'turned off'
+
+
 def test_open_folder_of_a_game_whose_files_are_gone(fake_game, tmp_path):
     for child in (tmp_path / 'FishGame').iterdir():
         child.unlink()
