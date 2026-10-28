@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.26.0 "Hearth" (2026-10-28)
+
+Heirloom brings over the games the Epic Games Launcher installed by itself, and tells you when a newer Heirloom is out.
 
 ### New
 - **Heirloom tells you about new versions.** Once a day, when it logs in, Heirloom checks its latest release on
