@@ -1989,6 +1989,29 @@ class HeirloomCore:
                 egl_game.display_name = game.app_title if game else egl_game.app_name
         return importable
 
+    def egl_import_new(self, app_name: str | None = None) -> list[str]:
+        """
+        Imports the games the Epic Games Launcher installed that Heirloom doesn't have yet (or just app_name), as
+        "egl-sync --import-only" does, so they are not downloaded again. Returns the app names it imported.
+        """
+        if not self.egl.installations_path and not (self.egl.programdata_path and
+                                                     Path(self.egl.programdata_path).is_dir()):
+            return []
+        try:
+            importable = [g for g in self.egl_get_importable() if not app_name or g.app_name == app_name]
+        except Exception as e:
+            self.log.warning(f'Reading the games the Epic Games Launcher installed failed: {e!r}')
+            return []
+        imported = []
+        for egl_game in importable:
+            try:
+                self.egl_import(egl_game.app_name)
+            except Exception as e:
+                self.log.warning(f'Importing "{egl_game.display_name}" from the Epic Games Launcher failed: {e!r}')
+            if self.is_installed(egl_game.app_name):
+                imported.append(egl_game.app_name)
+        return imported
+
     def egl_get_exportable(self):
         if self.egl.installations_path:  # the new launcher's install list is only read, never written
             return []
