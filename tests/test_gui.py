@@ -2,12 +2,13 @@
 import json
 import sys
 import time
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from heirloom.gui.app import GuiApi, Job, Jobs, read_library
 from heirloom.lfs.lgndry import LGDLFS
-from heirloom.models.game import GameAsset
+from heirloom.models.game import GameAsset, PlaytimeSession
 from heirloom.themes import load_themes
 
 # Stands in for "heirloom install": prints download log lines like heirloom's, then exits with the given code,
@@ -42,17 +43,24 @@ def write_meta(lgd_home, app_name, title, **metadata):
 def test_library_from_cached_files(fake_game):
     write_meta(fake_game, 'Fish', 'Fish Game', keyImages=[
         {'type': 'Thumbnail', 'url': 'https://cdn/fish-thumb.jpg'},
-        {'type': 'DieselGameBoxTall', 'url': 'https://cdn/fish-tall.jpg'}])
+        {'type': 'DieselGameBoxTall', 'url': 'https://cdn/fish-tall.jpg'},
+        {'type': 'DieselGameBox', 'url': 'https://cdn/fish-wide.jpg'}])
     write_meta(fake_game, 'Goo', 'World of Goo')
     write_meta(fake_game, 'FishDLC', 'Fish Game Soundtrack', mainGameItem={'id': 'fish'})
-    LGDLFS().assets = {'Linux': [GameAsset(app_name='Fish', build_version='2')],
-                       'Windows': [GameAsset(app_name='Goo', build_version='7')]}
+    lgd = LGDLFS()
+    lgd.assets = {'Linux': [GameAsset(app_name='Fish', build_version='2')],
+                  'Windows': [GameAsset(app_name='Goo', build_version='7')]}
+    day = datetime(2026, 10, 26, 20, tzinfo=timezone.utc)
+    lgd.add_playtime_session('Fish', PlaytimeSession(day, day + timedelta(hours=2), 0))
+    lgd.add_playtime_session('Fish', PlaytimeSession(day - timedelta(days=3), day - timedelta(days=3, minutes=-30)))
 
     fish, goo = read_library(LGDLFS())
-    assert fish == {'app_name': 'Fish', 'title': 'Fish Game', 'cover': 'https://cdn/fish-tall.jpg', 'installed': True,
-                    'version': '1', 'update': True, 'size': 1024 ** 3, 'store': None}
-    assert goo == {'app_name': 'Goo', 'title': 'World of Goo', 'cover': '', 'installed': False, 'version': '7',
-                   'update': False, 'size': None, 'store': None}, 'not installed, and DLC is left out'
+    assert fish == {'app_name': 'Fish', 'title': 'Fish Game', 'cover': 'https://cdn/fish-tall.jpg',
+                    'art': 'https://cdn/fish-wide.jpg', 'installed': True, 'version': '1', 'update': True,
+                    'size': 1024 ** 3, 'store': None, 'played': 2.5 * 3600, 'last_played': '2026-10-26T22:00:00+00:00'}
+    assert goo == {'app_name': 'Goo', 'title': 'World of Goo', 'cover': '', 'art': '', 'installed': False,
+                   'version': '7', 'update': False, 'size': None, 'store': None, 'played': 0,
+                   'last_played': None}, 'not installed, and DLC is left out'
 
 
 def run_jobs(jobs, kinds, until_done=True):
