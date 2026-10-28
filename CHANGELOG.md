@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.26.1 "Hearth" (2026-10-28)
+
+Heirloom tidies up after installs, updates and uninstalls, and uninstalls games imported from the Epic Games Launcher properly.
 
 ### New
 - **Less left behind.** After an install, update or uninstall, Heirloom removes the files it kept for game versions
