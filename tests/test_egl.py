@@ -170,3 +170,43 @@ def test_egl_sync_imports_from_the_new_launcher(new_launcher_game, lgd_home):
     again = run('egl-sync', '--yes')
     assert again.returncode == 0, again.stderr
     assert 'Nothing to import' in again.stdout, 'games already in Heirloom are left as they are'
+
+
+def use_new_launcher(lgd_home, installations):
+    (lgd_home / 'config.ini').write_text(f'[Heirloom]\negl_installations = {installations}\n')
+
+
+def test_install_takes_a_game_from_the_new_launcher_instead_of_downloading(new_launcher_game, lgd_home):
+    installations, game_dir, _ = new_launcher_game
+    use_new_launcher(lgd_home, installations)
+
+    result = run('-y', 'install', 'Fish')
+    assert result.returncode == 0, result.stderr
+    assert 'already installed by the Epic Games Launcher' in result.stderr
+    igame = json.loads((lgd_home / 'installed.json').read_text())['Fish']
+    assert (igame['install_path'], igame['egl_guid']) == (str(game_dir), 'AAA')
+
+
+def test_window_refresh_adds_games_from_the_new_launcher(new_launcher_game, lgd_home, monkeypatch):
+    from heirloom.gui.app import GuiApi
+
+    installations, game_dir, _ = new_launcher_game
+    use_new_launcher(lgd_home, installations)
+    monkeypatch.setattr('heirloom.gui.app.logged_in_user', lambda lgd: 'Tester')
+    monkeypatch.setattr(HeirloomCore, 'login', lambda self: True)
+    monkeypatch.setattr(HeirloomCore, 'get_game_and_dlc_list', lambda self, **kwargs: None)
+    api = GuiApi(None, lambda: {})
+    assert [game['installed'] for game in api.state()['games']] == [False]
+
+    api._refresh()
+    state = api.state()
+    assert [game['installed'] for game in state['games']] == [True]
+    assert state['notice'] == 'Added from the Epic Games Launcher: Fish Game.'
+
+    api._refresh()
+    assert api.state()['notice'] == '', 'only new games are added, and mentioned'
+
+
+def test_no_launcher_no_import(lgd_home, no_real_launcher):
+    lgd_home.mkdir()
+    assert HeirloomCore().egl_import_new() == []

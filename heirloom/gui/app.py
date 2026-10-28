@@ -291,6 +291,10 @@ class GuiApi:
                 notice = 'Could not log in, try logging in again.'
             else:
                 core.get_game_and_dlc_list(update_assets=True)
+                # games the Epic Games Launcher installed are added, rather than offered for download again
+                if imported := core.egl_import_new():
+                    titles = ', '.join(core.get_installed_game(app_name).title for app_name in imported)
+                    notice = f'Added from the Epic Games Launcher: {titles}.'
             # logging in checks for a newer Heirloom
             if core.update_available and core.update_notice_enabled() and (release := core.get_update_info()):
                 update = {'version': release['version'], 'name': release['name'], 'url': release['gh_url']}

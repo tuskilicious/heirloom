@@ -1201,6 +1201,10 @@ class HeirloomCLI:
             if igame.needs_verification and not args.repair_mode:
                 logger.info('Game needs to be verified before updating, switching to repair mode...')
                 args.repair_mode = True
+        elif args.subparser_name == 'install' and self.core.egl_import_new(args.app_name):
+            logger.info(f'"{args.app_name}" is already installed by the Epic Games Launcher, added it from there '
+                        f'instead of downloading it again.')
+            return
 
         repair_file = None
         if args.subparser_name == 'download':
