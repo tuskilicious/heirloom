@@ -1117,7 +1117,7 @@ class HeirloomCore:
 
         return str(absolute_path)
 
-    def check_savegame_state(self, path: str, save: SaveGameFile) -> tuple[SaveGameStatus, tuple[datetime | None, datetime | None]]:
+    def check_savegame_state(self, path: str, save: SaveGameFile | None) -> tuple[SaveGameStatus, tuple[datetime | None, datetime | None]]:
         latest = 0.0
         for f in Path(path).rglob('*'):
             if f.is_file():
@@ -1146,20 +1146,21 @@ class HeirloomCore:
         else:
             return SaveGameStatus.REMOTE_NEWER, (dt_local, dt_remote)
 
+    def get_save_filters(self, app_name: str) -> tuple[list[str] | None, list[str] | None]:
+        """The patterns of the files that are part of a game's cloud save, and of those that are not, if it has them"""
+        custom_attr = self.lgd.get_game_meta(app_name).metadata['customAttributes']
+        include = custom_attr.get('CloudIncludeList', {}).get('value')
+        exclude = custom_attr.get('CloudExcludeList', {}).get('value')
+        return (include.split(',') if include is not None else None,
+                exclude.split(',') if exclude is not None else None)
+
     def upload_save(self, app_name, save_dir, local_dt: datetime | None = None,
                     disable_filtering: bool = False):
         game = self.lgd.get_game_meta(app_name)
         custom_attr = game.metadata['customAttributes']
         save_path = custom_attr.get('CloudSaveFolder', {}).get('value')
         save_path_mac = custom_attr.get('CloudSaveFolder_MAC', {}).get('value')
-
-        include_f = exclude_f = None
-        if not disable_filtering:
-            # get file inclusion and exclusion filters if they exist
-            if (_include := custom_attr.get('CloudIncludeList', {}).get('value', None)) is not None:
-                include_f = _include.split(',')
-            if (_exclude := custom_attr.get('CloudExcludeList', {}).get('value', None)) is not None:
-                exclude_f = _exclude.split(',')
+        include_f, exclude_f = (None, None) if disable_filtering else self.get_save_filters(app_name)
 
         if not save_path and not save_path_mac:
             raise ValueError('Game does not support cloud saves')
@@ -1202,19 +1203,9 @@ class HeirloomCore:
                 _save_dir.mkdir(parents=True, exist_ok=True)
 
             if app_name and clean_dir:
-                game = self.lgd.get_game_meta(app_name)
-                custom_attr = game.metadata['customAttributes']
-                include_f = exclude_f = None
-
                 # Make sure to only delete files that match the include/exclude filters.
                 # This is particularly import for games that store save games in their install dir...
-                if (_include := custom_attr.get('CloudIncludeList', {}).get('value', None)) is not None:
-                    include_f = _include.split(',')
-                if (_exclude := custom_attr.get('CloudExcludeList', {}).get('value', None)) is not None:
-                    exclude_f = _exclude.split(',')
-
-                sgh = SaveGameHelper()
-                save_files = sgh.get_deletion_list(_save_dir, include_f, exclude_f)
+                save_files = SaveGameHelper().get_deletion_list(_save_dir, *self.get_save_filters(app_name))
                 self.log.info('Deleting old save files...')
                 delete_filelist(_save_dir, save_files, silent=True)
 
