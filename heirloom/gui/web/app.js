@@ -489,15 +489,44 @@ function showPlugins(plugins) {
     : button('Install', 'ghost', () => update(api.install_plugin(plugin.name)), 'download'))));
 }
 
+// names the cards on screen for a view transition, by their place in the library, so each glides from where it
+// was to where it is; the rest of a large library is left out, and stays cheap
+function nameCards() {
+  [...$('#library').children].forEach((node, index) => {
+    const box = node.getBoundingClientRect();
+    node.style.viewTransitionName = !node.hidden && box.bottom > 0 && box.top < innerHeight ? `card-${index}` : '';
+  });
+}
+
+// a change of what the library shows, with the cards gliding to their new places
+function smoothly(update) {
+  if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    update();
+    return;
+  }
+  nameCards();
+  const transition = document.startViewTransition(() => {
+    update();
+    nameCards();
+  });
+  // skipped in a minimized window, say: the update still happens, just without the glide
+  transition.ready.catch(() => {});
+  transition.finished.finally(() => {
+    for (const node of $('#library').children) node.style.viewTransitionName = '';
+  });
+}
+
 function setFilter(name) {
   filter = name;
   for (const item of document.querySelectorAll('[data-filter]')) {
     item.setAttribute('aria-pressed', String(item.dataset.filter === name));
   }
   moveMarker();
-  renderShelves();
-  renderHero();
-  renderLibrary();
+  smoothly(() => {
+    renderShelves();
+    renderHero();
+    renderLibrary();
+  });
 }
 
 async function start() {
@@ -506,10 +535,10 @@ async function start() {
   $('#account').onclick = login;
   $('#empty-login').onclick = login;
   $('#refresh').onclick = () => run(api.refresh());
-  $('#search').oninput = () => {
+  $('#search').oninput = () => smoothly(() => {
     renderHero();
     renderLibrary();
-  };
+  });
   for (const item of document.querySelectorAll('[data-filter]')) item.onclick = () => setFilter(item.dataset.filter);
   $('#rail-toggle').onclick = () => {
     const collapsed = $('#rail').classList.toggle('collapsed');

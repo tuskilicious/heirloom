@@ -24,7 +24,12 @@
 - **Customize, and a plugin store.** Customize in the sidebar opens a panel to choose the window's theme, turn
   plugins on and off, remove them, and open the themes and plugins folders to add your own. Its plugin store installs
   the plugins that now come with Heirloom in one click: Notifications (when a game is installed or updated), High
-  performance while playing (the Windows power plan), and Close the Epic Games Launcher (when a game starts).
+  performance while playing (the Windows power plan), Close the Epic Games Launcher (when a game starts), and
+  Library worth, whose `heirloom worth` adds up what your games and DLC cost on the Epic Games Store, at full price
+  and today.
+- **Smoother.** Covers lift, the sidebar marker slides and menus open on a gentle spring; filtering and searching
+  glide the cards to their new places; menus and Customize ease out as well as in; the downloads list folds up;
+  loading covers shimmer, and notices slide in with a citron edge. The logged-out lantern glows.
 
 ## 0.26.1 "Hearth" (2026-10-28)
 

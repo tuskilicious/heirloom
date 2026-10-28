@@ -812,6 +812,7 @@ Heirloom comes with a few plugins to install from Customize's plugin store, whic
 | Notifications (`notifications`) | A desktop notification when a game finishes installing or updating, the window's automatic updates included |
 | High performance while playing (`power-plan`) | Switches Windows to the High performance power plan while a game runs, and back afterwards (laptops with Modern Standby have no such plan) |
 | Close the Epic Games Launcher (`close-epic-launcher`) | Closes the Epic Games Launcher when a game starts, so it doesn't run in the background while you play |
+| Library worth (`library-worth`) | Adds `heirloom worth`: what your games and DLC cost on the Epic Games Store in your country, at full price and today, with the most valuable (`--top <n>`, `--json`) |
 
 They are in [`heirloom/store`](heirloom/store), and make good examples.
 

@@ -22,6 +22,10 @@
   --card-width: 172px;
   --shadow: 0 14px 34px rgb(0 10 7 / 45%);
   --ease: cubic-bezier(.23, 1, .32, 1);
+  --spring: linear(0, .006, .025 2.8%, .101 6.1%, .539 18.9%, .721 25.3%, .849 31.5%, .937 38.1%, .968 41.8%,
+    .991 45.7%, 1.006 50.1%, 1.015 55%, 1.017 63.9%, 1.001 85.9%, 1);
+  /* lets heights move to and from auto, for the downloads list */
+  interpolate-size: allow-keywords;
   color-scheme: dark;
 }
 
@@ -154,7 +158,7 @@ button:disabled { opacity: .55; cursor: default; }
   border-radius: var(--radius-control);
   background: var(--surface-raised);
   transform: translateY(var(--y, 0));
-  transition: transform .28s var(--ease);
+  transition: transform .5s var(--spring);
 }
 
 .shelf-marker::before {
@@ -248,9 +252,11 @@ kbd {
   margin: 0 0 20px;
   padding: 10px 14px;
   border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
   border-radius: var(--radius-control);
   background: var(--surface);
-  color: var(--muted);
+  color: var(--text);
+  animation: rise .5s var(--spring);
 }
 
 /* the game played last */
@@ -320,7 +326,7 @@ kbd {
   border-radius: var(--radius);
   background: var(--surface-raised);
   transform: perspective(700px) rotateX(var(--ry, 0deg)) rotateY(var(--rx, 0deg));
-  transition: transform .3s var(--ease), box-shadow .3s var(--ease);
+  transition: transform .5s var(--spring), box-shadow .4s var(--ease);
 }
 
 /* a sweep of light across the cover under the pointer */
@@ -481,7 +487,15 @@ kbd {
   box-shadow: var(--shadow);
 }
 
-.menu:popover-open { animation: rise .18s var(--ease); }
+.menu {
+  opacity: 0;
+  transform: translateY(-4px) scale(.97);
+  transform-origin: top right;
+  transition: opacity .16s ease, transform .35s var(--spring), overlay .35s allow-discrete, display .35s allow-discrete;
+}
+
+.menu:popover-open { opacity: 1; transform: none; }
+@starting-style { .menu:popover-open { opacity: 0; transform: translateY(-4px) scale(.97); } }
 .menu-title { margin: 0; padding: 6px 10px 8px; overflow: hidden; color: var(--muted); font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .menu button { display: flex; justify-content: flex-start; width: 100%; height: 34px; padding: 0 10px; background: transparent; }
 .menu button:is(:hover, :focus-visible) { background: var(--surface-raised); outline: none; }
@@ -504,7 +518,14 @@ kbd {
   scrollbar-width: thin;
 }
 
-.panel[open] { animation: rise .3s var(--ease); }
+.panel, .panel::backdrop {
+  opacity: 0;
+  transition: opacity .2s ease, transform .45s var(--spring), overlay .45s allow-discrete, display .45s allow-discrete;
+}
+
+.panel { transform: translateY(14px) scale(.98); }
+.panel[open], .panel[open]::backdrop { opacity: 1; transform: none; }
+@starting-style { .panel[open], .panel[open]::backdrop { opacity: 0; } .panel[open] { transform: translateY(14px) scale(.98); } }
 .panel::backdrop { background: color-mix(in srgb, var(--bg) 60%, transparent); backdrop-filter: blur(6px); }
 .panel-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; padding: 20px 0 8px; background: var(--surface); }
 .panel-head h2 { margin: 0; font-size: 20px; letter-spacing: -.01em; }
@@ -562,13 +583,18 @@ kbd {
 .switch:checked { background: var(--accent); box-shadow: 0 0 14px -2px color-mix(in srgb, var(--accent) 60%, transparent); }
 .switch:checked::after { background: var(--accent-text); transform: translateX(16px); }
 
-.card.skeleton { animation: pulse 1.6s ease-in-out infinite; }
-.skeleton .line { height: 10px; width: 72%; border-radius: 5px; background: var(--surface-raised); }
+.skeleton :is(.cover, .line) {
+  background: linear-gradient(100deg, var(--surface-raised) 40%, color-mix(in srgb, var(--surface-raised), var(--text) 7%) 50%,
+    var(--surface-raised) 60%) fixed 0 0 / 200vw 100%;
+  animation: sweep 1.6s linear infinite;
+}
+
+.skeleton .line { height: 10px; width: 72%; border-radius: 5px; }
 .skeleton .line + .line { width: 44%; }
 
 .empty { display: grid; justify-items: center; gap: 14px; padding: 90px 24px; color: var(--muted); text-align: center; }
-.empty .mark { height: 46px; width: auto; color: var(--logo); }
-.empty p { margin: 0; font-size: 16px; }
+.empty .mark { height: 58px; width: auto; color: var(--logo); animation: flicker 5s ease-in-out infinite; }
+.empty p { margin: 0; max-width: 34ch; font-size: 16px; text-wrap: balance; }
 
 /* downloads and other jobs (adapted from @suraj-xd's Google Drive Uploader Toast on 21st.dev) */
 .dock {
@@ -604,7 +630,8 @@ kbd {
 }
 
 #jobs { max-height: 300px; margin: 0; padding: 4px 0 6px; overflow: auto; border-top: 1px solid var(--border); list-style: none; }
-.dock.collapsed #jobs { display: none; }
+#jobs { height: auto; transition: height .4s var(--spring), padding .4s var(--spring), border-color .3s; }
+.dock.collapsed #jobs { height: 0; padding-block: 0; border-top-color: transparent; overflow: hidden; }
 
 .job { display: grid; grid-template-columns: 36px minmax(0, 1fr) 32px; align-items: center; gap: 12px; padding: 7px 12px 7px 16px; }
 .job:hover { background: color-mix(in srgb, var(--surface-raised) 50%, transparent); }
@@ -632,9 +659,13 @@ kbd {
 .ring:is(:hover, :focus-visible) .icon { opacity: 1; }
 
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
-@keyframes pulse { 50% { opacity: .5; } }
 @keyframes breathe { 50% { opacity: .35; transform: scale(.75); } }
 @keyframes spin { to { transform: rotate(360deg); } }
+::view-transition-group(*) { animation-duration: .5s; animation-timing-function: var(--spring); }
+::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+#hero { view-transition-name: hero; }
+
+@keyframes sweep { from { background-position: 100vw 0; } to { background-position: -100vw 0; } }
 @keyframes glint { from { background-position: -100% 0, 0 0; } to { background-position: 200% 0, 0 0; } }
 @keyframes breathe-light { from { opacity: .55; } to { opacity: 1; } }
 @keyframes kindle {
