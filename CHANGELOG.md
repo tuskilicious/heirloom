@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.25.0 "Strongbox" (2026-10-28)
+
+Playing a game through Heirloom now keeps its cloud saves in sync, as the Epic Games Launcher does.
 
 ### New
 - **Cloud saves sync when you play.** `heirloom launch`, and so Play in the window, downloads a game's cloud save
