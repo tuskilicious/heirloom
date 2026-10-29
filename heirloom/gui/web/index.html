@@ -229,6 +229,44 @@
     </section>
   </dialog>
 
+  <!-- what installing a game takes, and where it goes; its sizes come from Epic, a little after it opens -->
+  <dialog id="install" class="panel install-dialog" aria-labelledby="install-title">
+    <header class="panel-head">
+      <h2 id="install-title"></h2>
+      <button type="button" id="install-close" class="icon-button" title="Close">
+        <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>
+      </button>
+    </header>
+    <section>
+      <dl class="sizes">
+        <div><dt>Download</dt><dd id="install-download"></dd></div>
+        <div><dt>On disk</dt><dd id="install-disk"></dd></div>
+        <div><dt>Free there</dt><dd id="install-free"></dd></div>
+      </dl>
+      <ul class="rows">
+        <li class="row">
+          <span class="row-text"><span class="what">Install into</span>
+            <span id="install-folder" class="detail path"></span></span>
+          <button type="button" id="install-folder-change" class="ghost">
+            <svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg>Change
+          </button>
+        </li>
+        <li class="row" id="install-dlc-row" hidden>
+          <label class="row-text" for="install-dlcs"><span class="what">Install its DLC too</span>
+            <span id="install-dlc-list" class="detail"></span></label>
+          <input type="checkbox" role="switch" id="install-dlcs" class="switch" checked>
+        </li>
+      </ul>
+      <p id="install-warning" class="hint error" role="alert" hidden></p>
+      <div class="panel-actions">
+        <button type="button" id="install-cancel" class="ghost">Cancel</button>
+        <button type="button" id="install-start" class="primary">
+          <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Install
+        </button>
+      </div>
+    </section>
+  </dialog>
+
   <aside id="activity" class="dock" aria-labelledby="dock-title" hidden>
     <div class="dock-head">
       <h2 id="dock-title"></h2>
