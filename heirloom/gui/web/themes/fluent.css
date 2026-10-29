@@ -52,7 +52,7 @@
 .rail-item:hover:not(:disabled) { background: rgb(255 255 255 / 4%); }
 
 /* acrylic surfaces carry the grain */
-.top, .menu, .dock, .panel, .info { background-image: var(--grain); }
+.top, .menu, .dock, .panel { background-image: var(--grain); }
 
 /* standard and accent buttons, Fluent style: a subtle fill with a darker bottom edge */
 .ghost, .sort, .icon-button.ghost {

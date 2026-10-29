@@ -6,9 +6,17 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from heirloom.gui.app import GuiApi, Job, Jobs, free_games, read_library
+from heirloom.gui.app import (
+    COVER_TYPES,
+    GuiApi,
+    Job,
+    Jobs,
+    free_games,
+    image_url,
+    read_library,
+)
 from heirloom.lfs.lgndry import LGDLFS
-from heirloom.models.game import GameAsset, PlaytimeSession
+from heirloom.models.game import Game, GameAsset, PlaytimeSession
 from heirloom.themes import load_themes
 
 # Stands in for "heirloom install": prints download log lines like heirloom's, then exits with the given code,
@@ -38,6 +46,20 @@ if kind == 'slow':
 def write_meta(lgd_home, app_name, title, **metadata):
     (lgd_home / 'metadata' / f'{app_name}.json').write_text(json.dumps({
         'app_name': app_name, 'app_title': title, 'metadata': metadata, 'asset_infos': {}}))
+
+
+def test_covers_at_card_size_from_epic():
+    def game(url):
+        return Game(app_name='Fish', app_title='Fish Game', metadata={'keyImages': [
+            {'type': 'DieselGameBoxTall', 'url': url}]})
+
+    assert image_url(game('https://cdn1.epicgames.com/offer/fish/tall.jpg'), COVER_TYPES, (440, 586)) == \
+        'https://cdn1.epicgames.com/offer/fish/tall.jpg?h=586&quality=medium&resize=1&w=440'
+    assert image_url(game('https://cdn1.epicgames.com/tall.jpg?v=2'), COVER_TYPES, (440, 586)).startswith(
+        'https://cdn1.epicgames.com/tall.jpg?v=2&h=586'), 'added to a query it already has'
+    assert image_url(game('https://example.com/tall.jpg'), COVER_TYPES, (440, 586)) == \
+        'https://example.com/tall.jpg', "other hosts' images are left as they are"
+    assert image_url(game('https://cdn1.epicgames.com/wide.jpg'), COVER_TYPES) == 'https://cdn1.epicgames.com/wide.jpg'
 
 
 def test_library_from_cached_files(fake_game):

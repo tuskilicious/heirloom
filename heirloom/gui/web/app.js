@@ -312,7 +312,7 @@ function lighting(game, job) {
 function coverArt(game) {
   if (!game.cover) return el('span', {className: 'initials', textContent: initials(game.title)});
   return el('img', {
-    src: game.cover, alt: '', loading: 'lazy',
+    src: game.cover, alt: '', loading: 'lazy', decoding: 'async',
     // offline, or the image is gone: show the initials instead
     onerror: (event) => event.target.replaceWith(el('span', {className: 'initials', textContent: initials(game.title)})),
   });
@@ -323,7 +323,6 @@ function card(game) {
   if (!entry) {
     entry = {
       cover: el('div', {className: 'cover'}),
-      shade: el('span', {className: 'shade'}),
       badge: el('span', {className: 'badge', hidden: true}),
       title: el('h3', {className: 'title'}),
       status: el('p', {className: 'status'}),
@@ -343,7 +342,7 @@ function card(game) {
 
   if (entry.coverUrl !== game.cover) {
     entry.coverUrl = game.cover;
-    entry.cover.replaceChildren(coverArt(game), entry.shade, entry.badge, entry.info, entry.buttons);
+    entry.cover.replaceChildren(coverArt(game), entry.badge, entry.info, entry.buttons);
     entry.tiles = null;
   }
   const [lit, percent] = lighting(game, job);
@@ -413,8 +412,13 @@ function renderLibrary() {
   games.forEach((game, index) => {
     const entry = entries[index];
     const show = shown(game, query);
-    // a card coming into view rises in, after the ones before it
-    if (show && !entry.shown) entry.node.style.setProperty('--i', String(Math.min(count, 14)));
+    // a card coming into view rises in, after the ones before it; only the first screenful, as animating
+    // hundreds at once makes opening a large library stutter
+    if (show && !entry.shown && count < 24) {
+      entry.node.style.setProperty('--i', String(Math.min(count, 14)));
+      entry.node.classList.add('rising');
+      entry.node.addEventListener('animationend', () => entry.node.classList.remove('rising'), {once: true});
+    }
     entry.node.hidden = !show;
     entry.shown = show;
     count += show;
@@ -556,6 +560,7 @@ function render() {
 }
 
 async function poll() {
+  if (document.hidden) return;
   try {
     state = await api.state();
   } catch (error) {
