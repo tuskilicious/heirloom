@@ -132,17 +132,21 @@ Your login tokens are not saved in plain text: on Windows they are encrypted for
 A login saved by an older version is moved there the next time Heirloom runs.
 Without a usable keyring, for example on a headless machine, they stay in `user.json` as before; `PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring` does that on purpose.
 
-Open the window: your library with cover art, and Play, Install, Update and Uninstall buttons
+Open the window: your library with cover art, and Play, Install and Update buttons over each cover
 ````
 heirloom gui
 ````
 It needs pywebview, which the prebuilt Windows executable includes (install the `webview` extra otherwise; on Linux this also needs GTK WebKit, and macOS is untested).
-The sidebar switches between all your games, the installed ones and the ones with an update; `/` jumps to the search.
-Installed games are in colour and the others are not, until a download fills their cover from the bottom.
+The sidebar switches between all your games, the installed ones and the ones with an update, and the sort button orders them A to Z, by when you last played, by playtime or by size; the window opens on the shelf, order and sidebar you left it with.
+`/` jumps to the search, which ignores case, spaces and punctuation ("hitman3" finds HITMAN 3), and Escape empties it. Double-click an installed game to play it, and right-click it for its Manage menu.
+Installed games are in colour and the others are not; a download assembles its game's cover tile by tile, sharpening from a blur as it goes.
 The game you played last is at the top with your time played, ready to continue.
+On Windows, Customize in the sidebar also installs the Epic overlay, which games using Epic Online Services show friends, invites and achievements in, turns it on and off for every game, updates and removes it (as `heirloom eos-overlay` does).
+Each installed game's Manage button (`⋯`) opens its folder, adds a desktop shortcut that plays it (Windows), verifies and repairs its files, syncs its cloud saves and uninstalls it.
 Everything it does runs as a regular `heirloom` command, so playtime, plugins and resumable downloads work the same.
 Downloads run one at a time; Stop stops one cleanly, and installing it again continues where it stopped.
-Without a login, games are launched offline. The window uses your theme, see [Themes](#themes).
+Game updates install by themselves: each time the window refreshes your library (when it opens, then every hour), it starts the updates of installed games, except games being played and updates you stopped or that failed since the window opened, which wait for their Update button. Set `disable_auto_updates = true` to update only when you choose.
+Without a login, games are launched offline. The window has its own look, and can use your own CSS, see [Window themes](#window-themes).
 
 Listing your games
 ````
@@ -794,13 +798,25 @@ Each plugin is a folder in the `plugins` folder of the config directory (`~/.con
 ````
 
 Only `name` is required (lowercase letters, digits, `-` and `_`); `backend` defaults to `main.py`.
-Plugins run inside Heirloom with access to your Epic account and files, so each one stays off until you enable it:
+Plugins run inside Heirloom with access to your Epic account and files, so each one stays off until you enable it.
+In the window, Customize in the sidebar turns plugins on and off, removes them and opens the plugins folder; in a terminal:
 
 ````
 heirloom plugins
 heirloom plugins enable session-log
 heirloom plugins disable session-log
 ````
+
+Heirloom comes with a few plugins to install from Customize's plugin store, which copies one into the plugins folder and turns it on:
+
+| Plugin | What it does |
+|--------|--------------|
+| Notifications (`notifications`) | A desktop notification when a game finishes installing or updating, the window's automatic updates included |
+| High performance while playing (`power-plan`) | Switches Windows to the High performance power plan while a game runs, and back afterwards (laptops with Modern Standby have no such plan) |
+| Close the Epic Games Launcher (`close-epic-launcher`) | Closes the Epic Games Launcher when a game starts, so it doesn't run in the background while you play |
+| Library worth (`library-worth`) | Adds `heirloom worth`: what your games and DLC cost on the Epic Games Store in your country, at full price and today, with the most valuable (`--top <n>`, `--json`) |
+
+They are in [`heirloom/store`](heirloom/store), and make good examples.
 
 The backend's `setup(plugin)` function subscribes to events and can add commands:
 
@@ -885,8 +901,15 @@ Plugins can ship themes too, which are available while the plugin is enabled. A 
 
 Colours are only used when printing to a terminal, and never when `NO_COLOR` is set. Set `FORCE_COLOR=1` to keep them when piping output.
 
-Themes also style the window of `heirloom gui`, which can switch between them too.
-Name a CSS file next to the theme in `gui_css`, and it is added to the window's page, so it can restyle anything:
+### Window themes
+
+The window of `heirloom gui` has its own look, apart from the terminal's theme. Your own CSS can restyle it: once there is a window theme besides Heirloom's own, Customize in the sidebar switches between them, and its Themes folder button opens the folder to add or remove them.
+High contrast needs no theme: the window follows Windows' contrast themes and "Increase contrast" settings by itself.
+Heirloom comes with two more window themes. Fluent is Heirloom in the manner of Windows 11: a Mica-dark base with the library on a rounded layer, acrylic menus and panels, the light-blue accent and Segoe UI Variable (Windows 11's own font, so nothing is bundled). Impeccable is a light, editorial-poster look with cream pages, a burnt-orange sidebar, an amber accent, and Chakra Petch with JetBrains Mono (bundled, under the SIL Open Font License). They are also worked examples of window themes, in [`heirloom/gui/web/themes`](heirloom/gui/web/themes).
+
+The quickest window theme is a CSS file in the `themes` folder, such as `paper-white.css`, which shows as "Paper white".
+A terminal theme can bring window CSS too: name a CSS file next to the theme in `gui_css`.
+Either way it is added to the window's page, so it can restyle anything:
 
 ````json
 {
@@ -957,8 +980,12 @@ disable_auto_aliasing = false
 disable_playtime_tracking = false
 ; Do not download a newer cloud save before a game starts, or upload a newer local save after it exits
 disable_cloud_save_sync = false
+; Do not install game updates by themselves when the window of "heirloom gui" finds them
+disable_auto_updates = false
 ; Terminal theme (see "heirloom themes")
 theme = default
+; Window theme of "heirloom gui" (see "Window themes")
+window_theme = heirloom
 
 ; macOS specific settings
 ; Default application platform to use (default: Mac on macOS, Windows elsewhere)

@@ -45,7 +45,7 @@ def test_library_from_cached_files(fake_game):
         {'type': 'Thumbnail', 'url': 'https://cdn/fish-thumb.jpg'},
         {'type': 'DieselGameBoxTall', 'url': 'https://cdn/fish-tall.jpg'},
         {'type': 'DieselGameBox', 'url': 'https://cdn/fish-wide.jpg'}])
-    write_meta(fake_game, 'Goo', 'World of Goo')
+    write_meta(fake_game, 'Goo', 'World of Goo', customAttributes={'CloudSaveFolder': {'value': '{AppData}/Goo'}})
     write_meta(fake_game, 'FishDLC', 'Fish Game Soundtrack', mainGameItem={'id': 'fish'})
     lgd = LGDLFS()
     lgd.assets = {'Linux': [GameAsset(app_name='Fish', build_version='2')],
@@ -57,9 +57,9 @@ def test_library_from_cached_files(fake_game):
     fish, goo = read_library(LGDLFS())
     assert fish == {'app_name': 'Fish', 'title': 'Fish Game', 'cover': 'https://cdn/fish-tall.jpg',
                     'art': 'https://cdn/fish-wide.jpg', 'installed': True, 'version': '1', 'update': True,
-                    'size': 1024 ** 3, 'store': None, 'played': 2.5 * 3600, 'last_played': '2026-10-26T22:00:00+00:00'}
+                    'size': 1024 ** 3, 'store': None, 'cloud_saves': False, 'played': 2.5 * 3600, 'last_played': '2026-10-26T22:00:00+00:00'}
     assert goo == {'app_name': 'Goo', 'title': 'World of Goo', 'cover': '', 'art': '', 'installed': False,
-                   'version': '7', 'update': False, 'size': None, 'store': None, 'played': 0,
+                   'version': '7', 'update': False, 'size': None, 'store': None, 'cloud_saves': True, 'played': 0,
                    'last_played': None}, 'not installed, and DLC is left out'
 
 
@@ -120,12 +120,94 @@ def test_commands_for_each_action(fake_game):
     assert logged_out._command(Job(1, 'install', 'Fish', 'Fish Game')) == ['heirloom', '-c', 'custom.ini', '-y',
                                                                             'install', 'Fish']
     assert logged_out._command(Job(3, 'login', '', 'Epic Games account'))[-1] == 'auth'
+    assert logged_out._command(Job(4, 'repair', 'Fish', 'Fish Game'))[-3:] == ['-y', 'repair', 'Fish']
+    assert logged_out._command(Job(5, 'sync', 'Fish', 'Fish Game'))[-3:] == ['-y', 'sync-saves', 'Fish']
 
     (fake_game / 'user.json').write_text(json.dumps({'account_id': 'abc', 'displayName': 'Tester',
                                                      'access_token': 'a', 'refresh_token': 'r'}))
     logged_in = api()
     assert logged_in.state()['user'] == 'Tester'
     assert logged_in._command(play)[-3:] == ['-y', 'launch', 'Fish']
+
+
+def test_updates_start_by_themselves(fake_game, monkeypatch):
+    LGDLFS().assets = {'Linux': [GameAsset(app_name='Fish', build_version='2')]}
+
+    def api_starting(started):
+        api = GuiApi(None, lambda: {})
+        monkeypatch.setattr(api._jobs, 'add', lambda kind, app_name, title: started.append((kind, app_name)))
+        return api
+
+    started = []
+    api = api_starting(started)
+    assert api._update_games() == 'Updating by itself: Fish Game.' and started == [('install', 'Fish')]
+    for status, kind in (('running', 'play'), ('stopped', 'install'), ('failed', 'install')):
+        started.clear()
+        api._jobs._jobs[:] = [Job(1, kind, 'Fish', 'Fish Game', status)]
+        assert api._update_games() == '' and not started, f'{kind} {status}: left alone'
+
+    (fake_game / 'config.ini').write_text('[Heirloom]\ndisable_auto_updates = true\n')
+    started.clear()
+    assert api_starting(started)._update_games() == '' and not started, 'turned off'
+
+
+@pytest.mark.skipif(sys.platform != 'win32', reason='the window offers the overlay on Windows only')
+def test_epic_overlay(lgd_home, tmp_path, monkeypatch):
+    registry = {'overlay_path': None}
+    monkeypatch.setattr('heirloom.gui.app.query_registry_entries', lambda: dict(registry))
+    monkeypatch.setattr('heirloom.gui.app.remove_registry_entries', lambda: registry.update(overlay_path=None))
+    monkeypatch.setattr('heirloom.gui.app.add_registry_entries', lambda path: registry.update(overlay_path=path))
+    api = GuiApi(None, lambda: {}, command=lambda: ['heirloom'])
+    assert api.overlay() == {'installed': False, 'version': '', 'enabled': False}
+    with pytest.raises(ValueError):
+        api.set_overlay(True)
+    assert api._command(Job(1, 'overlay', '', 'Epic overlay')) == ['heirloom', '-y', 'eos-overlay', 'install']
+
+    overlay_dir = tmp_path / 'Overlay'
+    overlay_dir.mkdir()
+    (overlay_dir / 'EOSOVH-Win64-Shipping.dll').touch()
+    lgd_home.mkdir(exist_ok=True)
+    (lgd_home / 'overlay_install.json').write_text(json.dumps(
+        {'app_name': '98bc04bc842e4906993fd6d6644ffb8d', 'title': 'Epic overlay', 'version': '1.3.5',
+         'install_path': str(overlay_dir)}))
+    assert api.set_overlay(True) == {'installed': True, 'version': '1.3.5', 'enabled': True}
+    assert registry['overlay_path'] == str(overlay_dir)
+    assert api.set_overlay(False)['enabled'] is False and registry['overlay_path'] is None
+
+
+def test_the_window_opens_as_it_was_left(lgd_home):
+    api = GuiApi(None, lambda: {})
+    assert api.view() == {'filter': 'all', 'sort': 'title', 'rail_collapsed': False}
+    api.set_view({'filter': 'installed', 'sort': 'recent', 'rail_collapsed': True})
+    api.set_view({'sort': 'nonsense', 'filter': None, 'colour': 'red'})
+    assert GuiApi(None, lambda: {}).view() == {'filter': 'installed', 'sort': 'recent', 'rail_collapsed': True}, \
+        'kept between runs, and anything unknown left out'
+    (lgd_home / 'window.json').write_text('not json')
+    assert api.view()['sort'] == 'title'
+
+
+def test_open_folder_of_a_game_whose_files_are_gone(fake_game, tmp_path):
+    for child in (tmp_path / 'FishGame').iterdir():
+        child.unlink()
+    (tmp_path / 'FishGame').rmdir()
+    api = GuiApi(None, lambda: {})
+    api.open_folder('Fish')
+    assert api.state()['notice'] == 'The folder of Fish Game is gone. Repair it, or uninstall it.'
+
+
+@pytest.mark.skipif(sys.platform != 'win32', reason='desktop shortcuts are made on Windows')
+def test_desktop_shortcut_plays_the_game_with_its_icon(fake_game, tmp_path, monkeypatch):
+    ran = []
+    monkeypatch.setattr('heirloom.gui.app.subprocess.run', lambda command, env, **options: ran.append(env))
+    write_meta(fake_game, 'Fish', 'Fish: The Game?')
+    api = GuiApi('my config.ini', lambda: {}, command=lambda: ['C:\\Heirloom\\heirloom.exe'])
+    api.create_shortcut('Fish')
+    env, = ran
+    assert env['HL_NAME'] == 'Fish The Game', 'without the characters Windows does not allow in file names'
+    assert env['HL_TARGET'] == 'C:\\Heirloom\\heirloom.exe'
+    assert env['HL_ARGUMENTS'] == '-c "my config.ini" -y launch Fish'
+    assert env['HL_ICON'] == str(tmp_path / 'FishGame' / 'fish.cmd')
+    assert api.state()['notice'] == 'Added "Fish The Game" to your desktop.'
 
 
 def test_theme_css_for_the_window(lgd_home, tmp_path):
@@ -138,10 +220,22 @@ def test_theme_css_for_the_window(lgd_home, tmp_path):
     assert themes['neon'].css == ':root { --accent: #00f0ff; }'
     assert 'sneaky' not in themes and 'next to the theme' in errors['sneaky.json (user)']
 
+    window_dir = lgd_home / 'themes'
+    window_dir.mkdir(parents=True)
+    (window_dir / 'copy-of-neon.css').write_text(':root { --accent: #00f0ff; }')
+    (window_dir / 'paper_white.css').write_text(':root { --bg: #fff; }')
+
     api = GuiApi(None, lambda: themes)
-    assert api.themes()['active'] == 'default' and api.themes()['css'] == ''
-    switched = api.use_theme('neon')
-    assert (switched['active'], switched['css']) == ('neon', ':root { --accent: #00f0ff; }')
-    assert 'theme = neon' in (lgd_home / 'config.ini').read_text(), 'the terminal uses the same theme'
+    assert api.themes() == {'active': 'heirloom', 'css': '', 'themes': [
+        {'name': 'heirloom', 'title': 'Heirloom'}, {'name': 'fluent', 'title': 'Fluent'},
+        {'name': 'impeccable', 'title': 'Impeccable'}, {'name': 'neon', 'title': 'neon'},
+        {'name': 'paper_white', 'title': 'Paper white'}]}, \
+        "its own look and the ones that come with it, then themes with CSS and CSS files, " \
+        "not terminal themes or the same CSS twice"
+    assert 'Chakra Petch' in api.use_theme('impeccable')['css']
+    switched = api.use_theme('paper_white')
+    assert (switched['active'], switched['css']) == ('paper_white', ':root { --bg: #fff; }')
+    config = (lgd_home / 'config.ini').read_text()
+    assert 'window_theme = paper_white' in config and '\ntheme =' not in config, 'the terminal keeps its theme'
     with pytest.raises(ValueError):
-        api.use_theme('nope')
+        api.use_theme('default')

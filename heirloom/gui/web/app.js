@@ -7,10 +7,19 @@
 const $ = (selector) => document.querySelector(selector);
 const SVG = 'http://www.w3.org/2000/svg';
 const ACTIVE = new Set(['queued', 'running']);
-const DOWNLOADS = new Set(['install', 'uninstall']);
-const DOING = {install: 'Installing', uninstall: 'Uninstalling', play: 'Playing', login: 'Logging in'};
-const DONE = {install: 'Installed', uninstall: 'Uninstalled', play: 'Game closed', login: 'Logged in'};
+const DOWNLOADS = new Set(['install', 'uninstall', 'repair', 'overlay']);
+const DOING = {install: 'Installing', uninstall: 'Uninstalling', repair: 'Repairing', sync: 'Syncing saves',
+  play: 'Playing', login: 'Logging in', overlay: 'Installing', overlay_remove: 'Removing'};
+const DONE = {install: 'Installed', uninstall: 'Uninstalled', repair: 'Repaired', sync: 'Saves synced',
+  play: 'Game closed', login: 'Logged in', overlay: 'Installed and on', overlay_remove: 'Removed'};
 const SHELVES = {all: 'Library', installed: 'Installed', updates: 'Updates'};
+// how the library can be ordered; the library comes sorted by title, which breaks ties
+const SORTS = {
+  title: ['A to Z', () => 0],
+  recent: ['Recently played', (a, b) => (b.last_played || '').localeCompare(a.last_played || '')],
+  played: ['Most played', (a, b) => b.played - a.played],
+  size: ['Largest', (a, b) => (b.size || 0) - (a.size || 0)],
+};
 const RING = '<svg class="meter" viewBox="0 0 24 24" aria-hidden="true">'
   + '<circle class="track" cx="12" cy="12" r="10" pathLength="100"/>'
   + '<circle class="value" cx="12" cy="12" r="10" pathLength="100"/></svg>';
@@ -18,9 +27,14 @@ const RING = '<svg class="meter" viewBox="0 0 24 24" aria-hidden="true">'
 let api;
 let state = {user: null, refreshing: false, notice: '', games: [], jobs: []};
 let filter = 'all';
+let sort = 'title';
+// the notice closed with its X, until a different one comes
+let dismissedNotice = '';
 let libraryOrder = '';
 let jobOrder = '';
 let heroKey = '';
+// the states of the Epic overlay's jobs, to redraw Customize when one finishes
+let overlayJobs = '';
 const cards = new Map();
 const rows = new Map();
 // finished jobs taken off the list with "Clear finished"
@@ -120,7 +134,7 @@ function statusText(game, job) {
   return parts.join(' · ');
 }
 
-function actions(game, job, uninstall = true) {
+function actions(game, job) {
   if (job) {
     return DOWNLOADS.has(job.kind) ? [button('Stop', 'ghost', () => run(api.stop(job.id)), 'x')] : [];
   }
@@ -128,14 +142,80 @@ function actions(game, job, uninstall = true) {
   const install = () => run(api.install(game.app_name));
   // citron is kept for playing and updating, so a library of uninstalled games isn't a wall of it
   if (!game.installed) return [button('Install', 'ghost', install, 'download')];
-  const play = () => run(api.play(game.app_name));
   return [
-    game.update ? button('Update', 'primary', install, 'updates') : button('Play', 'primary', play, 'play'),
-    game.update ? iconButton('play', `Play ${game.title}`, 'ghost', play) : null,
-    uninstall ? iconButton('trash', `Uninstall ${game.title}`, 'ghost danger', () => {
+    game.update ? button('Update', 'primary', install, 'updates')
+      : button('Play', 'primary', () => run(api.play(game.app_name)), 'play'),
+    manageButton(game),
+  ];
+}
+
+function manageButton(game) {
+  const node = iconButton('manage', `Manage ${game.title}`, 'ghost', (event) => openManage(game, event.currentTarget));
+  node.setAttribute('aria-haspopup', 'menu');
+  return node;
+}
+
+// a choice in a menu: it closes the menu, then does its thing
+function menuItem(label, iconName, onclick, className = '') {
+  return el('button', {
+    type: 'button', role: 'menuitem', className,
+    onclick: (event) => {
+      event.currentTarget.closest('.menu').hidePopover();
+      onclick();
+    },
+  }, icon(iconName), label);
+}
+
+function showMenu(menu, anchor, children, at = null) {
+  menu.replaceChildren(...children.filter(Boolean));
+  // closing it with Escape or a choice puts the keyboard back on the button
+  menu.onbeforetoggle = (event) => {
+    if (event.newState === 'closed' && anchor.isConnected && menu.contains(document.activeElement)) anchor.focus();
+  };
+  menu.showPopover();
+  // below the button (or the pointer), or above it when there's no room, and kept inside the window
+  const button = at ? {left: at.x, right: at.x, top: at.y, bottom: at.y} : anchor.getBoundingClientRect();
+  const {width, height} = menu.getBoundingClientRect();
+  const below = button.bottom + 6 + height <= innerHeight;
+  menu.style.left = `${Math.max(8, Math.min(button.right - width, innerWidth - width - 8))}px`;
+  menu.style.top = `${below ? button.bottom + 6 : Math.max(8, button.top - 6 - height)}px`;
+  (menu.querySelector('[aria-checked="true"]') || menu.querySelector('[role^="menuitem"]')).focus();
+}
+
+function openManage(game, anchor, at = null) {
+  showMenu($('#manage'), anchor, [
+    el('p', {className: 'menu-title', textContent: game.title}),
+    game.update ? menuItem('Play without updating', 'play', () => run(api.play(game.app_name))) : null,
+    menuItem('Open folder', 'folder', () => run(api.open_folder(game.app_name))),
+    menuItem('Create desktop shortcut', 'desktop', () => run(api.create_shortcut(game.app_name))),
+    menuItem('Verify and repair', 'repair', () => run(api.repair(game.app_name))),
+    game.cloud_saves ? menuItem('Sync cloud saves', 'cloud', () => run(api.sync_saves(game.app_name))) : null,
+    el('hr'),
+    menuItem('Uninstall', 'trash', () => {
       if (confirm(`Uninstall ${game.title}? Its files will be deleted.`)) run(api.uninstall(game.app_name));
-    }) : null,
-  ].filter(Boolean);
+    }, 'danger'),
+  ], at);
+}
+
+// the tiles over a cover being downloaded, and the order they light up in as it goes: scattered, the same every time
+const TILES = 48;
+const scatter = (index) => Math.abs(Math.sin(index * 12.9898) * 43758.5453) % 1;
+const TILE_TURN = Array.from({length: TILES}, (_, index) => index).sort((a, b) => scatter(a) - scatter(b))
+  .reduce((turns, tile, turn) => Object.assign(turns, {[tile]: turn}), []);
+
+function assemble(entry, percent) {
+  if (percent === null) {
+    if (entry.tiles) entry.tiles.remove();
+    entry.tiles = null;
+    return;
+  }
+  if (!entry.tiles) {
+    entry.tiles = el('span', {className: 'tiles'}, ...Array.from({length: TILES}, () => el('span')));
+    entry.cover.insertBefore(entry.tiles, entry.badge);
+  }
+  [...entry.tiles.children].forEach((tile, index) => {
+    tile.classList.toggle('lit', percent >= (TILE_TURN[index] + 1) / TILES * 100);
+  });
 }
 
 // how much of the cover is lit, in percent: installed games are, the rest light up as they download
@@ -161,7 +241,6 @@ function card(game) {
     entry = {
       cover: el('div', {className: 'cover'}),
       shade: el('span', {className: 'shade'}),
-      wick: el('span', {className: 'wick'}),
       badge: el('span', {className: 'badge', hidden: true}),
       title: el('h3', {className: 'title'}),
       status: el('p', {className: 'status'}),
@@ -169,8 +248,9 @@ function card(game) {
       key: '',
       shown: false,
     };
-    entry.node = el('article', {className: 'card'}, entry.cover,
-      el('div', {className: 'info'}, entry.title, entry.status, entry.buttons));
+    entry.info = el('div', {className: 'info'}, entry.title, entry.status);
+    entry.node = el('article', {className: 'card'}, entry.cover);
+    entry.node.dataset.app = game.app_name;
     cards.set(game.app_name, entry);
   }
   const job = activeJob(game.app_name);
@@ -180,11 +260,21 @@ function card(game) {
 
   if (entry.coverUrl !== game.cover) {
     entry.coverUrl = game.cover;
-    entry.cover.replaceChildren(coverArt(game), entry.shade, entry.wick, entry.badge);
+    entry.cover.replaceChildren(coverArt(game), entry.shade, entry.badge, entry.info, entry.buttons);
+    entry.tiles = null;
   }
   const [lit, percent] = lighting(game, job);
   entry.node.dataset.state = lit;
-  entry.cover.style.setProperty('--lit', `${percent}%`);
+  entry.cover.style.setProperty('--fill', String(percent));
+  assemble(entry, lit === 'filling' ? percent : null);
+  // a download that filled the cover lights it up, once it is installed
+  if (lit === 'filling') entry.filling = true;
+  if (lit === 'installed' && entry.filling) {
+    entry.filling = false;
+    entry.cover.classList.remove('kindled');
+    void entry.cover.offsetWidth;
+    entry.cover.classList.add('kindled');
+  }
   const playing = lit === 'playing';
   entry.badge.hidden = !playing && (!game.update || job !== null);
   entry.badge.textContent = playing ? 'Playing' : 'Update';
@@ -192,6 +282,7 @@ function card(game) {
   entry.title.textContent = game.title;
   entry.node.title = game.version ? `${game.title} (version ${game.version})` : game.title;
   entry.status.textContent = statusText(game, job);
+  entry.status.classList.toggle('lit', Boolean(game.update && !job) || playing);
   entry.buttons.replaceChildren(...actions(game, job));
   return entry;
 }
@@ -201,9 +292,16 @@ function skeleton() {
     el('div', {className: 'cover'}), el('div', {className: 'line'}), el('div', {className: 'line'}));
 }
 
+// searching ignores case, spaces and punctuation: "hitman3" finds "HITMAN 3"
+const searchable = (text) => text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+
 function shown(game, query) {
   return (filter === 'all' || (filter === 'installed' && game.installed) || (filter === 'updates' && game.update))
-    && (!query || game.title.toLowerCase().includes(query) || game.app_name.toLowerCase().includes(query));
+    && (!query || searchable(game.title).includes(query) || searchable(game.app_name).includes(query));
+}
+
+function sorted(games) {
+  return sort === 'title' ? games : [...games].sort(SORTS[sort][1]);
 }
 
 function emptyText(query) {
@@ -218,17 +316,18 @@ function emptyText(query) {
 }
 
 function renderLibrary() {
-  const query = $('#search').value.trim().toLowerCase();
+  const query = searchable($('#search').value);
   const library = $('#library');
   const loading = state.refreshing && !state.games.length && Boolean(state.user);
-  const entries = state.games.map(card);
-  const order = loading ? 'loading' : state.games.map((game) => game.app_name).join('\n');
+  const games = sorted(state.games);
+  const entries = games.map(card);
+  const order = loading ? 'loading' : games.map((game) => game.app_name).join('\n');
   if (order !== libraryOrder) {
     libraryOrder = order;
     library.replaceChildren(...(loading ? Array.from({length: 12}, skeleton) : entries.map((entry) => entry.node)));
   }
   let count = 0;
-  state.games.forEach((game, index) => {
+  games.forEach((game, index) => {
     const entry = entries[index];
     const show = shown(game, query);
     // a card coming into view rises in, after the ones before it
@@ -272,6 +371,7 @@ function renderHero() {
     .sort((a, b) => b.last_played.localeCompare(a.last_played));
   const game = filter === 'all' && !$('#search').value.trim() ? played[0] : null;
   $('#hero').hidden = !game;
+  $('#ambient').hidden = !game;
   if (!game) return;
   const job = activeJob(game.app_name);
   const key = JSON.stringify([game, job]);
@@ -279,12 +379,12 @@ function renderHero() {
   heroKey = key;
   const art = $('#hero-art');
   const src = game.art || game.cover;
-  if (art.getAttribute('src') !== src) art.src = src;
-  art.hidden = !src;
+  if (art.getAttribute('src') !== src) art.src = $('#ambient').src = src;
+  art.hidden = $('#ambient').hidden = !src;
   $('#hero-title').textContent = game.title;
   $('#hero-meta').textContent = job ? progressText(job)
     : `${formatPlayed(game.played)} · last played ${formatDay(game.last_played)}`;
-  $('#hero-actions').replaceChildren(...actions(game, job, false));
+  $('#hero-actions').replaceChildren(...actions(game, job));
 }
 
 function renderRail() {
@@ -296,8 +396,8 @@ function renderRail() {
   refresh.disabled = state.refreshing;
   refresh.classList.toggle('busy', state.refreshing);
   refresh.querySelector('.label').textContent = state.refreshing ? 'Refreshing…' : 'Refresh';
-  $('#notice').hidden = !state.notice;
-  $('#notice').textContent = state.notice;
+  $('#notice').hidden = !state.notice || state.notice === dismissedNotice;
+  $('#notice-text').textContent = state.notice;
   // only ever a link to a release page on GitHub
   const update = $('#heirloom-update');
   const release = state.update && state.update.url.startsWith('https://github.com/') ? state.update : null;
@@ -314,7 +414,7 @@ function jobEnd(job, kind) {
   if (kind !== 'ring') return icon({done: 'done', failed: 'failed', stopped: 'x'}[kind], 'icon state');
   const label = `Stop ${DOING[job.kind].toLowerCase()} ${job.title}`;
   const stop = el('button', {type: 'button', className: 'ring', title: label, innerHTML: RING,
-    onclick: () => run(api.stop(job.id))}, icon('x'));
+    onclick: () => run(api.stop(job.id))}, el('span', {className: 'percent', ariaHidden: 'true'}), icon('x'));
   stop.setAttribute('aria-label', label);
   return stop;
 }
@@ -338,6 +438,8 @@ function jobRow(job) {
     row.end.replaceChildren(jobEnd(job, kind));
   }
   row.end.style.setProperty('--p', String(job.progress || 0));
+  const percent = row.end.querySelector('.percent');
+  if (percent) percent.textContent = job.progress === null ? '' : String(Math.floor(job.progress));
   return row.node;
 }
 
@@ -377,16 +479,134 @@ async function poll() {
     return;
   }
   render();
+  const overlay = state.jobs.filter((job) => job.kind.startsWith('overlay')).map((job) => job.status).join();
+  if (overlay !== overlayJobs) {
+    overlayJobs = overlay;
+    if ($('#customize').open) showOverlay(await api.overlay());
+  }
+}
+
+// the Epic overlay's row in Customize: what it is, how it stands, and what can be done with it
+function showOverlay(info) {
+  $('#overlay-section').hidden = !info;
+  if (!info) return;
+  const busy = state.jobs.some((job) => job.kind.startsWith('overlay') && ACTIVE.has(job.status));
+  let detail = 'Not installed';
+  if (busy) detail = 'Working on it, see the downloads panel';
+  else if (info.installed) detail = `Version ${info.version}, ${info.enabled ? 'on' : 'off'} for every game`;
+  else if (info.enabled) detail = 'On, from the Epic Games Launcher';
+  const install = () => run(api.install_overlay()).then(() => showOverlay(info));
+  $('#overlay-row').replaceChildren(...[
+    el('span', {className: 'row-text'},
+      el('span', {className: 'what', textContent: 'Friends, invites and achievements in games'}),
+      el('span', {className: 'detail', textContent: detail})),
+    !busy && (info.installed || info.enabled) ? el('input', {
+      type: 'checkbox', role: 'switch', className: 'switch', checked: info.enabled, ariaLabel: 'Epic overlay on',
+      onchange: async (event) => showOverlay(await api.set_overlay(event.target.checked)),
+    }) : null,
+    !busy && !info.installed ? button('Install', 'ghost', install, 'download') : null,
+    !busy && info.installed ? iconButton('updates', 'Update the Epic overlay', '', install) : null,
+    !busy && info.installed ? iconButton('trash', 'Remove the Epic overlay', 'danger', () => {
+      if (confirm('Remove the Epic overlay? Games stop showing it.')) run(api.remove_overlay());
+    }) : null,
+  ].filter(Boolean));
 }
 
 async function showThemes(info) {
   const themes = info || await api.themes();
   document.documentElement.dataset.theme = themes.active;
   $('#theme-css').textContent = themes.css;
-  $('#theme').replaceChildren(...themes.themes.map((theme) =>
-    el('option', {value: theme.name, textContent: theme.title, selected: theme.name === themes.active})));
-  const active = themes.themes.find((theme) => theme.name === themes.active);
-  $('#theme-name').textContent = active ? `${active.title} theme` : 'Theme';
+  // a choice only once there is a theme besides the window's own look
+  const choice = themes.themes.length > 1;
+  $('#theme-list').hidden = !choice;
+  $('#themes-hint').hidden = choice;
+  $('#theme-list').replaceChildren(...themes.themes.map((theme) => el('label', {className: 'choice'},
+    el('input', {
+      type: 'radio', name: 'theme', value: theme.name, checked: theme.name === themes.active,
+      onchange: async () => showThemes(await api.use_theme(theme.name)),
+    }),
+    el('span', {textContent: theme.title}))));
+}
+
+// a plugin's name and what it does, then what can be done with it
+function pluginRow(plugin, ...controls) {
+  return el('li', {className: 'row'},
+    el('span', {className: 'row-text'}, el('span', {className: 'what', textContent: plugin.title}),
+      el('span', {className: 'detail', textContent: plugin.description})),
+    ...controls);
+}
+
+function showPlugins(plugins) {
+  const update = async (call) => showPlugins(await call);
+  $('#plugins-hint').hidden = plugins.installed.length > 0;
+  $('#plugin-list').replaceChildren(...plugins.installed.map((plugin) => pluginRow(plugin,
+    el('input', {
+      type: 'checkbox', role: 'switch', className: 'switch', checked: plugin.enabled,
+      ariaLabel: `${plugin.title} on`,
+      onchange: (event) => {
+        // plugins run inside Heirloom with your Epic account and files; the store's come with Heirloom
+        const fromStore = plugins.store.some((entry) => entry.name === plugin.name);
+        if (event.target.checked && !fromStore
+          && !confirm(`Turn on ${plugin.title}? Plugins run inside Heirloom with access to your Epic account `
+            + 'and files, so only turn on ones you trust.')) {
+          event.target.checked = false;
+          return;
+        }
+        update(api.set_plugin(plugin.name, event.target.checked));
+      },
+    }),
+    iconButton('trash', `Remove ${plugin.title}`, 'danger', () => {
+      if (confirm(`Remove ${plugin.title}? Its folder is deleted.`)) update(api.remove_plugin(plugin.name));
+    }))));
+  $('#store-list').replaceChildren(...plugins.store.map((plugin) => pluginRow(plugin, plugin.installed
+    ? el('span', {className: 'installed', textContent: 'Installed'})
+    : button('Install', 'ghost', () => update(api.install_plugin(plugin.name)), 'download'))));
+}
+
+// names the cards on screen for a view transition, by their place in the library, so each glides from where it
+// was to where it is; the rest of a large library is left out, and stays cheap
+function nameCards() {
+  [...$('#library').children].forEach((node, index) => {
+    const box = node.getBoundingClientRect();
+    node.style.viewTransitionName = !node.hidden && box.bottom > 0 && box.top < innerHeight ? `card-${index}` : '';
+  });
+}
+
+// a change of what the library shows, with the cards gliding to their new places
+function smoothly(update) {
+  if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    update();
+    return;
+  }
+  nameCards();
+  const transition = document.startViewTransition(() => {
+    update();
+    nameCards();
+  });
+  // skipped in a minimized window, say: the update still happens, just without the glide
+  transition.ready.catch(() => {});
+  transition.finished.finally(() => {
+    for (const node of $('#library').children) node.style.viewTransitionName = '';
+  });
+}
+
+// keeps the shelf, the sort order and the sidebar for the next time the window opens
+function saveView() {
+  api.set_view({filter, sort, rail_collapsed: $('#rail').classList.contains('collapsed')});
+}
+
+function setSort(name) {
+  sort = name;
+  $('#sort-name').textContent = SORTS[name][0];
+  smoothly(renderLibrary);
+}
+
+function setRailCollapsed(collapsed) {
+  $('#rail').classList.toggle('collapsed', collapsed);
+  const toggle = $('#rail-toggle');
+  toggle.setAttribute('aria-expanded', String(!collapsed));
+  toggle.title = collapsed ? 'Expand the sidebar' : 'Collapse the sidebar';
+  toggle.querySelector('.label').textContent = collapsed ? 'Expand' : 'Collapse';
 }
 
 function setFilter(name) {
@@ -395,9 +615,11 @@ function setFilter(name) {
     item.setAttribute('aria-pressed', String(item.dataset.filter === name));
   }
   moveMarker();
-  renderShelves();
-  renderHero();
-  renderLibrary();
+  smoothly(() => {
+    renderShelves();
+    renderHero();
+    renderLibrary();
+  });
 }
 
 async function start() {
@@ -406,18 +628,63 @@ async function start() {
   $('#account').onclick = login;
   $('#empty-login').onclick = login;
   $('#refresh').onclick = () => run(api.refresh());
-  $('#search').oninput = () => {
+  $('#search').oninput = () => smoothly(() => {
     renderHero();
     renderLibrary();
-  };
-  $('#theme').onchange = async (event) => showThemes(await api.use_theme(event.target.value));
-  for (const item of document.querySelectorAll('[data-filter]')) item.onclick = () => setFilter(item.dataset.filter);
+  });
+  for (const item of document.querySelectorAll('[data-filter]')) {
+    item.onclick = () => {
+      setFilter(item.dataset.filter);
+      saveView();
+    };
+  }
   $('#rail-toggle').onclick = () => {
-    const collapsed = $('#rail').classList.toggle('collapsed');
-    const toggle = $('#rail-toggle');
-    toggle.setAttribute('aria-expanded', String(!collapsed));
-    toggle.title = collapsed ? 'Expand the sidebar' : 'Collapse the sidebar';
-    toggle.querySelector('.label').textContent = collapsed ? 'Expand' : 'Collapse';
+    setRailCollapsed(!$('#rail').classList.contains('collapsed'));
+    saveView();
+  };
+  $('#sort').onclick = (event) => showMenu($('#sort-menu'), event.currentTarget, [
+    el('p', {className: 'menu-title', textContent: 'Sort by'}),
+    ...Object.entries(SORTS).map(([name, [label]]) => {
+      const item = menuItem(label, name === sort ? 'done' : 'sort', () => {
+        setSort(name);
+        saveView();
+      });
+      item.setAttribute('role', 'menuitemradio');
+      item.setAttribute('aria-checked', String(name === sort));
+      return item;
+    }),
+  ]);
+  $('#notice-close').onclick = () => {
+    dismissedNotice = state.notice;
+    renderRail();
+  };
+  // Escape empties the search, then leaves it
+  $('#search').onkeydown = (event) => {
+    if (event.key !== 'Escape') return;
+    if (!event.target.value) {
+      event.target.blur();
+      return;
+    }
+    event.target.value = '';
+    event.target.dispatchEvent(new Event('input'));
+  };
+  const gameOf = (event) => {
+    const node = event.target.closest('.card[data-app]');
+    return node && {node, game: state.games.find((game) => game.app_name === node.dataset.app)};
+  };
+  // a double click on an installed game plays it
+  $('#library').ondblclick = (event) => {
+    const found = gameOf(event);
+    if (!found || !found.game || !found.game.installed || event.target.closest('button')
+      || activeJob(found.game.app_name)) return;
+    run(api.play(found.game.app_name));
+  };
+  // a right click on an installed game opens its Manage menu where it was clicked
+  $('#library').oncontextmenu = (event) => {
+    const found = gameOf(event);
+    if (!found) return;
+    event.preventDefault();
+    if (found.game && found.game.installed) openManage(found.game, found.node, {x: event.clientX, y: event.clientY});
   };
   $('#activity-toggle').onclick = () => {
     const collapsed = $('#activity').classList.toggle('collapsed');
@@ -429,6 +696,41 @@ async function start() {
     for (const job of state.jobs) if (!ACTIVE.has(job.status)) cleared.add(job.id);
     renderJobs();
   };
+  const library = $('#library');
+  library.onpointermove = (event) => {
+    const cover = event.target.closest('.cover');
+    if (!cover || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const box = cover.getBoundingClientRect();
+    cover.style.setProperty('--rx', `${((event.clientX - box.left) / box.width - .5) * 10}deg`);
+    cover.style.setProperty('--ry', `${(.5 - (event.clientY - box.top) / box.height) * 10}deg`);
+  };
+  library.onpointerout = (event) => {
+    const cover = event.target.closest('.cover');
+    if (cover && !cover.contains(event.relatedTarget)) {
+      cover.style.removeProperty('--rx');
+      cover.style.removeProperty('--ry');
+    }
+  };
+  $('#customize-open').onclick = async () => {
+    // themes and plugins added in their folders meanwhile show up too
+    await showThemes();
+    showOverlay(await api.overlay());
+    showPlugins(await api.plugins());
+    $('#customize').showModal();
+  };
+  $('#customize-close').onclick = () => $('#customize').close();
+  for (const folder of document.querySelectorAll('[data-folder]')) {
+    folder.onclick = () => api.open_config_folder(folder.dataset.folder);
+  }
+  for (const menu of document.querySelectorAll('.menu')) {
+    menu.onkeydown = (event) => {
+      const items = [...menu.querySelectorAll('[role^="menuitem"]')];
+      const step = {ArrowDown: 1, ArrowUp: -1}[event.key];
+      if (!step) return;
+      event.preventDefault();
+      items[(items.indexOf(document.activeElement) + step + items.length) % items.length].focus();
+    };
+  }
   document.addEventListener('keydown', (event) => {
     const typing = event.target.closest('input, select, textarea');
     if (event.key === '/' && !typing && !event.ctrlKey && !event.metaKey && !event.altKey) {
@@ -436,11 +738,17 @@ async function start() {
       $('#search').focus();
     }
   });
-  moveMarker();
+  // the window opens as it was left
+  const view = await api.view();
+  setRailCollapsed(view.rail_collapsed);
+  setSort(view.sort);
+  setFilter(view.filter);
   await showThemes();
   await poll();
   api.refresh();
   setInterval(poll, 1000);
+  // new versions turn up while the window stays open, and their updates start by themselves
+  setInterval(() => api.refresh(), 60 * 60 * 1000);
 }
 
 if (window.pywebview && window.pywebview.api) start();

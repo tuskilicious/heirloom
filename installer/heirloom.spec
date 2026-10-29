@@ -7,7 +7,8 @@ root = os.path.dirname(SPECPATH)
 icon = os.path.join(root, 'assets', 'windows_icon.ico')
 
 cli = Analysis([os.path.join(root, 'heirloom', 'cli.py')],
-               datas=[(os.path.join(root, 'heirloom', 'gui', 'web'), 'heirloom/gui/web')])
+               datas=[(os.path.join(root, 'heirloom', 'gui', 'web'), 'heirloom/gui/web'),
+                      (os.path.join(root, 'heirloom', 'store'), 'heirloom/store')])
 launcher = Analysis([os.path.join(SPECPATH, 'heirloom_gui.py')])
 
 cli_exe = EXE(PYZ(cli.pure), cli.scripts, [], exclude_binaries=True, name='heirloom', icon=icon, console=True)

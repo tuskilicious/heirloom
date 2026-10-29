@@ -82,6 +82,8 @@ filterwarnings = ["error::DeprecationWarning:heirloom.*"]
 [tool.mypy]
 python_version = "3.10"
 files = ["heirloom"]
+# plugins of the store, loaded by path (each a main.py) rather than imported
+exclude = ["^heirloom/store/"]
 check_untyped_defs = true
 warn_unused_ignores = true
 warn_redundant_casts = true

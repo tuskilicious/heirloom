@@ -2,6 +2,53 @@
 
 ## Unreleased
 
+### New
+- **Game updates install by themselves.** Each time the window refreshes your library, when it opens and then every
+  hour, it starts the updates of installed games and says which. Games being played are left alone, and so are
+  updates you stopped or that failed since the window opened, until you press Update. `disable_auto_updates = true`
+  in the config file turns it off.
+- **Manage a game from the window.** Each installed game has a Manage button (`⋯`): open its folder, add a desktop
+  shortcut that plays it (Windows), verify and repair its files, sync its cloud saves, play without updating, or
+  uninstall it.
+- **A calmer, livelier library.** A game's buttons appear over its cover when you point at it or reach it with
+  the keyboard, so the library reads as covers rather than rows of buttons. Covers lean toward the pointer, catch a
+  sweep of light and glow in the lantern's colour; the art of the game you played last lights the page behind the
+  frosted header, and the logo's lantern flickers. Scrollbars are slim and in the window's colours.
+- **Downloads assemble their cover.** While a game downloads, tiles over its cover light up in a scattered order,
+  flash citron and snap away, and the art beneath sharpens from a blur and gains its colour, crisp at 100%. When the
+  game is installed, the whole cover flares up. The progress bar of the downloads panel glints too.
+- **The window's own theme.** The window keeps its own look whatever the terminal's theme is, and window themes are
+  your CSS: a `.css` file in the `themes` folder, or a theme's `gui_css`. Themes are chosen in Customize, which only
+  offers a choice once there is one. High contrast follows Windows' contrast settings. The setting is `window_theme`
+  in the config file.
+- **Quality of life in the window.** A sort button orders the library A to Z, by when you last played, by playtime or
+  by size, the cards gliding into place. The window opens on the shelf, order and sidebar you left it with. Search
+  ignores case, spaces and punctuation, and Escape empties it. Double-click an installed game to play it, right-click
+  it for its Manage menu, and notices can be closed.
+- **Fluent, a window theme in the manner of Windows 11.** A Mica-dark base with the library on a rounded layer,
+  acrylic menus and panels with a fine grain, the light-blue accent, Fluent's calm deceleration, and Segoe UI
+  Variable, which Windows 11 has.
+- **Impeccable, a second window theme.** A light, editorial-poster look to choose in Customize: cream pages beside a
+  burnt-orange sidebar, an amber accent with burnt-orange text where amber would be too faint to read, and Chakra Petch
+  with JetBrains Mono labels, bundled so it works offline. No glows; shadows are tinted warm.
+- **The Epic overlay in the window.** On Windows, Customize installs the Epic overlay (friends, invites and
+  achievements in games using Epic Online Services) as a download, turns it on and off for every game, updates and
+  removes it, and says when it is on from the Epic Games Launcher's own copy.
+- **Covers tilt with the pointer at once.** The tilt toward the pointer no longer trails behind it; the lift keeps
+  its spring, and the tilt springs back on leaving.
+- **Customize, and a plugin store.** Customize in the sidebar opens a panel to choose the window's theme, turn
+  plugins on and off, remove them, and open the themes and plugins folders to add your own. Its plugin store installs
+  the plugins that now come with Heirloom in one click: Notifications (when a game is installed or updated), High
+  performance while playing (the Windows power plan), Close the Epic Games Launcher (when a game starts), and
+  Library worth, whose `heirloom worth` adds up what your games and DLC cost on the Epic Games Store, at full price
+  and today.
+- **Smoother.** Covers lift, the sidebar marker slides and menus open on a gentle spring; filtering and searching
+  glide the cards to their new places; menus and Customize ease out as well as in; the downloads list folds up;
+  loading covers shimmer, and notices slide in with a citron edge. The logged-out lantern glows.
+- **Frosted glass.** The header is a floating bar of frosted glass, each game's name and status sit on a frosted
+  plate over its cover (making way for its buttons under the pointer), and the downloads panel and menus are frosted
+  too. Under Windows' contrast settings they stay solid.
+
 ### Fixed
 - Opening Heirloom from the Start menu or desktop shortcut no longer shows a terminal window for a moment. The
   shortcuts run the new `heirloom-gui.exe`, a windowed program that starts the window with its terminal hidden.

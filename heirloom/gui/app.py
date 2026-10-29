@@ -5,10 +5,13 @@ do, so playtime, plugins and resumable downloads work just as they do in the ter
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
+import shutil
 import subprocess
+import sys
 import threading
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
@@ -16,23 +19,40 @@ from pathlib import Path
 from typing import Any
 
 from heirloom.downloader.queue import heirloom_command, start_job, stop_job
+from heirloom.lfs.eos import (
+    add_registry_entries,
+    query_registry_entries,
+    remove_registry_entries,
+)
 from heirloom.lfs.lgndry import LGDLFS
 from heirloom.models.game import Game
-from heirloom.themes import DEFAULT_THEME, Theme
+from heirloom.plugins import PluginManager
+from heirloom.themes import Theme
 
 log = logging.getLogger('GUI')
 
 WEB = Path(__file__).parent / 'web'
+# plugins that come with Heirloom, to install from the window
+STORE = Path(__file__).parent.parent / 'store'
+# the window's own look, Keeper Light, in web/style.css
+WINDOW_THEME = 'heirloom'
+# how the window shows the library, kept between runs in window.json: the first of each is the default
+VIEW_CHOICES = {'filter': ('all', 'installed', 'updates'), 'sort': ('title', 'recent', 'played', 'size')}
 # portrait art first, as the library shows covers
 COVER_TYPES = ('DieselGameBoxTall', 'OfferImageTall', 'DieselStoreFrontTall', 'Thumbnail', 'DieselGameBox')
 # landscape art for the banner of the game played last
 ART_TYPES = ('DieselGameBox', 'DieselStoreFrontWide', 'OfferImageWide')
 
-# downloads (and uninstalls) run one at a time, as heirloom installs only one game at a time
-DOWNLOADS = ('install', 'uninstall')
+# downloads (and uninstalls and repairs) run one at a time, as heirloom installs only one game at a time
+DOWNLOADS = ('install', 'uninstall', 'repair', 'overlay')
 COMMANDS = {
     'install': ['-y', 'install'],
     'uninstall': ['-y', 'uninstall'],
+    'repair': ['-y', 'repair'],
+    'sync': ['-y', 'sync-saves'],
+    # the Epic overlay: installing also turns it on, and installing again updates it
+    'overlay': ['-y', 'eos-overlay', 'install'],
+    'overlay_remove': ['-y', 'eos-overlay', 'remove'],
     'play': ['-y', 'launch'],
     'login': ['auth'],
 }
@@ -40,6 +60,17 @@ COMMANDS = {
 PROGRESS = re.compile(r'= Progress: (\d+(?:\.\d+)?)%')
 SPEED = re.compile(r'\+ Download\s+- ([\d.]+ MiB/s) \(raw\)')
 LOG_LINE = re.compile(r'^\[[\w.-]+\] [A-Z]+: (.*)$')
+
+# writes a desktop shortcut from HL_* variables, so no text from Epic is ever part of the script
+SHORTCUT = '''
+$shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut(
+    (Join-Path ([Environment]::GetFolderPath('Desktop')) "$env:HL_NAME.lnk"))
+$shortcut.TargetPath = $env:HL_TARGET
+$shortcut.Arguments = $env:HL_ARGUMENTS
+$shortcut.IconLocation = $env:HL_ICON
+$shortcut.WindowStyle = 7
+$shortcut.Save()
+'''
 
 
 def logged_in_user(lgd: LGDLFS) -> str | None:
@@ -51,6 +82,35 @@ def logged_in_user(lgd: LGDLFS) -> str | None:
 def image_url(game: Game | None, kinds: tuple[str, ...]) -> str:
     images = {image.get('type'): image.get('url') for image in game.metadata.get('keyImages', [])} if game else {}
     return next((images[kind] for kind in kinds if images.get(kind)), '')
+
+
+def open_in_file_manager(path: str | Path) -> None:
+    if sys.platform == 'win32':
+        os.startfile(path)
+    else:
+        subprocess.Popen(['open' if sys.platform == 'darwin' else 'xdg-open', str(path)])
+
+
+def window_themes(themes: dict[str, Theme], themes_dir: Path) -> dict[str, tuple[str, str]]:
+    """
+    The window's themes by name, as (title, CSS): its own look, the ones that come with Heirloom (web/themes), then
+    the themes with "gui_css", then any other CSS file in the themes folder, which is a theme for the window alone
+    """
+    found = {WINDOW_THEME: ('Heirloom', '')}
+    found |= {path.stem: (_title(path), path.read_text(encoding='utf-8')) for path in sorted((WEB / 'themes').glob('*.css'))}
+    found |= {theme.name: (theme.common_name, theme.css) for theme in themes.values()
+              if theme.css and theme.name not in found}
+    for path in sorted(themes_dir.glob('*.css')):
+        css = path.read_text(encoding='utf-8', errors='replace')
+        # the CSS of a theme above, under its own name or another
+        if path.stem in found or any(css == known for _, known in found.values()):
+            continue
+        found[path.stem] = (_title(path), css)
+    return found
+
+
+def _title(css_file: Path) -> str:
+    return css_file.stem.replace('-', ' ').replace('_', ' ').capitalize()
 
 
 def read_library(lgd: LGDLFS) -> list[dict[str, Any]]:
@@ -76,6 +136,7 @@ def read_library(lgd: LGDLFS) -> list[dict[str, Any]]:
             'update': bool(igame and version and version != igame.version),
             'size': igame.install_size if igame else None,
             'store': game.third_party_store if game else None,
+            'cloud_saves': bool(game and game.supports_cloud_saves),
             # seconds played, and when the last session ended
             'played': round(sum(session.duration.total_seconds() for session in sessions)),
             'last_played': max(session.end for session in sessions).isoformat() if sessions else None,
@@ -227,25 +288,166 @@ class GuiApi:
     def uninstall(self, app_name: str) -> None:
         self._jobs.add('uninstall', app_name, self._title(app_name))
 
+    def repair(self, app_name: str) -> None:
+        self._jobs.add('repair', app_name, self._title(app_name))
+
+    def sync_saves(self, app_name: str) -> None:
+        self._jobs.add('sync', app_name, self._title(app_name))
+
+    def open_folder(self, app_name: str) -> None:
+        igame = self._lgd().get_installed_game(app_name)
+        if not igame or not Path(igame.install_path).is_dir():
+            notice = f'The folder of {self._title(app_name)} is gone. Repair it, or uninstall it.'
+            with self._lock:
+                self._notice = notice
+            return
+        open_in_file_manager(igame.install_path)
+
+    def open_config_folder(self, name: str) -> None:
+        """Opens the themes or plugins folder, made if there is none yet, to add or remove them"""
+        if name not in ('themes', 'plugins'):
+            raise ValueError(f'No folder named "{name}"')
+        folder = self._lgd().path / name
+        folder.mkdir(parents=True, exist_ok=True)
+        open_in_file_manager(folder)
+
+    def plugins(self) -> dict[str, Any]:
+        """The plugins in the plugins folder, and the ones of the store"""
+        manager = PluginManager(self._lgd().path / 'plugins')
+        found, enabled = manager.discover(), manager.enabled()
+        return {
+            'installed': [{'name': name, 'title': manifest.common_name, 'description': manifest.description,
+                           'enabled': name in enabled} for name, (_, manifest) in found.items()],
+            'store': [{'name': name, 'title': manifest.common_name, 'description': manifest.description,
+                       'installed': name in found} for name, (_, manifest) in PluginManager(STORE).discover().items()],
+        }
+
+    def set_plugin(self, name: str, enabled: bool) -> dict[str, Any]:
+        """Turns a plugin on or off for the heirloom commands started from now on, the window's jobs included"""
+        manager = PluginManager(self._lgd().path / 'plugins')
+        if name not in manager.discover():
+            raise ValueError(f'No plugin named "{name}"')
+        manager.set_enabled(name, enabled)
+        return self.plugins()
+
+    def install_plugin(self, name: str) -> dict[str, Any]:
+        """Copies a plugin of the store into the plugins folder and turns it on"""
+        source = PluginManager(STORE).discover().get(name)
+        manager = PluginManager(self._lgd().path / 'plugins')
+        if not source or name in manager.discover():
+            raise ValueError(f'No plugin named "{name}" to install')
+        shutil.copytree(source[0], manager.folder / source[0].name, ignore=shutil.ignore_patterns('__pycache__'))
+        manager.set_enabled(name, True)
+        return self.plugins()
+
+    def remove_plugin(self, name: str) -> dict[str, Any]:
+        """Turns a plugin off and deletes its folder"""
+        manager = PluginManager(self._lgd().path / 'plugins')
+        if not (found := manager.discover().get(name)):
+            raise ValueError(f'No plugin named "{name}"')
+        manager.set_enabled(name, False)
+        shutil.rmtree(found[0])
+        return self.plugins()
+
+    def create_shortcut(self, app_name: str) -> None:
+        """A desktop shortcut that plays the game, with its icon; the terminal it runs in starts minimized"""
+        title = self._title(app_name)
+        igame = self._lgd().get_installed_game(app_name)
+        if sys.platform != 'win32' or not igame:
+            notice = 'Desktop shortcuts can only be made on Windows, for installed games.'
+        else:
+            target, *arguments = self._heirloom()
+            config = ['-c', self._config_file] if self._config_file else []
+            game_exe = Path(igame.install_path, igame.executable)
+            # what Windows allows in a file name
+            name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '', title).strip(' .') or app_name
+            try:
+                subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-Command', SHORTCUT],
+                               env=os.environ | {
+                                   'HL_NAME': name, 'HL_TARGET': target,
+                                   'HL_ARGUMENTS': subprocess.list2cmdline([*arguments, *config, '-y', 'launch', app_name]),
+                                   'HL_ICON': str(game_exe) if game_exe.is_file() else target,
+                               },
+                               creationflags=subprocess.CREATE_NO_WINDOW, capture_output=True, check=True, timeout=30)
+                notice = f'Added "{name}" to your desktop.'
+            except (OSError, subprocess.SubprocessError) as e:
+                log.warning(f'Could not create the shortcut: {e!r}')
+                notice = f'Could not add a desktop shortcut for {title}.'
+        with self._lock:
+            self._notice = notice
+
+    def overlay(self) -> dict[str, Any] | None:
+        """
+        The Epic overlay, which games using Epic Online Services show friends, invites and achievements in: whether
+        Heirloom installed it, and whether it is on. None off Windows, where it needs a Wine prefix (see the CLI).
+        """
+        if sys.platform != 'win32':
+            return None
+        install = self._lgd().get_overlay_install_info()
+        path = query_registry_entries()['overlay_path']
+        return {'installed': install is not None, 'version': install.version if install else '',
+                # it may be on from the Epic Games Launcher's own copy
+                'enabled': bool(path) and Path(path, 'EOSOVH-Win64-Shipping.dll').exists()}
+
+    def set_overlay(self, enabled: bool) -> dict[str, Any] | None:
+        """Turns the overlay on or off for every game, in the registry of the current user"""
+        install = self._lgd().get_overlay_install_info()
+        if enabled and not install:
+            raise ValueError('The overlay is not installed')
+        remove_registry_entries()
+        if enabled and install:
+            add_registry_entries(os.path.normpath(install.install_path))
+        return self.overlay()
+
+    def install_overlay(self) -> None:
+        self._jobs.add('overlay', '', 'Epic overlay')
+
+    def remove_overlay(self) -> None:
+        self._jobs.add('overlay_remove', '', 'Epic overlay')
+
     def login(self) -> None:
         self._jobs.add('login', '', 'Epic Games account')
 
     def stop(self, job_id: int) -> None:
         self._jobs.stop(job_id)
 
+    def view(self) -> dict[str, Any]:
+        """How the window was left: the shelf, the sort order, and whether the sidebar was collapsed"""
+        try:
+            saved = json.loads((self._lgd().path / 'window.json').read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            saved = {}
+        if not isinstance(saved, dict):
+            saved = {}
+        view: dict[str, Any] = {key: saved.get(key) if saved.get(key) in choices else choices[0]
+                                for key, choices in VIEW_CHOICES.items()}
+        view['rail_collapsed'] = saved.get('rail_collapsed') is True
+        return view
+
+    def set_view(self, view: dict[str, Any]) -> None:
+        """Keeps how the window shows the library for the next time; anything unknown is left out"""
+        kept = self.view()
+        kept |= {key: view[key] for key, choices in VIEW_CHOICES.items() if view.get(key) in choices}
+        if isinstance(view.get('rail_collapsed'), bool):
+            kept['rail_collapsed'] = view['rail_collapsed']
+        path = self._lgd().path
+        path.mkdir(parents=True, exist_ok=True)
+        (path / 'window.json').write_text(json.dumps(kept, indent=2), encoding='utf-8')
+
     def themes(self) -> dict[str, Any]:
-        themes = self._load_themes()
-        name = self._lgd().config.get('Heirloom', 'theme', fallback=DEFAULT_THEME.name)
-        active = themes.get(name, DEFAULT_THEME)
-        return {'active': active.name, 'css': active.css,
-                'themes': [{'name': theme.name, 'title': theme.common_name} for theme in themes.values()]}
+        lgd = self._lgd()
+        themes = window_themes(self._load_themes(), lgd.path / 'themes')
+        name = lgd.config.get('Heirloom', 'window_theme', fallback=WINDOW_THEME)
+        active = name if name in themes else WINDOW_THEME
+        return {'active': active, 'css': themes[active][1],
+                'themes': [{'name': name, 'title': title} for name, (title, _) in themes.items()]}
 
     def use_theme(self, name: str) -> dict[str, Any]:
-        if name not in self._load_themes():
-            raise ValueError(f'No theme named "{name}"')
         # a fresh read of the config, so changes heirloom made to it meanwhile are kept
         lgd = self._lgd()
-        lgd.config.set('Heirloom', 'theme', name)
+        if name not in window_themes(self._load_themes(), lgd.path / 'themes'):
+            raise ValueError(f'No theme named "{name}"')
+        lgd.config.set('Heirloom', 'window_theme', name)
         lgd.save_config()
         return self.themes()
 
@@ -280,8 +482,22 @@ class GuiApi:
         with self._lock:
             self._games, self._user = games, user
 
+    def _update_games(self) -> str:
+        """Starts the updates of installed games by themselves, and says which"""
+        if self._lgd().config.getboolean('Heirloom', 'disable_auto_updates', fallback=False):
+            return ''
+        # games being played or updated, and updates stopped or failed while the window is open: Stop means stop,
+        # and a failing update (a full disk, say) waits for the Update button rather than failing every hour
+        skip = {job['app_name'] for job in self._jobs.snapshot()
+                if job['status'] in ('queued', 'running') or (job['kind'] == 'install' and job['status'] != 'done')}
+        with self._lock:
+            games = [game for game in self._games if game['update'] and game['app_name'] not in skip]
+        for game in games:
+            self._jobs.add('install', game['app_name'], game['title'])
+        return f'Updating by itself: {", ".join(game["title"] for game in games)}.' if games else ''
+
     def _refresh(self) -> None:
-        notice, update = '', None
+        notice, update, refreshed = '', None, False
         try:
             from heirloom.core import HeirloomCore
             core = HeirloomCore(override_config=self._config_file)
@@ -295,6 +511,7 @@ class GuiApi:
                 if imported := core.egl_import_new():
                     titles = ', '.join(core.get_installed_game(app_name).title for app_name in imported)
                     notice = f'Added from the Epic Games Launcher: {titles}.'
+                refreshed = True
             # logging in checks for a newer Heirloom
             if core.update_available and core.update_notice_enabled() and (release := core.get_update_info()):
                 update = {'version': release['version'], 'name': release['name'], 'url': release['gh_url']}
@@ -302,6 +519,9 @@ class GuiApi:
             log.warning(f'Refreshing the library failed: {e!r}')
             notice = f'Refreshing the library failed: {e}'
         self._read_library()
+        # only with the latest versions just fetched, which needs the login to have worked
+        if refreshed:
+            notice = ' '.join(filter(None, (notice, self._update_games())))
         with self._lock:
             self._notice, self._update, self._refreshing = notice, update, False
 
