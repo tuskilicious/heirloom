@@ -141,7 +141,7 @@ function actions(game, job) {
   if (game.store) return [];
   const install = () => run(api.install(game.app_name));
   // citron is kept for playing and updating, so a library of uninstalled games isn't a wall of it
-  if (!game.installed) return [button('Install', 'ghost', install, 'download')];
+  if (!game.installed) return [button('Install', 'ghost', () => openInstall(game), 'download')];
   return [
     game.update ? button('Update', 'primary', install, 'updates')
       : button('Play', 'primary', () => run(api.play(game.app_name)), 'play'),
@@ -216,6 +216,45 @@ function assemble(entry, percent) {
   [...entry.tiles.children].forEach((tile, index) => {
     tile.classList.toggle('lit', percent >= (TILE_TURN[index] + 1) / TILES * 100);
   });
+}
+
+// the install dialog: opens at once with where the game goes, and fills in its sizes when Epic has said
+let installing = null;
+
+function showInstall() {
+  const {game, folder, free, info, failed} = installing;
+  const size = (bytes) => (bytes === null || bytes === undefined ? '' : formatSize(bytes));
+  const waiting = !info && !failed;
+  $('#install-title').textContent = `Install ${game.title}`;
+  $('#install-download').textContent = info ? size(info.download_size) : waiting ? 'Working it out…' : 'Unknown';
+  $('#install-disk').textContent = info ? size(info.disk_size) : waiting ? 'Working it out…' : 'Unknown';
+  $('#install-free').textContent = free === null ? 'Unknown' : size(free);
+  $('#install-folder').textContent = folder;
+  $('#install-folder').title = folder;
+  const dlcs = info ? info.dlcs : [];
+  $('#install-dlc-row').hidden = !dlcs.length;
+  $('#install-dlc-list').textContent = dlcs.join(', ');
+  const short = info && info.disk_size && free !== null && free < info.disk_size;
+  const warning = $('#install-warning');
+  warning.hidden = !short && !failed;
+  warning.textContent = short ? `Not enough space: it needs ${size(info.disk_size - free)} more there. Choose another folder.`
+    : failed ? 'Could not find out its size from Epic. It can still be installed.' : '';
+  $('#install-start').disabled = Boolean(short);
+}
+
+async function openInstall(game) {
+  const settings = await api.settings();
+  installing = {game, folder: settings.install_dir, free: await api.free_space(settings.install_dir), info: null, failed: false};
+  const opened = installing;
+  showInstall();
+  $('#install').showModal();
+  try {
+    const info = await api.install_info(game.app_name);
+    if (installing === opened) Object.assign(installing, {info, free: installing.free ?? info.free});
+  } catch (error) {
+    if (installing === opened) installing.failed = true;
+  }
+  if (installing === opened) showInstall();
 }
 
 // how much of the cover is lit, in percent: installed games are, the rest light up as they download
@@ -755,6 +794,29 @@ async function start() {
     $('#settings').showModal();
   };
   $('#settings-close').onclick = () => $('#settings').close();
+  const closeInstall = () => {
+    installing = null;
+    $('#install').close();
+  };
+  $('#install-close').onclick = closeInstall;
+  $('#install-cancel').onclick = closeInstall;
+  $('#install').onclose = () => {
+    installing = null;
+  };
+  $('#install-folder-change').onclick = async () => {
+    const chosen = await api.choose_folder(installing.folder);
+    if (chosen && installing) {
+      Object.assign(installing, chosen);
+      showInstall();
+    }
+  };
+  $('#install-start').onclick = async () => {
+    const {game, folder, info} = installing;
+    const settings = await api.settings();
+    const dlcs = info && info.dlcs.length ? $('#install-dlcs').checked : null;
+    closeInstall();
+    run(api.install(game.app_name, folder === settings.install_dir ? null : folder, dlcs));
+  };
   $('#install-dir-change').onclick = async () => showSettings(await api.choose_install_dir());
   for (const name of ['max_download_speed', 'max_download_speed_while_playing']) {
     $(`#${name}`).onchange = (event) => saveSetting(name, event.target.value);

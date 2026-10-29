@@ -89,7 +89,7 @@ def test_downloads_run_one_at_a_time_and_report_progress():
     assert started == ['ok', 'fail']
     assert ok | {'id': 0} == {'id': 0, 'kind': 'install', 'app_name': 'ok', 'title': 'ok', 'status': 'done',
                               'progress': 42.5, 'speed': '12.34 MiB/s',
-                              'message': 'Preparing download for "Fish Game" (Fish)...'}
+                              'message': 'Preparing download for "Fish Game" (Fish)...', 'options': []}
     assert failing['status'] == 'failed' and failing['message'] == 'Not enough free disk space'
     assert [job.app_name for job in finished] == ['ok', 'fail']
 
@@ -173,6 +173,24 @@ def test_epic_overlay(lgd_home, tmp_path, monkeypatch):
     assert api.set_overlay(True) == {'installed': True, 'version': '1.3.5', 'enabled': True}
     assert registry['overlay_path'] == str(overlay_dir)
     assert api.set_overlay(False)['enabled'] is False and registry['overlay_path'] is None
+
+
+def test_installing_with_a_folder_and_dlc(fake_game, tmp_path):
+    info = {'game': {'owned_dlc': [{'title': 'Fish Soundtrack', 'installable': True},
+                                   {'title': 'Fish Hat', 'installable': None}]},
+            'manifest': {'download_size': 3 * 1024 ** 3, 'disk_size': 5 * 1024 ** 3}}
+    # stands in for "heirloom info <game> --json": logs, then the JSON
+    script = f'import sys; print("[cli] INFO: Getting game metadata..."); print({json.dumps(json.dumps(info))})'
+    api = GuiApi(None, lambda: {}, command=lambda: [sys.executable, '-c', script])
+    found = api.install_info('Fish')
+    assert (found['download_size'], found['disk_size'], found['dlcs']) == (3 * 1024 ** 3, 5 * 1024 ** 3,
+                                                                           ['Fish Soundtrack'])
+    assert found['free'] > 0, 'the install folder need not exist yet: its drive is asked'
+
+    install = Job(1, 'install', 'Fish', 'Fish Game', options=['--base-path', str(tmp_path), '--skip-dlcs'])
+    assert api._command(install)[-5:] == ['install', 'Fish', '--base-path', str(tmp_path), '--skip-dlcs']
+    with pytest.raises(ValueError):
+        api.install('Fish', folder='games')
 
 
 def test_settings_read_and_write_the_config(lgd_home, tmp_path):

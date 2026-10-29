@@ -8,6 +8,9 @@
   again brings back the window already open rather than a second one. Customize can start Heirloom with Windows,
   hidden in the tray, so games are updated before you sit down to play (`heirloom gui --background` does the same by
   hand). The library is refreshed every hour while Heirloom runs, window open or not.
+- **An install dialog.** Install opens a dialog with the game's download size, its size on disk and the space free
+  where it goes, and warns rather than starts when it won't fit. A game can go into a folder of its own, and its DLC
+  can be left out. It opens at once and fills in the sizes when Epic has answered.
 - **Settings.** A Settings panel in the sidebar chooses where games are installed (with the system's folder
   dialog), sets the download speed limit and a lower one while you play, and turns automatic updates, cloud save
   sync, starting with Windows and the notice about new Heirloom versions on and off. They are the config file's

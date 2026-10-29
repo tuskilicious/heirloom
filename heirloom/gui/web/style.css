@@ -607,6 +607,15 @@ kbd {
 .hint.error { color: var(--danger); }
 .switch:disabled { opacity: .45; cursor: default; }
 
+/* the install dialog: three sizes side by side, then where it goes */
+.install-dialog { width: min(480px, calc(100vw - 40px)); }
+.sizes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 14px; }
+.sizes div { padding: 10px 12px; border: 1px solid var(--glass-edge); border-radius: var(--radius-control); background: color-mix(in srgb, var(--bg) 35%, transparent); }
+.sizes dt { color: var(--muted); font-size: 12px; }
+.sizes dd { margin: 2px 0 0; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.panel-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 14px; }
+.panel-actions button { height: 36px; padding: 0 16px; }
+
 /* an on/off switch, drawn from a checkbox */
 .switch {
   position: relative;

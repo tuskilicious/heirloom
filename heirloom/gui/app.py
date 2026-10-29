@@ -14,7 +14,7 @@ import subprocess
 import sys
 import threading
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -106,6 +106,18 @@ def open_in_file_manager(path: str | Path) -> None:
         subprocess.Popen(['open' if sys.platform == 'darwin' else 'xdg-open', str(path)])
 
 
+def free_space(folder: str) -> int | None:
+    """The bytes free on the drive of folder, which need not exist yet; None if there is no telling"""
+    path = Path(folder).expanduser()
+    for candidate in (path, *path.parents):
+        if candidate.exists():
+            try:
+                return shutil.disk_usage(candidate).free
+            except OSError:
+                return None
+    return None
+
+
 def window_themes(themes: dict[str, Theme], themes_dir: Path) -> dict[str, tuple[str, str]]:
     """
     The window's themes by name, as (title, CSS): its own look, the ones that come with Heirloom (web/themes), then
@@ -170,6 +182,8 @@ class Job:
     progress: float | None = None
     speed: str = ''
     message: str = ''
+    # what was chosen for it, such as an install's folder and DLC, as heirloom's options
+    options: list[str] = field(default_factory=list)
 
 
 class Jobs:
@@ -187,9 +201,9 @@ class Jobs:
         with self._lock:
             return [asdict(job) for job in self._jobs]
 
-    def add(self, kind: str, app_name: str, title: str) -> None:
+    def add(self, kind: str, app_name: str, title: str, options: list[str] | None = None) -> None:
         with self._lock:
-            self._jobs.append(Job(len(self._jobs) + 1, kind, app_name, title))
+            self._jobs.append(Job(len(self._jobs) + 1, kind, app_name, title, options=options or []))
         self._start_next()
 
     def stop(self, job_id: int) -> None:
@@ -297,8 +311,48 @@ class GuiApi:
     def play(self, app_name: str) -> None:
         self._jobs.add('play', app_name, self._title(app_name))
 
-    def install(self, app_name: str) -> None:
-        self._jobs.add('install', app_name, self._title(app_name))
+    def install_info(self, app_name: str) -> dict[str, Any]:
+        """
+        What installing a game takes, for the install dialog: its download and size on disk, its DLC, and the
+        install folder with the space free there. It asks Epic, as "heirloom info" does, so it takes a moment.
+        """
+        config = ['-c', self._config_file] if self._config_file else []
+        result = subprocess.run([*self._heirloom(), *config, 'info', app_name, '--json'], capture_output=True,
+                                text=True, encoding='utf-8', errors='replace', timeout=120,
+                                env=os.environ | {'PYTHONIOENCODING': 'utf-8'},
+                                creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        try:
+            info = json.loads(result.stdout[result.stdout.index('{'):])
+        except ValueError:
+            raise ValueError(f'Could not find out what {self._title(app_name)} takes to install') from None
+        manifest, game = info.get('manifest') or {}, info.get('game') or {}
+        folder = self.settings()['install_dir']
+        return {
+            'download_size': manifest.get('download_size'), 'disk_size': manifest.get('disk_size'),
+            # only DLC with files of its own: the rest comes with the game
+            'dlcs': [dlc['title'] for dlc in game.get('owned_dlc') or [] if dlc.get('installable')],
+            'folder': folder, 'free': free_space(folder),
+        }
+
+    def free_space(self, folder: str) -> int | None:
+        return free_space(folder)
+
+    def choose_folder(self, current: str) -> dict[str, Any] | None:
+        """A folder for one install, from the system's folder dialog, with the space free there; None if cancelled"""
+        import webview
+        chosen = webview.windows[0].create_file_dialog(FOLDER_DIALOG, directory=current if Path(current).is_dir() else '')
+        return {'folder': chosen[0], 'free': free_space(chosen[0])} if chosen else None
+
+    def install(self, app_name: str, folder: str | None = None, dlcs: bool | None = None) -> None:
+        """Installs a game, into folder (the install folder of Settings if None), with or without its DLC"""
+        options = []
+        if folder:
+            if not Path(folder).is_absolute():
+                raise ValueError('Choose a whole path for the install folder')
+            options += ['--base-path', folder]
+        if dlcs is not None:
+            options.append('--with-dlcs' if dlcs else '--skip-dlcs')
+        self._jobs.add('install', app_name, self._title(app_name), options)
 
     def uninstall(self, app_name: str) -> None:
         self._jobs.add('uninstall', app_name, self._title(app_name))
@@ -435,12 +489,9 @@ class GuiApi:
 
     def choose_install_dir(self) -> dict[str, Any]:
         """Asks for the install folder with the system's folder dialog, and keeps the choice"""
-        import webview
         current = self.settings()['install_dir']
-        chosen = webview.windows[0].create_file_dialog(FOLDER_DIALOG, directory=current if Path(current).is_dir() else '')
-        if chosen:
-            return self.set_setting('install_dir', chosen[0])
-        return self.settings()
+        chosen = self.choose_folder(current)
+        return self.set_setting('install_dir', chosen['folder']) if chosen else self.settings()
 
     def background(self) -> dict[str, Any]:
         """Whether Heirloom keeps going in the tray, and whether it starts with Windows (only from the installer)"""
@@ -534,7 +585,7 @@ class GuiApi:
         with self._lock:
             # without a login only offline launches work, so try that rather than fail
             offline = ['--offline'] if job.kind == 'play' and not self._user else []
-        return [*self._heirloom(), *config, *COMMANDS[job.kind], *target, *offline]
+        return [*self._heirloom(), *config, *COMMANDS[job.kind], *target, *job.options, *offline]
 
     def _title(self, app_name: str) -> str:
         with self._lock:
