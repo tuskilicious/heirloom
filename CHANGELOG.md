@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.28.1 "Homestead" (2026-10-29)
+
+Heirloom's window is fast again with a large library.
 
 ### Fixed
 - **The window is fast with a large library again.** Every card carried two live blurs of what was behind it (the
