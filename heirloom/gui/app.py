@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -49,6 +50,9 @@ WINDOW_THEME = 'heirloom'
 SWITCHES = {'cloud_saves': 'disable_cloud_save_sync', 'auto_updates': 'disable_auto_updates',
             'update_notice': 'disable_update_notice'}
 SPEEDS = ('max_download_speed', 'max_download_speed_while_playing')
+# Epic's public list of the games given away now and next
+FREE_GAMES = 'https://store-site-backend-static-ipv4.ak.epicgames.com/freeGamesPromotions'
+STORE_PAGE = 'https://store.epicgames.com/p/'
 # folder dialogs, in pywebview's numbering (webview.FileDialog.FOLDER in newer ones)
 FOLDER_DIALOG = 20
 # how the window shows the library, kept between runs in window.json: the first of each is the default
@@ -104,6 +108,40 @@ def open_in_file_manager(path: str | Path) -> None:
         os.startfile(path)
     else:
         subprocess.Popen(['open' if sys.platform == 'darwin' else 'xdg-open', str(path)])
+
+
+def free_games(country: str, locale: str, owned: set[str]) -> list[dict[str, Any]]:
+    """
+    The games Epic gives away now and next: title, cover, store page, whether it is free now (or from start),
+    until when, and whether it is in the library already (by namespace, from owned)
+    """
+    import requests
+    response = requests.get(FREE_GAMES, params={'locale': locale, 'country': country, 'allowCountries': country},
+                            headers={'User-Agent': 'Heirloom'}, timeout=20)
+    response.raise_for_status()
+    found = []
+    for element in response.json()['data']['Catalog']['searchStore']['elements']:
+        promotions = element.get('promotions') or {}
+        # free is a promotion at 100% off; the rest of the list are sales and leftovers
+        offers = {kind: [offer for group in promotions.get(key) or [] for offer in group['promotionalOffers']
+                         if offer['discountSetting']['discountPercentage'] == 0]
+                  for kind, key in (('now', 'promotionalOffers'), ('next', 'upcomingPromotionalOffers'))}
+        if not (offer := next(iter(offers['now'] or offers['next']), None)):
+            continue
+        mappings = (element.get('catalogNs') or {}).get('mappings') or []
+        slug = (element.get('productSlug') or next((m['pageSlug'] for m in mappings), '') or '').split('/')[0]
+        images = {image['type']: image['url'] for image in element.get('keyImages') or []}
+        found.append({
+            'title': element['title'],
+            'image': next((images[kind] for kind in ('OfferImageTall', 'Thumbnail', 'DieselStoreFrontTall')
+                           if kind in images), ''),
+            # only a store page of Epic's, whatever the list says
+            'url': STORE_PAGE + slug if re.fullmatch(r'[a-z0-9-]+', slug) else 'https://store.epicgames.com/free-games',
+            'now': bool(offers['now']), 'start': offer['startDate'], 'end': offer['endDate'],
+            'owned': element.get('namespace') in owned,
+        })
+    # free now first, then by when
+    return sorted(found, key=lambda game: (not game['now'], game['start']))
 
 
 def free_space(folder: str) -> int | None:
@@ -293,13 +331,15 @@ class GuiApi:
         self._notice = ''
         # a newer Heirloom release: version, name and url
         self._update: dict[str, str] | None = None
+        self._free_games: list[dict[str, Any]] = []
         self._jobs = Jobs(self._command, self._job_finished)
         self._read_library()
 
     def state(self) -> dict[str, Any]:
         with self._lock:
             return {'user': self._user, 'refreshing': self._refreshing, 'notice': self._notice,
-                    'update': self._update, 'games': self._games, 'jobs': self._jobs.snapshot()}
+                    'update': self._update, 'games': self._games, 'free_games': self._free_games,
+                    'jobs': self._jobs.snapshot()}
 
     def refresh(self) -> None:
         with self._lock:
@@ -336,6 +376,31 @@ class GuiApi:
 
     def free_space(self, folder: str) -> int | None:
         return free_space(folder)
+
+    def open_store(self, url: str) -> None:
+        """Opens a game's page on the Epic Games Store in the browser, to claim it there"""
+        if not url.startswith('https://store.epicgames.com/'):
+            raise ValueError('Only pages of the Epic Games Store open from here')
+        import webbrowser
+        webbrowser.open(url)
+
+    def launch_options(self, app_name: str) -> str:
+        """The arguments a game starts with besides its own (start_params in its section of the config)"""
+        return self._lgd().config.get(app_name, 'start_params', fallback='')
+
+    def set_launch_options(self, app_name: str, options: str) -> str:
+        options = options.strip()
+        # what launching will do with them, so a stray quote is caught here rather than then
+        shlex.split(options)
+        lgd = self._lgd()
+        if options:
+            if not lgd.config.has_section(app_name):
+                lgd.config.add_section(app_name)
+            lgd.config.set(app_name, 'start_params', options)
+        elif lgd.config.has_option(app_name, 'start_params'):
+            lgd.config.remove_option(app_name, 'start_params')
+        lgd.save_config()
+        return options
 
     def choose_folder(self, current: str) -> dict[str, Any] | None:
         """A folder for one install, from the system's folder dialog, with the space free there; None if cancelled"""
@@ -629,6 +694,15 @@ class GuiApi:
                 notice = 'Could not log in, try logging in again.'
             else:
                 core.get_game_and_dlc_list(update_assets=True)
+                try:
+                    owned = {game.namespace for game in map(core.lgd.get_game_meta, core.lgd.get_game_app_names())
+                             if game and game.namespace}
+                    free = free_games(core.country_code, f'{core.language_code}-{core.country_code}', owned)
+                    with self._lock:
+                        self._free_games = free
+                except Exception as e:
+                    # the free games are a nicety: the library refreshes without them
+                    log.warning(f'Could not get the free games: {e!r}')
                 # games the Epic Games Launcher installed are added, rather than offered for download again
                 if imported := core.egl_import_new():
                     titles = ', '.join(core.get_installed_game(app_name).title for app_name in imported)

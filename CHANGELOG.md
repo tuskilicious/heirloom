@@ -8,6 +8,11 @@
   again brings back the window already open rather than a second one. Customize can start Heirloom with Windows,
   hidden in the tray, so games are updated before you sit down to play (`heirloom gui --background` does the same by
   hand). The library is refreshed every hour while Heirloom runs, window open or not.
+- **Free on Epic.** Above the library, the games Epic gives away now and next, with when, from Epic's public list;
+  the ones already in your library are marked, and Claim on Epic opens a game's store page in your browser to claim
+  it there. Discounts that aren't free are left out.
+- **Launch options.** Manage has Launch options, to set the arguments a game starts with (such as `-dx11`), kept as
+  `start_params` in its section of the config; options with a stray quote are refused.
 - **An install dialog.** Install opens a dialog with the game's download size, its size on disk and the space free
   where it goes, and warns rather than starts when it won't fit. A game can go into a folder of its own, and its DLC
   can be left out. It opens at once and fills in the sizes when Epic has answered.

@@ -109,6 +109,12 @@
       </div>
     </section>
 
+    <!-- Epic's free games: now, and next; shown on the whole library, when not searching -->
+    <section id="free" class="free" aria-labelledby="free-title" hidden>
+      <h2 id="free-title" class="free-title">Free on Epic</h2>
+      <div id="free-list" class="free-list"></div>
+    </section>
+
     <section id="library" class="grid" aria-label="Your games"></section>
     <div id="empty" class="empty" hidden>
       <svg class="mark" viewBox="16 16 272 400" aria-hidden="true"><use href="#logo"/></svg>
@@ -263,6 +269,28 @@
         <button type="button" id="install-start" class="primary">
           <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Install
         </button>
+      </div>
+    </section>
+  </dialog>
+
+  <!-- the arguments a game starts with, besides its own -->
+  <dialog id="launch" class="panel launch-dialog" aria-labelledby="launch-title">
+    <header class="panel-head">
+      <h2 id="launch-title"></h2>
+      <button type="button" id="launch-close" class="icon-button" title="Close">
+        <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>
+      </button>
+    </header>
+    <section>
+      <label class="field" for="launch-options">
+        <span class="what">Launch options</span>
+        <span class="detail">Added when the game starts, such as <code>-dx11</code> or <code>-skipintro</code>. Leave empty for none.</span>
+        <input type="text" id="launch-options" class="text" autocomplete="off" spellcheck="false">
+      </label>
+      <p id="launch-error" class="hint error" role="alert" hidden></p>
+      <div class="panel-actions">
+        <button type="button" id="launch-cancel" class="ghost">Cancel</button>
+        <button type="button" id="launch-save" class="primary">Save</button>
       </div>
     </section>
   </dialog>
