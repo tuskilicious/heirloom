@@ -552,10 +552,11 @@ def run(config_file: str | None, load_themes: Callable[[], dict[str, Theme]], ba
 
     api = GuiApi(config_file, load_themes)
     tray = Tray.available()
-    window = None
+    # the window, once there is one: a second "heirloom gui" may ask for it before
+    opened: list[webview.Window] = []
 
     def show() -> None:
-        if window:
+        for window in opened:
             window.show()
             window.restore()
 
@@ -563,6 +564,8 @@ def run(config_file: str | None, load_themes: Callable[[], dict[str, Theme]], ba
         return
     window = webview.create_window('Heirloom', url=str(WEB / 'index.html'), js_api=api, width=1280, height=820,
                                    min_size=(760, 560), background_color='#01211a', hidden=background and tray)
+    assert window is not None
+    opened.append(window)
     quitting = threading.Event()
 
     def closing() -> bool:

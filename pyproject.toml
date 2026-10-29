@@ -92,6 +92,11 @@ warn_redundant_casts = true
 module = ["webview", "webview.*"]
 ignore_missing_imports = true
 
+# .NET, through pythonnet, for the Windows tray (heirloom/gui/background.py)
+[[tool.mypy.overrides]]
+module = ["clr", "System", "System.*"]
+ignore_missing_imports = true
+
 # Ratchet: these still set attributes to None and fill them in later, which mypy can't
 # follow inside unannotated functions. Remove a module from this list once it passes.
 [[tool.mypy.overrides]]

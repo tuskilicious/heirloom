@@ -11,6 +11,14 @@ import threading
 from collections.abc import Callable
 from pathlib import Path
 
+if sys.platform == 'win32':
+    from heirloom.lfs.windows_helpers import (
+        HKEY_CURRENT_USER,
+        query_registry_value,
+        remove_registry_value,
+        set_registry_value,
+    )
+
 log = logging.getLogger('GUI')
 
 # what a second "heirloom gui" sends the one already running, to bring its window back
@@ -59,25 +67,23 @@ def startup_command() -> str | None:
 
 
 def starts_with_windows() -> bool:
-    if sys.platform != 'win32':
-        return False
-    from heirloom.lfs.windows_helpers import HKEY_CURRENT_USER, query_registry_value
-    return query_registry_value(HKEY_CURRENT_USER, RUN_KEY, RUN_VALUE) is not None
+    if sys.platform == 'win32':
+        return query_registry_value(HKEY_CURRENT_USER, RUN_KEY, RUN_VALUE) is not None
+    return False
 
 
 def start_with_windows(enabled: bool) -> None:
-    from heirloom.lfs.windows_helpers import (
-        HKEY_CURRENT_USER,
-        remove_registry_value,
-        set_registry_value,
-    )
-    if not enabled:
-        if starts_with_windows():
-            remove_registry_value(HKEY_CURRENT_USER, RUN_KEY, RUN_VALUE)
-        return
-    if not (command := startup_command()):
-        raise ValueError('Starting with Windows needs Heirloom from its installer')
-    set_registry_value(HKEY_CURRENT_USER, RUN_KEY, RUN_VALUE, command)
+    command = startup_command()
+    if sys.platform == 'win32':
+        if not enabled:
+            if starts_with_windows():
+                remove_registry_value(HKEY_CURRENT_USER, RUN_KEY, RUN_VALUE)
+            return
+        if command:
+            set_registry_value(HKEY_CURRENT_USER, RUN_KEY, RUN_VALUE, command)
+            return
+    if enabled:
+        raise ValueError('Starting with Windows needs Heirloom from its installer, on Windows')
 
 
 class Tray:
