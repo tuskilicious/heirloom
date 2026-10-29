@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from heirloom.downloader.queue import heirloom_command, start_job, stop_job
+from heirloom.downloader.throttle import parse_speed
 from heirloom.gui.background import (
     Tray,
     claim_window,
@@ -35,6 +36,7 @@ from heirloom.lfs.lgndry import LGDLFS
 from heirloom.models.game import Game
 from heirloom.plugins import PluginManager
 from heirloom.themes import Theme
+from heirloom.utils.env import is_windows_mac_or_pyi
 
 log = logging.getLogger('GUI')
 
@@ -43,6 +45,12 @@ WEB = Path(__file__).parent / 'web'
 STORE = Path(__file__).parent.parent / 'store'
 # the window's own look, Keeper Light, in web/style.css
 WINDOW_THEME = 'heirloom'
+# switches in Settings, and the config options they turn the other way: each is on unless disabled
+SWITCHES = {'cloud_saves': 'disable_cloud_save_sync', 'auto_updates': 'disable_auto_updates',
+            'update_notice': 'disable_update_notice'}
+SPEEDS = ('max_download_speed', 'max_download_speed_while_playing')
+# folder dialogs, in pywebview's numbering (webview.FileDialog.FOLDER in newer ones)
+FOLDER_DIALOG = 20
 # how the window shows the library, kept between runs in window.json: the first of each is the default
 VIEW_CHOICES = {'filter': ('all', 'installed', 'updates'), 'sort': ('title', 'recent', 'played', 'size')}
 # portrait art first, as the library shows covers
@@ -383,14 +391,61 @@ class GuiApi:
         with self._lock:
             self._notice = notice
 
+    def settings(self) -> dict[str, Any]:
+        """The options Settings shows: where games go, download speeds in MiB/s (0 for none), and switches"""
+        config = self._lgd().config
+        speeds = {}
+        for option in SPEEDS:
+            try:
+                speeds[option] = round(parse_speed(config.get('Heirloom', option, fallback='0')) / 1024 ** 2, 2)
+            except ValueError:
+                speeds[option] = 0
+        # the update notice is off by default where Heirloom comes from a package manager, which updates it
+        defaults = {'update_notice': not is_windows_mac_or_pyi()}
+        return {
+            'install_dir': str(Path(config.get('Heirloom', 'install_dir', fallback='~/Games')).expanduser()),
+            **speeds,
+            **{name: not config.getboolean('Heirloom', option, fallback=defaults.get(name, False))
+               for name, option in SWITCHES.items()},
+            **self.background(),
+        }
+
+    def set_setting(self, name: str, value: Any) -> dict[str, Any]:
+        """Changes one option of Settings in the config file; a value that makes no sense is refused"""
+        if name == 'starts_with_windows':
+            start_with_windows(value is True)
+            return self.settings()
+        # a fresh read of the config, so changes heirloom made to it meanwhile are kept
+        lgd = self._lgd()
+        if name == 'install_dir':
+            folder = Path(str(value)).expanduser()
+            if not str(value).strip() or not folder.is_absolute():
+                raise ValueError('Choose a whole path for the install folder')
+            lgd.config.set('Heirloom', 'install_dir', str(folder))
+        elif name in SPEEDS:
+            speed = str(value).strip() or '0'
+            parse_speed(speed)
+            lgd.config.set('Heirloom', name, speed)
+        elif name in SWITCHES and isinstance(value, bool):
+            lgd.config.set('Heirloom', SWITCHES[name], str(not value).lower())
+        else:
+            raise ValueError(f'No setting named "{name}"')
+        lgd.save_config()
+        return self.settings()
+
+    def choose_install_dir(self) -> dict[str, Any]:
+        """Asks for the install folder with the system's folder dialog, and keeps the choice"""
+        import webview
+        current = self.settings()['install_dir']
+        chosen = webview.windows[0].create_file_dialog(FOLDER_DIALOG, directory=current if Path(current).is_dir() else '')
+        if chosen:
+            return self.set_setting('install_dir', chosen[0])
+        return self.settings()
+
     def background(self) -> dict[str, Any]:
         """Whether Heirloom keeps going in the tray, and whether it starts with Windows (only from the installer)"""
         return {'tray': Tray.available(), 'startup_possible': startup_command() is not None,
                 'starts_with_windows': starts_with_windows()}
-
-    def set_starts_with_windows(self, enabled: bool) -> dict[str, Any]:
-        start_with_windows(enabled)
-        return self.background()
 
     def overlay(self) -> dict[str, Any] | None:
         """

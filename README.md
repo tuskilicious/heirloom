@@ -145,7 +145,8 @@ On Windows, Customize in the sidebar also installs the Epic overlay, which games
 Each installed game's Manage button (`⋯`) opens its folder, adds a desktop shortcut that plays it (Windows), verifies and repairs its files, syncs its cloud saves and uninstalls it.
 Everything it does runs as a regular `heirloom` command, so playtime, plugins and resumable downloads work the same.
 Downloads run one at a time; Stop stops one cleanly, and installing it again continues where it stopped.
-On Windows, closing the window keeps Heirloom going in the tray, downloads and updates included: double-click its icon to bring the window back, or choose Quit in its menu. Opening Heirloom again brings back the window already open. Customize can start it with Windows, in the tray (`heirloom gui --background` starts it that way by hand).
+On Windows, closing the window keeps Heirloom going in the tray, downloads and updates included: double-click its icon to bring the window back, or choose Quit in its menu. Opening Heirloom again brings back the window already open. Settings can start it with Windows, in the tray (`heirloom gui --background` starts it that way by hand).
+Settings in the sidebar also chooses where games are installed, the download speed limits (and a lower one while you play), and turns automatic updates, cloud save sync and the notice about new Heirloom versions on and off; they are the same options as in the config file, saved as soon as they change.
 Game updates install by themselves: each time Heirloom refreshes your library (when it opens, then every hour), it starts the updates of installed games, except games being played and updates you stopped or that failed since the window opened, which wait for their Update button. Set `disable_auto_updates = true` to update only when you choose.
 Without a login, games are launched offline. The window has its own look, and can use your own CSS, see [Window themes](#window-themes).
 

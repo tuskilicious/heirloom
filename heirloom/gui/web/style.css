@@ -588,6 +588,25 @@ kbd {
 .row .ghost { height: 32px; }
 .row .installed { color: var(--muted); font-size: 13px; }
 
+/* Settings: a path that may be long, and numbers with their unit */
+.path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.unit { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+.speed {
+  width: 84px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--bg) 45%, transparent);
+  color: var(--text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.speed:focus-visible { outline: none; border-color: var(--accent); }
+.hint.error { color: var(--danger); }
+.switch:disabled { opacity: .45; cursor: default; }
+
 /* an on/off switch, drawn from a checkbox */
 .switch {
   position: relative;

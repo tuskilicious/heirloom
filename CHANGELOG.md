@@ -8,6 +8,10 @@
   again brings back the window already open rather than a second one. Customize can start Heirloom with Windows,
   hidden in the tray, so games are updated before you sit down to play (`heirloom gui --background` does the same by
   hand). The library is refreshed every hour while Heirloom runs, window open or not.
+- **Settings.** A Settings panel in the sidebar chooses where games are installed (with the system's folder
+  dialog), sets the download speed limit and a lower one while you play, and turns automatic updates, cloud save
+  sync, starting with Windows and the notice about new Heirloom versions on and off. They are the config file's
+  options, saved as soon as they change, and a value that makes no sense is refused with a message.
 
 ## 0.27.0 "Keepsake" (2026-10-29)
 

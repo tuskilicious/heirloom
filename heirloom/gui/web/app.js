@@ -486,21 +486,34 @@ async function poll() {
   }
 }
 
-// keeping going in the tray, and starting with Windows
-function showBackground(info) {
-  $('#background-section').hidden = !info.tray;
-  if (!info.tray) return;
-  $('#background-row').replaceChildren(...[
-    el('span', {className: 'row-text'},
-      el('span', {className: 'what', textContent: 'Start with Windows'}),
-      el('span', {className: 'detail', textContent: info.startup_possible
-        ? 'In the tray, so games update before you play. Closing the window keeps Heirloom there; Quit is in its menu.'
-        : 'Install Heirloom with its installer to start it with Windows. Closing the window keeps it in the tray.'})),
-    info.startup_possible ? el('input', {
-      type: 'checkbox', role: 'switch', className: 'switch', checked: info.starts_with_windows,
-      ariaLabel: 'Start with Windows', onchange: async (event) => showBackground(await api.set_starts_with_windows(event.target.checked)),
-    }) : null,
-  ].filter(Boolean));
+// Settings: shows the options, and saves each as it changes
+function showSettings(settings) {
+  $('#install-dir').textContent = settings.install_dir;
+  $('#install-dir').title = settings.install_dir;
+  for (const name of ['max_download_speed', 'max_download_speed_while_playing']) {
+    if (document.activeElement !== $(`#${name}`)) $(`#${name}`).value = settings[name];
+  }
+  for (const name of ['auto_updates', 'cloud_saves', 'update_notice', 'starts_with_windows']) {
+    $(`#${name}`).checked = settings[name];
+  }
+  $('#startup-row').hidden = !settings.tray;
+  $('#starts_with_windows').disabled = !settings.startup_possible;
+  $('#startup-detail').textContent = settings.startup_possible
+    ? 'In the tray, so games update before you play. Closing the window keeps Heirloom there; Quit is in its menu.'
+    : 'Install Heirloom with its installer to start it with Windows. Closing the window keeps it in the tray.';
+}
+
+async function saveSetting(name, value) {
+  const error = $('#settings-error');
+  try {
+    showSettings(await api.set_setting(name, value));
+    error.hidden = true;
+  } catch (failure) {
+    // pywebview hands a Python error over with its message
+    error.textContent = failure.message || String(failure);
+    error.hidden = false;
+    showSettings(await api.settings());
+  }
 }
 
 // the Epic overlay's row in Customize: what it is, how it stands, and what can be done with it
@@ -731,12 +744,24 @@ async function start() {
   $('#customize-open').onclick = async () => {
     // themes and plugins added in their folders meanwhile show up too
     await showThemes();
-    showBackground(await api.background());
     showOverlay(await api.overlay());
     showPlugins(await api.plugins());
     $('#customize').showModal();
   };
   $('#customize-close').onclick = () => $('#customize').close();
+  $('#settings-open').onclick = async () => {
+    $('#settings-error').hidden = true;
+    showSettings(await api.settings());
+    $('#settings').showModal();
+  };
+  $('#settings-close').onclick = () => $('#settings').close();
+  $('#install-dir-change').onclick = async () => showSettings(await api.choose_install_dir());
+  for (const name of ['max_download_speed', 'max_download_speed_while_playing']) {
+    $(`#${name}`).onchange = (event) => saveSetting(name, event.target.value);
+  }
+  for (const name of ['auto_updates', 'cloud_saves', 'update_notice', 'starts_with_windows']) {
+    $(`#${name}`).onchange = (event) => saveSetting(name, event.target.checked);
+  }
   for (const folder of document.querySelectorAll('[data-folder]')) {
     folder.onclick = () => api.open_config_folder(folder.dataset.folder);
   }

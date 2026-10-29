@@ -175,6 +175,30 @@ def test_epic_overlay(lgd_home, tmp_path, monkeypatch):
     assert api.set_overlay(False)['enabled'] is False and registry['overlay_path'] is None
 
 
+def test_settings_read_and_write_the_config(lgd_home, tmp_path):
+    lgd_home.mkdir()
+    (lgd_home / 'config.ini').write_text('[Heirloom]\nmax_download_speed = 500K\ndisable_cloud_save_sync = true\n')
+    api = GuiApi(None, lambda: {})
+    settings = api.settings()
+    assert settings['max_download_speed'] == 0.49 and settings['max_download_speed_while_playing'] == 0
+    assert settings['cloud_saves'] is False and settings['auto_updates'] is True
+
+    games = tmp_path / 'My Games'
+    api.set_setting('install_dir', str(games))
+    api.set_setting('max_download_speed_while_playing', '2.5')
+    settings = api.set_setting('cloud_saves', True)
+    assert (settings['install_dir'], settings['max_download_speed_while_playing'], settings['cloud_saves']) == \
+        (str(games), 2.5, True)
+    config = (lgd_home / 'config.ini').read_text()
+    assert 'disable_cloud_save_sync = false' in config and 'max_download_speed_while_playing = 2.5' in config
+
+    for name, value in (('max_download_speed', 'fast'), ('install_dir', 'relative/games'), ('theme', 'neon'),
+                        ('auto_updates', 'yes')):
+        with pytest.raises(ValueError):
+            api.set_setting(name, value)
+    assert api.settings()['max_download_speed'] == 0.49, 'a refused value changes nothing'
+
+
 def test_the_window_opens_as_it_was_left(lgd_home):
     api = GuiApi(None, lambda: {})
     assert api.view() == {'filter': 'all', 'sort': 'title', 'rail_collapsed': False}
