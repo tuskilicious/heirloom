@@ -1,8 +1,7 @@
 ; Heirloom's Windows installer, built with Inno Setup 6 (https://jrsoftware.org/isinfo.php) from PyInstaller's
-; folder build of heirloom.exe in installer\build\heirloom (see .github/workflows/build-base.yml):
+; folder build in installer\build\heirloom (installer\heirloom.spec, see .github/workflows/build-base.yml):
 ;   iscc /DAppVersion=0.24.0 installer\heirloom.iss
-; The folder build starts faster than the one-file one, and runs no launcher process whose job would end the copy
-; of itself "heirloom gui" starts to open the window without a terminal.
+; The shortcuts run heirloom-gui.exe, a windowed program that opens the window without any terminal showing.
 ; It installs for the current user, so it needs no administrator rights, and leaves the config folder
 ; (~/.config/heirloom, with the login and game list) in place when uninstalling.
 
@@ -49,14 +48,14 @@ Type: filesandordirs; Name: "{app}\_internal"
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\Heirloom"; Filename: "{app}\heirloom.exe"; Parameters: "gui"; Comment: "Your Epic Games library"; Flags: runminimized
-Name: "{autodesktop}\Heirloom"; Filename: "{app}\heirloom.exe"; Parameters: "gui"; Comment: "Your Epic Games library"; Tasks: desktopicon; Flags: runminimized
+Name: "{autoprograms}\Heirloom"; Filename: "{app}\heirloom-gui.exe"; Comment: "Your Epic Games library"
+Name: "{autodesktop}\Heirloom"; Filename: "{app}\heirloom-gui.exe"; Comment: "Your Epic Games library"; Tasks: desktopicon
 
 [Registry]
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; Tasks: addtopath; Check: NotInPath
 
 [Run]
-Filename: "{app}\heirloom.exe"; Parameters: "gui"; Description: "Open Heirloom"; Flags: nowait postinstall skipifsilent runminimized
+Filename: "{app}\heirloom-gui.exe"; Description: "Open Heirloom"; Flags: nowait postinstall skipifsilent
 
 [Code]
 function PathEntry(Path: string): Integer;
