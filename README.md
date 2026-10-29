@@ -142,7 +142,8 @@ The sidebar switches between all your games, the installed ones and the ones wit
 Installed games are in colour and the others are not; a download assembles its game's cover tile by tile, sharpening from a blur as it goes.
 The game you played last is at the top with your time played, ready to continue.
 On Windows, Customize in the sidebar also installs the Epic overlay, which games using Epic Online Services show friends, invites and achievements in, turns it on and off for every game, updates and removes it (as `heirloom eos-overlay` does).
-Each installed game's Manage button (`⋯`) opens its folder, adds a desktop shortcut that plays it (Windows), verifies and repairs its files, syncs its cloud saves and uninstalls it.
+Each installed game's Manage button (`⋯`) opens its folder, adds a desktop shortcut that plays it (Windows), sets its launch options (`start_params` in its section of the config), verifies and repairs its files, syncs its cloud saves and uninstalls it.
+Above the library, "Free on Epic" shows the games Epic gives away now and next, from Epic's public list, marking the ones already in your library; Claim on Epic opens a game's store page in your browser, where claiming happens.
 Everything it does runs as a regular `heirloom` command, so playtime, plugins and resumable downloads work the same.
 Install opens a dialog with the game's download size, its size on disk and the space free in the install folder (warning when it won't fit), a folder for this game alone, and whether to install its DLC too; its sizes come from Epic a few seconds after it opens.
 Downloads run one at a time; Stop stops one cleanly, and installing it again continues where it stopped.

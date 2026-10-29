@@ -188,6 +188,7 @@ function openManage(game, anchor, at = null) {
     game.update ? menuItem('Play without updating', 'play', () => run(api.play(game.app_name))) : null,
     menuItem('Open folder', 'folder', () => run(api.open_folder(game.app_name))),
     menuItem('Create desktop shortcut', 'desktop', () => run(api.create_shortcut(game.app_name))),
+    menuItem('Launch options…', 'play', () => openLaunchOptions(game)),
     menuItem('Verify and repair', 'repair', () => run(api.repair(game.app_name))),
     game.cloud_saves ? menuItem('Sync cloud saves', 'cloud', () => run(api.sync_saves(game.app_name))) : null,
     el('hr'),
@@ -216,6 +217,49 @@ function assemble(entry, percent) {
   [...entry.tiles.children].forEach((tile, index) => {
     tile.classList.toggle('lit', percent >= (TILE_TURN[index] + 1) / TILES * 100);
   });
+}
+
+// a game's launch options, in a small dialog of their own
+let launchGame = null;
+
+async function openLaunchOptions(game) {
+  launchGame = game;
+  $('#launch-title').textContent = game.title;
+  $('#launch-options').value = await api.launch_options(game.app_name);
+  $('#launch-error').hidden = true;
+  $('#launch').showModal();
+  $('#launch-options').focus();
+}
+
+async function saveLaunchOptions() {
+  try {
+    await api.set_launch_options(launchGame.app_name, $('#launch-options').value);
+    $('#launch').close();
+  } catch (failure) {
+    $('#launch-error').textContent = `Those options don't parse: ${failure.message || failure}`;
+    $('#launch-error').hidden = false;
+  }
+}
+
+// the games Epic gives away: free now, then next, with a way to claim them on Epic's store
+let freeKey = '';
+
+function renderFree() {
+  const games = state.free_games || [];
+  $('#free').hidden = !games.length || filter !== 'all' || Boolean($('#search').value.trim());
+  const key = JSON.stringify(games);
+  if (key === freeKey) return;
+  freeKey = key;
+  const day = (iso) => new Date(iso).toLocaleDateString(undefined, {weekday: 'short', day: 'numeric', month: 'short'});
+  $('#free-list').replaceChildren(...games.map((game) => el('article', {className: `free-game${game.now ? '' : ' next'}`},
+    el('div', {className: 'free-cover'}, game.image ? el('img', {src: game.image, alt: '', loading: 'lazy'}) : null,
+      el('span', {className: 'badge', textContent: game.now ? 'Free now' : 'Next'})),
+    el('div', {className: 'free-text'},
+      el('h3', {className: 'title', textContent: game.title}),
+      el('p', {className: 'status', textContent: game.now ? `Until ${day(game.end)}` : `From ${day(game.start)}`})),
+    game.owned ? el('span', {className: 'owned', textContent: 'In your library'})
+      : button(game.now ? 'Claim on Epic' : 'See on Epic', game.now ? 'primary' : 'ghost',
+        () => api.open_store(game.url)))));
 }
 
 // the install dialog: opens at once with where the game goes, and fills in its sizes when Epic has said
@@ -506,6 +550,7 @@ function render() {
   renderRail();
   renderShelves();
   renderHero();
+  renderFree();
   renderLibrary();
   renderJobs();
 }
@@ -687,6 +732,7 @@ function setFilter(name) {
   smoothly(() => {
     renderShelves();
     renderHero();
+    renderFree();
     renderLibrary();
   });
 }
@@ -699,6 +745,7 @@ async function start() {
   $('#refresh').onclick = () => run(api.refresh());
   $('#search').oninput = () => smoothly(() => {
     renderHero();
+    renderFree();
     renderLibrary();
   });
   for (const item of document.querySelectorAll('[data-filter]')) {
@@ -794,6 +841,12 @@ async function start() {
     $('#settings').showModal();
   };
   $('#settings-close').onclick = () => $('#settings').close();
+  $('#launch-close').onclick = () => $('#launch').close();
+  $('#launch-cancel').onclick = () => $('#launch').close();
+  $('#launch-save').onclick = saveLaunchOptions;
+  $('#launch-options').onkeydown = (event) => {
+    if (event.key === 'Enter') saveLaunchOptions();
+  };
   const closeInstall = () => {
     installing = null;
     $('#install').close();

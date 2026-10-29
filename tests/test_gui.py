@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from heirloom.gui.app import GuiApi, Job, Jobs, read_library
+from heirloom.gui.app import GuiApi, Job, Jobs, free_games, read_library
 from heirloom.lfs.lgndry import LGDLFS
 from heirloom.models.game import GameAsset, PlaytimeSession
 from heirloom.themes import load_themes
@@ -173,6 +173,46 @@ def test_epic_overlay(lgd_home, tmp_path, monkeypatch):
     assert api.set_overlay(True) == {'installed': True, 'version': '1.3.5', 'enabled': True}
     assert registry['overlay_path'] == str(overlay_dir)
     assert api.set_overlay(False)['enabled'] is False and registry['overlay_path'] is None
+
+
+def test_free_games_now_and_next(monkeypatch):
+    def promotion(percentage, start):
+        return [{'promotionalOffers': [{'startDate': start, 'endDate': start.replace('-22', '-29'),
+                                        'discountSetting': {'discountPercentage': percentage}}]}]
+
+    def element(title, namespace, slug, now=(), upcoming=()):
+        return {'title': title, 'namespace': namespace, 'productSlug': slug,
+                'keyImages': [{'type': 'Thumbnail', 'url': f'https://cdn/{namespace}.jpg'}],
+                'promotions': {'promotionalOffers': list(now), 'upcomingPromotionalOffers': list(upcoming)}}
+
+    elements = [
+        element('Later Game', 'later', 'later-game', upcoming=promotion(0, '2026-11-22T15:00:00Z')),
+        element('Sker Ritual', 'sker', 'sker-ritual-aac702', now=promotion(0, '2026-10-22T15:00:00Z')),
+        element('On Sale', 'sale', 'on-sale', now=promotion(60, '2026-10-22T15:00:00Z')),
+        element('Odd Slug', 'odd', 'javascript:alert(1)', now=promotion(0, '2026-10-22T15:00:00Z')),
+        element('Old Promo', 'old', 'old-promo'),
+    ]
+    response = type('Response', (), {'raise_for_status': lambda self: None,
+                                     'json': lambda self: {'data': {'Catalog': {'searchStore': {'elements': elements}}}}})
+    monkeypatch.setattr('requests.get', lambda *args, **kwargs: response())
+    games = free_games('GB', 'en-GB', owned={'odd'})
+    assert [(game['title'], game['now'], game['owned']) for game in games] == [
+        ('Sker Ritual', True, False), ('Odd Slug', True, True), ('Later Game', False, False)], \
+        'free ones only, now before next, and the ones in the library marked'
+    assert games[0]['url'] == 'https://store.epicgames.com/p/sker-ritual-aac702'
+    assert games[1]['url'] == 'https://store.epicgames.com/free-games', 'only store pages of Epic'
+    with pytest.raises(ValueError):
+        GuiApi(None, lambda: {}).open_store('https://example.com/claim')
+
+
+def test_launch_options(fake_game):
+    api = GuiApi(None, lambda: {})
+    assert api.launch_options('Fish') == ''
+    assert api.set_launch_options('Fish', '  -dx11 -skipintro ') == '-dx11 -skipintro'
+    assert '[Fish]\nstart_params = -dx11 -skipintro' in (fake_game / 'config.ini').read_text()
+    with pytest.raises(ValueError):
+        api.set_launch_options('Fish', '-name "unclosed')
+    assert api.set_launch_options('Fish', '') == '' and api.launch_options('Fish') == ''
 
 
 def test_installing_with_a_folder_and_dlc(fake_game, tmp_path):
