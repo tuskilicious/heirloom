@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.27.0 "Keepsake" (2026-10-29)
+
+Heirloom's window becomes a launcher to keep: games manage and update themselves, themes and plugins are a click
+away, and the library assembles, glides and glows.
 
 ### New
 - **Game updates install by themselves.** Each time the window refreshes your library, when it opens and then every
