@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### New
+- **Heirloom keeps going in the tray.** On Windows, closing the window hides it to an icon in the tray, and downloads
+  and updates go on; double-click the icon to bring the window back, or choose Quit in its menu. Opening Heirloom
+  again brings back the window already open rather than a second one. Customize can start Heirloom with Windows,
+  hidden in the tray, so games are updated before you sit down to play (`heirloom gui --background` does the same by
+  hand). The library is refreshed every hour while Heirloom runs, window open or not.
+
 ## 0.27.0 "Keepsake" (2026-10-29)
 
 Heirloom's window becomes a launcher to keep: games manage and update themselves, themes and plugins are a click

@@ -52,6 +52,8 @@ Name: "{autoprograms}\Heirloom"; Filename: "{app}\heirloom-gui.exe"; Comment: "Y
 Name: "{autodesktop}\Heirloom"; Filename: "{app}\heirloom-gui.exe"; Comment: "Your Epic Games library"; Tasks: desktopicon
 
 [Registry]
+; "Start with Windows", which the window turns on: taken away with Heirloom
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "Heirloom"; Flags: uninsdeletevalue dontcreatekey
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; Tasks: addtopath; Check: NotInPath
 
 [Run]

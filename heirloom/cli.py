@@ -992,13 +992,14 @@ class HeirloomCLI:
                 config = ['-c', args.config_file] if args.config_file else []
                 try:
                     # breaking away from the job the one-file executable runs in, which would end it with this one
-                    subprocess.Popen([*heirloom_command(), *config, 'gui'],
+                    background = ['--background'] if args.background else []
+                    subprocess.Popen([*heirloom_command(), *config, 'gui', *background],
                                      creationflags=subprocess.CREATE_NO_WINDOW | subprocess.CREATE_BREAKAWAY_FROM_JOB)
                     return
                 except OSError as e:
                     logger.debug(f'Could not open the window without the terminal: {e!r}')
         from heirloom.gui.app import run
-        run(args.config_file, lambda: self.available_themes()[0])
+        run(args.config_file, lambda: self.available_themes()[0], background=args.background)
 
     def manage_queue(self, args, install_options):
         queue = DownloadQueue(self.core.lgd.path / 'queue.json')
@@ -3148,8 +3149,10 @@ def main():
     cx_parser = subparsers.add_parser('crossover', help='Setup CrossOver for launching games (macOS only)')
     download_saves_parser = subparsers.add_parser('download-saves', help='Download all cloud saves')
     egl_sync_parser = subparsers.add_parser('egl-sync', help='Setup or run Epic Games Launcher sync')
-    subparsers.add_parser('gui', help='Open the Heirloom window: your library, installs, updates and playing')
+    gui_parser = subparsers.add_parser('gui', help='Open the Heirloom window: your library, installs, updates and playing')
     eos_overlay_parser = subparsers.add_parser('eos-overlay', help='Manage EOS Overlay install')
+    gui_parser.add_argument('--background', action='store_true',
+                            help='Start in the tray, with the window hidden (as when starting with Windows)')
     import_parser = subparsers.add_parser('import', help='Import an already installed game',
                                           aliases=('import-game',), hide_aliases=True)
     info_parser = subparsers.add_parser('info', help='Prints info about specified app name or manifest')
