@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.28.0 "Homestead" (2026-10-29)
+
+Heirloom settles in as your launcher: it keeps going in the tray and starts with Windows, asks where a game goes
+before installing it, has its settings in the window, and shows what Epic gives away.
 
 ### New
 - **Heirloom keeps going in the tray.** On Windows, closing the window hides it to an icon in the tray, and downloads
