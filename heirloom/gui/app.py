@@ -5,6 +5,7 @@ do, so playtime, plugins and resumable downloads work just as they do in the ter
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -35,6 +36,8 @@ WEB = Path(__file__).parent / 'web'
 STORE = Path(__file__).parent.parent / 'store'
 # the window's own look, Keeper Light, in web/style.css
 WINDOW_THEME = 'heirloom'
+# how the window shows the library, kept between runs in window.json: the first of each is the default
+VIEW_CHOICES = {'filter': ('all', 'installed', 'updates'), 'sort': ('title', 'recent', 'played', 'size')}
 # portrait art first, as the library shows covers
 COVER_TYPES = ('DieselGameBoxTall', 'OfferImageTall', 'DieselStoreFrontTall', 'Thumbnail', 'DieselGameBox')
 # landscape art for the banner of the game played last
@@ -407,6 +410,29 @@ class GuiApi:
 
     def stop(self, job_id: int) -> None:
         self._jobs.stop(job_id)
+
+    def view(self) -> dict[str, Any]:
+        """How the window was left: the shelf, the sort order, and whether the sidebar was collapsed"""
+        try:
+            saved = json.loads((self._lgd().path / 'window.json').read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            saved = {}
+        if not isinstance(saved, dict):
+            saved = {}
+        view: dict[str, Any] = {key: saved.get(key) if saved.get(key) in choices else choices[0]
+                                for key, choices in VIEW_CHOICES.items()}
+        view['rail_collapsed'] = saved.get('rail_collapsed') is True
+        return view
+
+    def set_view(self, view: dict[str, Any]) -> None:
+        """Keeps how the window shows the library for the next time; anything unknown is left out"""
+        kept = self.view()
+        kept |= {key: view[key] for key, choices in VIEW_CHOICES.items() if view.get(key) in choices}
+        if isinstance(view.get('rail_collapsed'), bool):
+            kept['rail_collapsed'] = view['rail_collapsed']
+        path = self._lgd().path
+        path.mkdir(parents=True, exist_ok=True)
+        (path / 'window.json').write_text(json.dumps(kept, indent=2), encoding='utf-8')
 
     def themes(self) -> dict[str, Any]:
         lgd = self._lgd()

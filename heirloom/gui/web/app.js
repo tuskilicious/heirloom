@@ -13,6 +13,13 @@ const DOING = {install: 'Installing', uninstall: 'Uninstalling', repair: 'Repair
 const DONE = {install: 'Installed', uninstall: 'Uninstalled', repair: 'Repaired', sync: 'Saves synced',
   play: 'Game closed', login: 'Logged in', overlay: 'Installed and on', overlay_remove: 'Removed'};
 const SHELVES = {all: 'Library', installed: 'Installed', updates: 'Updates'};
+// how the library can be ordered; the library comes sorted by title, which breaks ties
+const SORTS = {
+  title: ['A to Z', () => 0],
+  recent: ['Recently played', (a, b) => (b.last_played || '').localeCompare(a.last_played || '')],
+  played: ['Most played', (a, b) => b.played - a.played],
+  size: ['Largest', (a, b) => (b.size || 0) - (a.size || 0)],
+};
 const RING = '<svg class="meter" viewBox="0 0 24 24" aria-hidden="true">'
   + '<circle class="track" cx="12" cy="12" r="10" pathLength="100"/>'
   + '<circle class="value" cx="12" cy="12" r="10" pathLength="100"/></svg>';
@@ -20,6 +27,9 @@ const RING = '<svg class="meter" viewBox="0 0 24 24" aria-hidden="true">'
 let api;
 let state = {user: null, refreshing: false, notice: '', games: [], jobs: []};
 let filter = 'all';
+let sort = 'title';
+// the notice closed with its X, until a different one comes
+let dismissedNotice = '';
 let libraryOrder = '';
 let jobOrder = '';
 let heroKey = '';
@@ -156,15 +166,15 @@ function menuItem(label, iconName, onclick, className = '') {
   }, icon(iconName), label);
 }
 
-function showMenu(menu, anchor, children) {
+function showMenu(menu, anchor, children, at = null) {
   menu.replaceChildren(...children.filter(Boolean));
   // closing it with Escape or a choice puts the keyboard back on the button
   menu.onbeforetoggle = (event) => {
     if (event.newState === 'closed' && anchor.isConnected && menu.contains(document.activeElement)) anchor.focus();
   };
   menu.showPopover();
-  // below the button, or above it when there's no room, and kept inside the window
-  const button = anchor.getBoundingClientRect();
+  // below the button (or the pointer), or above it when there's no room, and kept inside the window
+  const button = at ? {left: at.x, right: at.x, top: at.y, bottom: at.y} : anchor.getBoundingClientRect();
   const {width, height} = menu.getBoundingClientRect();
   const below = button.bottom + 6 + height <= innerHeight;
   menu.style.left = `${Math.max(8, Math.min(button.right - width, innerWidth - width - 8))}px`;
@@ -172,7 +182,7 @@ function showMenu(menu, anchor, children) {
   (menu.querySelector('[aria-checked="true"]') || menu.querySelector('[role^="menuitem"]')).focus();
 }
 
-function openManage(game, anchor) {
+function openManage(game, anchor, at = null) {
   showMenu($('#manage'), anchor, [
     el('p', {className: 'menu-title', textContent: game.title}),
     game.update ? menuItem('Play without updating', 'play', () => run(api.play(game.app_name))) : null,
@@ -184,7 +194,7 @@ function openManage(game, anchor) {
     menuItem('Uninstall', 'trash', () => {
       if (confirm(`Uninstall ${game.title}? Its files will be deleted.`)) run(api.uninstall(game.app_name));
     }, 'danger'),
-  ]);
+  ], at);
 }
 
 // the tiles over a cover being downloaded, and the order they light up in as it goes: scattered, the same every time
@@ -240,6 +250,7 @@ function card(game) {
     };
     entry.info = el('div', {className: 'info'}, entry.title, entry.status);
     entry.node = el('article', {className: 'card'}, entry.cover);
+    entry.node.dataset.app = game.app_name;
     cards.set(game.app_name, entry);
   }
   const job = activeJob(game.app_name);
@@ -281,9 +292,16 @@ function skeleton() {
     el('div', {className: 'cover'}), el('div', {className: 'line'}), el('div', {className: 'line'}));
 }
 
+// searching ignores case, spaces and punctuation: "hitman3" finds "HITMAN 3"
+const searchable = (text) => text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+
 function shown(game, query) {
   return (filter === 'all' || (filter === 'installed' && game.installed) || (filter === 'updates' && game.update))
-    && (!query || game.title.toLowerCase().includes(query) || game.app_name.toLowerCase().includes(query));
+    && (!query || searchable(game.title).includes(query) || searchable(game.app_name).includes(query));
+}
+
+function sorted(games) {
+  return sort === 'title' ? games : [...games].sort(SORTS[sort][1]);
 }
 
 function emptyText(query) {
@@ -298,17 +316,18 @@ function emptyText(query) {
 }
 
 function renderLibrary() {
-  const query = $('#search').value.trim().toLowerCase();
+  const query = searchable($('#search').value);
   const library = $('#library');
   const loading = state.refreshing && !state.games.length && Boolean(state.user);
-  const entries = state.games.map(card);
-  const order = loading ? 'loading' : state.games.map((game) => game.app_name).join('\n');
+  const games = sorted(state.games);
+  const entries = games.map(card);
+  const order = loading ? 'loading' : games.map((game) => game.app_name).join('\n');
   if (order !== libraryOrder) {
     libraryOrder = order;
     library.replaceChildren(...(loading ? Array.from({length: 12}, skeleton) : entries.map((entry) => entry.node)));
   }
   let count = 0;
-  state.games.forEach((game, index) => {
+  games.forEach((game, index) => {
     const entry = entries[index];
     const show = shown(game, query);
     // a card coming into view rises in, after the ones before it
@@ -377,8 +396,8 @@ function renderRail() {
   refresh.disabled = state.refreshing;
   refresh.classList.toggle('busy', state.refreshing);
   refresh.querySelector('.label').textContent = state.refreshing ? 'Refreshing…' : 'Refresh';
-  $('#notice').hidden = !state.notice;
-  $('#notice').textContent = state.notice;
+  $('#notice').hidden = !state.notice || state.notice === dismissedNotice;
+  $('#notice-text').textContent = state.notice;
   // only ever a link to a release page on GitHub
   const update = $('#heirloom-update');
   const release = state.update && state.update.url.startsWith('https://github.com/') ? state.update : null;
@@ -571,6 +590,25 @@ function smoothly(update) {
   });
 }
 
+// keeps the shelf, the sort order and the sidebar for the next time the window opens
+function saveView() {
+  api.set_view({filter, sort, rail_collapsed: $('#rail').classList.contains('collapsed')});
+}
+
+function setSort(name) {
+  sort = name;
+  $('#sort-name').textContent = SORTS[name][0];
+  smoothly(renderLibrary);
+}
+
+function setRailCollapsed(collapsed) {
+  $('#rail').classList.toggle('collapsed', collapsed);
+  const toggle = $('#rail-toggle');
+  toggle.setAttribute('aria-expanded', String(!collapsed));
+  toggle.title = collapsed ? 'Expand the sidebar' : 'Collapse the sidebar';
+  toggle.querySelector('.label').textContent = collapsed ? 'Expand' : 'Collapse';
+}
+
 function setFilter(name) {
   filter = name;
   for (const item of document.querySelectorAll('[data-filter]')) {
@@ -594,13 +632,59 @@ async function start() {
     renderHero();
     renderLibrary();
   });
-  for (const item of document.querySelectorAll('[data-filter]')) item.onclick = () => setFilter(item.dataset.filter);
+  for (const item of document.querySelectorAll('[data-filter]')) {
+    item.onclick = () => {
+      setFilter(item.dataset.filter);
+      saveView();
+    };
+  }
   $('#rail-toggle').onclick = () => {
-    const collapsed = $('#rail').classList.toggle('collapsed');
-    const toggle = $('#rail-toggle');
-    toggle.setAttribute('aria-expanded', String(!collapsed));
-    toggle.title = collapsed ? 'Expand the sidebar' : 'Collapse the sidebar';
-    toggle.querySelector('.label').textContent = collapsed ? 'Expand' : 'Collapse';
+    setRailCollapsed(!$('#rail').classList.contains('collapsed'));
+    saveView();
+  };
+  $('#sort').onclick = (event) => showMenu($('#sort-menu'), event.currentTarget, [
+    el('p', {className: 'menu-title', textContent: 'Sort by'}),
+    ...Object.entries(SORTS).map(([name, [label]]) => {
+      const item = menuItem(label, name === sort ? 'done' : 'sort', () => {
+        setSort(name);
+        saveView();
+      });
+      item.setAttribute('role', 'menuitemradio');
+      item.setAttribute('aria-checked', String(name === sort));
+      return item;
+    }),
+  ]);
+  $('#notice-close').onclick = () => {
+    dismissedNotice = state.notice;
+    renderRail();
+  };
+  // Escape empties the search, then leaves it
+  $('#search').onkeydown = (event) => {
+    if (event.key !== 'Escape') return;
+    if (!event.target.value) {
+      event.target.blur();
+      return;
+    }
+    event.target.value = '';
+    event.target.dispatchEvent(new Event('input'));
+  };
+  const gameOf = (event) => {
+    const node = event.target.closest('.card[data-app]');
+    return node && {node, game: state.games.find((game) => game.app_name === node.dataset.app)};
+  };
+  // a double click on an installed game plays it
+  $('#library').ondblclick = (event) => {
+    const found = gameOf(event);
+    if (!found || !found.game || !found.game.installed || event.target.closest('button')
+      || activeJob(found.game.app_name)) return;
+    run(api.play(found.game.app_name));
+  };
+  // a right click on an installed game opens its Manage menu where it was clicked
+  $('#library').oncontextmenu = (event) => {
+    const found = gameOf(event);
+    if (!found) return;
+    event.preventDefault();
+    if (found.game && found.game.installed) openManage(found.game, found.node, {x: event.clientX, y: event.clientY});
   };
   $('#activity-toggle').onclick = () => {
     const collapsed = $('#activity').classList.toggle('collapsed');
@@ -654,7 +738,11 @@ async function start() {
       $('#search').focus();
     }
   });
-  moveMarker();
+  // the window opens as it was left
+  const view = await api.view();
+  setRailCollapsed(view.rail_collapsed);
+  setSort(view.sort);
+  setFilter(view.filter);
   await showThemes();
   await poll();
   api.refresh();

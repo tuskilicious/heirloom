@@ -21,6 +21,13 @@
   your CSS: a `.css` file in the `themes` folder, or a theme's `gui_css`. Themes are chosen in Customize, which only
   offers a choice once there is one. High contrast follows Windows' contrast settings. The setting is `window_theme`
   in the config file.
+- **Quality of life in the window.** A sort button orders the library A to Z, by when you last played, by playtime or
+  by size, the cards gliding into place. The window opens on the shelf, order and sidebar you left it with. Search
+  ignores case, spaces and punctuation, and Escape empties it. Double-click an installed game to play it, right-click
+  it for its Manage menu, and notices can be closed.
+- **Fluent, a window theme in the manner of Windows 11.** A Mica-dark base with the library on a rounded layer,
+  acrylic menus and panels with a fine grain, the light-blue accent, Fluent's calm deceleration, and Segoe UI
+  Variable, which Windows 11 has.
 - **Impeccable, a second window theme.** A light, editorial-poster look to choose in Customize: cream pages beside a
   burnt-orange sidebar, an amber accent with burnt-orange text where amber would be too faint to read, and Chakra Petch
   with JetBrains Mono labels, bundled so it works offline. No glows; shadows are tinted warm.

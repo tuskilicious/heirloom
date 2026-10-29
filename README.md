@@ -137,7 +137,8 @@ Open the window: your library with cover art, and Play, Install and Update butto
 heirloom gui
 ````
 It needs pywebview, which the prebuilt Windows executable includes (install the `webview` extra otherwise; on Linux this also needs GTK WebKit, and macOS is untested).
-The sidebar switches between all your games, the installed ones and the ones with an update; `/` jumps to the search.
+The sidebar switches between all your games, the installed ones and the ones with an update, and the sort button orders them A to Z, by when you last played, by playtime or by size; the window opens on the shelf, order and sidebar you left it with.
+`/` jumps to the search, which ignores case, spaces and punctuation ("hitman3" finds HITMAN 3), and Escape empties it. Double-click an installed game to play it, and right-click it for its Manage menu.
 Installed games are in colour and the others are not; a download assembles its game's cover tile by tile, sharpening from a blur as it goes.
 The game you played last is at the top with your time played, ready to continue.
 On Windows, Customize in the sidebar also installs the Epic overlay, which games using Epic Online Services show friends, invites and achievements in, turns it on and off for every game, updates and removes it (as `heirloom eos-overlay` does).
@@ -904,7 +905,7 @@ Colours are only used when printing to a terminal, and never when `NO_COLOR` is 
 
 The window of `heirloom gui` has its own look, apart from the terminal's theme. Your own CSS can restyle it: once there is a window theme besides Heirloom's own, Customize in the sidebar switches between them, and its Themes folder button opens the folder to add or remove them.
 High contrast needs no theme: the window follows Windows' contrast themes and "Increase contrast" settings by itself.
-Heirloom comes with one more window theme, Impeccable: a light, editorial-poster look with cream pages, a burnt-orange sidebar, an amber accent, and Chakra Petch with JetBrains Mono (bundled, under the SIL Open Font License). It is also a worked example of a window theme, in [`heirloom/gui/web/themes`](heirloom/gui/web/themes).
+Heirloom comes with two more window themes. Fluent is Heirloom in the manner of Windows 11: a Mica-dark base with the library on a rounded layer, acrylic menus and panels, the light-blue accent and Segoe UI Variable (Windows 11's own font, so nothing is bundled). Impeccable is a light, editorial-poster look with cream pages, a burnt-orange sidebar, an amber accent, and Chakra Petch with JetBrains Mono (bundled, under the SIL Open Font License). They are also worked examples of window themes, in [`heirloom/gui/web/themes`](heirloom/gui/web/themes).
 
 The quickest window theme is a CSS file in the `themes` folder, such as `paper-white.css`, which shows as "Paper white".
 A terminal theme can bring window CSS too: name a CSS file next to the theme in `gui_css`.

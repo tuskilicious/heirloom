@@ -175,6 +175,17 @@ def test_epic_overlay(lgd_home, tmp_path, monkeypatch):
     assert api.set_overlay(False)['enabled'] is False and registry['overlay_path'] is None
 
 
+def test_the_window_opens_as_it_was_left(lgd_home):
+    api = GuiApi(None, lambda: {})
+    assert api.view() == {'filter': 'all', 'sort': 'title', 'rail_collapsed': False}
+    api.set_view({'filter': 'installed', 'sort': 'recent', 'rail_collapsed': True})
+    api.set_view({'sort': 'nonsense', 'filter': None, 'colour': 'red'})
+    assert GuiApi(None, lambda: {}).view() == {'filter': 'installed', 'sort': 'recent', 'rail_collapsed': True}, \
+        'kept between runs, and anything unknown left out'
+    (lgd_home / 'window.json').write_text('not json')
+    assert api.view()['sort'] == 'title'
+
+
 def test_open_folder_of_a_game_whose_files_are_gone(fake_game, tmp_path):
     for child in (tmp_path / 'FishGame').iterdir():
         child.unlink()
@@ -216,8 +227,9 @@ def test_theme_css_for_the_window(lgd_home, tmp_path):
 
     api = GuiApi(None, lambda: themes)
     assert api.themes() == {'active': 'heirloom', 'css': '', 'themes': [
-        {'name': 'heirloom', 'title': 'Heirloom'}, {'name': 'impeccable', 'title': 'Impeccable'},
-        {'name': 'neon', 'title': 'neon'}, {'name': 'paper_white', 'title': 'Paper white'}]}, \
+        {'name': 'heirloom', 'title': 'Heirloom'}, {'name': 'fluent', 'title': 'Fluent'},
+        {'name': 'impeccable', 'title': 'Impeccable'}, {'name': 'neon', 'title': 'neon'},
+        {'name': 'paper_white', 'title': 'Paper white'}]}, \
         "its own look and the ones that come with it, then themes with CSS and CSS files, " \
         "not terminal themes or the same CSS twice"
     assert 'Chakra Petch' in api.use_theme('impeccable')['css']

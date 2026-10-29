@@ -1,0 +1,76 @@
+/*
+  Fluent: Heirloom in the manner of Windows 11. A Mica-dark base with the library on a rounded layer, acrylic menus
+  and panels with a fine grain, the light-blue accent, 4/8px corners, and Fluent's calm deceleration rather than a
+  spring. The type is Segoe UI Variable, which Windows 11 has; elsewhere Segoe UI or the system font stands in.
+  A window theme that comes with Heirloom.
+*/
+:root {
+  --bg: #202020;
+  --surface: #2b2b2b;
+  --surface-raised: #333333;
+  --border: #3a3a3a;
+  --text: #ffffff;
+  --muted: #c5c5c5;
+  --accent: #60cdff;
+  --accent-text: #001a2a;
+  --logo: #ffffff;
+  --danger: #ff99a4;
+  --progress: var(--accent);
+  --unlit: grayscale(1) brightness(.6);
+  --radius: 8px;
+  --radius-control: 4px;
+  --font: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --shadow: 0 8px 16px rgb(0 0 0 / 26%);
+  /* Fluent motion decelerates into place, without overshoot */
+  --ease: cubic-bezier(0, 0, 0, 1);
+  --spring: cubic-bezier(0, 0, 0, 1);
+  /* acrylic: a tint, a strong blur, and a faint grain so it reads as material rather than smoke */
+  --glass: color-mix(in srgb, #2c2c2c 74%, transparent);
+  --glass-strong: color-mix(in srgb, #2c2c2c 88%, transparent);
+  --glass-blur: blur(30px) saturate(1.25);
+  --glass-edge: rgb(255 255 255 / 8%);
+  --glass-shine: inset 0 1px 0 rgb(255 255 255 / 6%);
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .035 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  color-scheme: dark;
+}
+
+/* the navigation pane sits on Mica; the library is a layer above it, with a rounded top-left corner */
+.rail { background: transparent; border-right: 0; }
+.main {
+  margin-top: 8px;
+  border: 1px solid var(--glass-edge);
+  border-width: 1px 0 0 1px;
+  border-top-left-radius: var(--radius);
+  background: rgb(58 58 58 / 30%);
+}
+
+/* the selected item: a quiet fill and a short accent pill, no glow */
+.shelf-marker { border-color: transparent; background: rgb(255 255 255 / 6%); box-shadow: none; }
+.shelf-marker::before { top: 12px; bottom: 12px; box-shadow: none; }
+.shelves .rail-item[aria-pressed="true"] .icon { filter: none; }
+.shelves .rail-item[aria-pressed="true"] .count { background: rgb(255 255 255 / 9%); color: var(--text); }
+.rail-item:hover:not(:disabled) { background: rgb(255 255 255 / 4%); }
+
+/* acrylic surfaces carry the grain */
+.top, .menu, .dock, .panel, .info { background-image: var(--grain); }
+
+/* standard and accent buttons, Fluent style: a subtle fill with a darker bottom edge */
+.ghost, .sort, .icon-button.ghost {
+  border-color: rgb(255 255 255 / 7%);
+  border-bottom-color: rgb(255 255 255 / 3%);
+  background-color: rgb(255 255 255 / 6%);
+}
+.ghost:hover:not(:disabled), .sort:hover:not(:disabled) { background-color: rgb(255 255 255 / 8%); }
+.primary { border-color: rgb(255 255 255 / 8%); border-bottom-color: rgb(0 0 0 / 14%); }
+.primary:hover:not(:disabled) { filter: brightness(.92); box-shadow: none; }
+button:active:not(:disabled) { transform: none; opacity: .8; }
+
+/* focus: Fluent's white ring */
+:focus-visible { outline: 2px solid #ffffff; outline-offset: 1px; }
+
+/* no glows */
+.brand, .empty .mark { animation: none; }
+.card:hover .cover { box-shadow: var(--shadow), 0 0 0 1px rgb(255 255 255 / 14%); }
+.switch:checked { box-shadow: none; }
+.ambient { opacity: .2; }
+.dock-progress { box-shadow: none; }
