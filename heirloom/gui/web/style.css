@@ -342,7 +342,10 @@ kbd {
   flex-direction: column;
   gap: 11px;
   min-width: 0;
-  animation: rise .5s var(--ease) both;
+}
+
+.card.rising {
+  animation: rise .5s var(--ease) backwards;
   animation-delay: calc(var(--i, 0) * 22ms);
 }
 
@@ -354,8 +357,8 @@ kbd {
   overflow: hidden;
   border-radius: var(--radius);
   background: var(--surface-raised);
-  /* the tilt toward the pointer is the transform, the lift is translate: each moves at its own pace */
-  transform: perspective(700px) rotateX(var(--ry, 0deg)) rotateY(var(--rx, 0deg));
+  /* the tilt toward the pointer is the transform, the lift is translate: each moves at its own pace. Only a
+     cover under the pointer is tilted, so the rest of a large library stays cheap to draw */
   transition: transform .7s var(--spring), translate .5s var(--spring), box-shadow .4s var(--ease);
 }
 
@@ -386,6 +389,7 @@ kbd {
 }
 
 .card:hover .cover {
+  transform: perspective(700px) rotateX(var(--ry, 0deg)) rotateY(var(--rx, 0deg));
   translate: 0 -6px;
   box-shadow: var(--shadow), 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent),
     0 16px 44px -14px color-mix(in srgb, var(--accent) 45%, transparent);
@@ -394,15 +398,9 @@ kbd {
 .cover .initials { font-size: 34px; font-weight: 700; color: var(--muted); }
 
 /* games not installed are unlit, until the pointer or keyboard is on them */
-.shade {
-  position: absolute;
-  inset: 0;
-  backdrop-filter: var(--unlit);
-  transition: opacity .3s ease;
-  pointer-events: none;
-}
-
-.card:not([data-state="unlit"]) .shade, .card[data-state="unlit"]:is(:hover, :focus-within) .shade { opacity: 0; }
+.cover img { transition: filter .3s ease; }
+.card[data-state="unlit"] .cover img { filter: var(--unlit); }
+.card[data-state="unlit"]:is(:hover, :focus-within) .cover img { filter: none; }
 
 /* a download assembles its cover: the art sharpens from a blur and gains its colour as it goes (--fill, 0 to 100),
    while tiles over it light up in a scattered order and snap away, until it is whole and crisp */
@@ -459,8 +457,8 @@ kbd {
   padding: 9px 11px 10px;
   border: 1px solid var(--glass-edge);
   border-radius: calc(var(--radius) - 6px);
-  background: var(--glass);
-  backdrop-filter: var(--glass-blur);
+  /* a tint rather than live blur: there is one per game */
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
   box-shadow: var(--glass-shine);
   text-align: left;
   transition: opacity .2s ease, transform .4s var(--spring);
@@ -505,7 +503,7 @@ kbd {
 
 .card:is(:hover, :focus-within) .cover .actions { opacity: 1; transform: none; }
 @media (hover: none) { .cover .actions { opacity: 1; transform: none; } }
-.cover .ghost { background: color-mix(in srgb, var(--surface-raised) 80%, transparent); backdrop-filter: blur(8px); }
+.cover .ghost { background: color-mix(in srgb, var(--surface-raised) 92%, transparent); }
 .cover .ghost:hover:not(:disabled) { background: var(--surface-raised); }
 .cover .icon-button { color: var(--text); }
 

@@ -18,6 +18,7 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from heirloom.downloader.queue import heirloom_command, start_job, stop_job
 from heirloom.downloader.throttle import parse_speed
@@ -59,6 +60,10 @@ FOLDER_DIALOG = 20
 VIEW_CHOICES = {'filter': ('all', 'installed', 'updates'), 'sort': ('title', 'recent', 'played', 'size')}
 # portrait art first, as the library shows covers
 COVER_TYPES = ('DieselGameBoxTall', 'OfferImageTall', 'DieselStoreFrontTall', 'Thumbnail', 'DieselGameBox')
+# covers are drawn at most this big, at twice their size on screen: hundreds of originals are slow to decode
+COVER_SIZE = (440, 586)
+# Epic's image servers, which resize on request
+RESIZABLE = ('cdn1.epicgames.com', 'cdn2.unrealengine.com')
 # landscape art for the banner of the game played last
 ART_TYPES = ('DieselGameBox', 'DieselStoreFrontWide', 'OfferImageWide')
 
@@ -98,9 +103,14 @@ def logged_in_user(lgd: LGDLFS) -> str | None:
     return userdata.get('displayName') if 'refresh_token' in userdata else None
 
 
-def image_url(game: Game | None, kinds: tuple[str, ...]) -> str:
+def image_url(game: Game | None, kinds: tuple[str, ...], size: tuple[int, int] | None = None) -> str:
+    """The first of kinds a game has an image of; at size (width, height) when Epic's image server can resize it"""
     images = {image.get('type'): image.get('url') for image in game.metadata.get('keyImages', [])} if game else {}
-    return next((images[kind] for kind in kinds if images.get(kind)), '')
+    url = next((images[kind] for kind in kinds if images.get(kind)), '')
+    if url and size and urlparse(url).hostname in RESIZABLE:
+        width, height = size
+        url += f'{"&" if "?" in url else "?"}h={height}&quality=medium&resize=1&w={width}'
+    return url
 
 
 def open_in_file_manager(path: str | Path) -> None:
@@ -194,7 +204,7 @@ def read_library(lgd: LGDLFS) -> list[dict[str, Any]]:
         games.append({
             'app_name': app_name,
             'title': game.app_title if game else igame.title if igame else app_name,
-            'cover': image_url(game, COVER_TYPES),
+            'cover': image_url(game, COVER_TYPES, COVER_SIZE),
             'art': image_url(game, ART_TYPES),
             'installed': igame is not None,
             'version': igame.version if igame else version,

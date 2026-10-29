@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- **The window is fast with a large library again.** Every card carried two live blurs of what was behind it (the
+  name plate and the grey of a game not installed), a 3D layer of its own and an animation it never let go of, so a
+  library of hundreds of games made the window crawl. Name plates are now a tint, a game not installed is greyed by a
+  filter on its cover, the tilt only exists under the pointer, and only the first screenful fades in. Covers come
+  from Epic's image server at the size they are drawn rather than as originals, and a window hidden in the tray stops
+  redrawing. The frosted glass stays on the header, the menus and the downloads panel.
+
 ## 0.28.0 "Homestead" (2026-10-29)
 
 Heirloom settles in as your launcher: it keeps going in the tray and starts with Windows, asks where a game goes
