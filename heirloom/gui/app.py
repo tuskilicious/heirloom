@@ -19,6 +19,13 @@ from pathlib import Path
 from typing import Any
 
 from heirloom.downloader.queue import heirloom_command, start_job, stop_job
+from heirloom.gui.background import (
+    Tray,
+    claim_window,
+    start_with_windows,
+    starts_with_windows,
+    startup_command,
+)
 from heirloom.lfs.eos import (
     add_registry_entries,
     query_registry_entries,
@@ -376,6 +383,15 @@ class GuiApi:
         with self._lock:
             self._notice = notice
 
+    def background(self) -> dict[str, Any]:
+        """Whether Heirloom keeps going in the tray, and whether it starts with Windows (only from the installer)"""
+        return {'tray': Tray.available(), 'startup_possible': startup_command() is not None,
+                'starts_with_windows': starts_with_windows()}
+
+    def set_starts_with_windows(self, enabled: bool) -> dict[str, Any]:
+        start_with_windows(enabled)
+        return self.background()
+
     def overlay(self) -> dict[str, Any] | None:
         """
         The Epic overlay, which games using Epic Online Services show friends, invites and achievements in: whether
@@ -526,13 +542,54 @@ class GuiApi:
             self._notice, self._update, self._refreshing = notice, update, False
 
 
-def run(config_file: str | None, load_themes: Callable[[], dict[str, Theme]]) -> None:
+def run(config_file: str | None, load_themes: Callable[[], dict[str, Theme]], background: bool = False) -> None:
+    """
+    Opens the window, or brings back the one already open. With the tray (Windows), closing the window hides it
+    and Heirloom keeps going, downloads and updates included, until Quit in the tray's menu; background starts it
+    hidden there.
+    """
     import webview
 
     api = GuiApi(config_file, load_themes)
-    webview.create_window('Heirloom', url=str(WEB / 'index.html'), js_api=api, width=1280, height=820,
-                          min_size=(760, 560), background_color='#01211a')
+    tray = Tray.available()
+    # the window, once there is one: a second "heirloom gui" may ask for it before
+    opened: list[webview.Window] = []
+
+    def show() -> None:
+        for window in opened:
+            window.show()
+            window.restore()
+
+    if not claim_window(api._lgd().path / 'window.port', show):
+        return
+    window = webview.create_window('Heirloom', url=str(WEB / 'index.html'), js_api=api, width=1280, height=820,
+                                   min_size=(760, 560), background_color='#01211a', hidden=background and tray)
+    assert window is not None
+    opened.append(window)
+    quitting = threading.Event()
+
+    def closing() -> bool:
+        if not tray or quitting.is_set():
+            return True
+        window.hide()
+        return False
+
+    def quit_heirloom() -> None:
+        quitting.set()
+        window.destroy()
+
+    window.events.closing += closing
+    if tray:
+        Tray(show, quit_heirloom).start()
+
+    def refresh_hourly() -> None:
+        # new versions turn up while Heirloom keeps going, and their updates start by themselves
+        while not quitting.wait(60 * 60):
+            api.refresh()
+
+    threading.Thread(target=refresh_hourly, daemon=True).start()
     try:
         webview.start()
     finally:
+        quitting.set()
         api._close()

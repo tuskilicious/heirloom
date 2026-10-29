@@ -486,6 +486,23 @@ async function poll() {
   }
 }
 
+// keeping going in the tray, and starting with Windows
+function showBackground(info) {
+  $('#background-section').hidden = !info.tray;
+  if (!info.tray) return;
+  $('#background-row').replaceChildren(...[
+    el('span', {className: 'row-text'},
+      el('span', {className: 'what', textContent: 'Start with Windows'}),
+      el('span', {className: 'detail', textContent: info.startup_possible
+        ? 'In the tray, so games update before you play. Closing the window keeps Heirloom there; Quit is in its menu.'
+        : 'Install Heirloom with its installer to start it with Windows. Closing the window keeps it in the tray.'})),
+    info.startup_possible ? el('input', {
+      type: 'checkbox', role: 'switch', className: 'switch', checked: info.starts_with_windows,
+      ariaLabel: 'Start with Windows', onchange: async (event) => showBackground(await api.set_starts_with_windows(event.target.checked)),
+    }) : null,
+  ].filter(Boolean));
+}
+
 // the Epic overlay's row in Customize: what it is, how it stands, and what can be done with it
 function showOverlay(info) {
   $('#overlay-section').hidden = !info;
@@ -714,6 +731,7 @@ async function start() {
   $('#customize-open').onclick = async () => {
     // themes and plugins added in their folders meanwhile show up too
     await showThemes();
+    showBackground(await api.background());
     showOverlay(await api.overlay());
     showPlugins(await api.plugins());
     $('#customize').showModal();
@@ -747,8 +765,6 @@ async function start() {
   await poll();
   api.refresh();
   setInterval(poll, 1000);
-  // new versions turn up while the window stays open, and their updates start by themselves
-  setInterval(() => api.refresh(), 60 * 60 * 1000);
 }
 
 if (window.pywebview && window.pywebview.api) start();
