@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.31.0 "Workbench" (2026-10-30)
+
+The window can now move games, add ones already on disk, manage DLC, show how cloud saves stand, and activate
+Ubisoft games, all things only the terminal or Epic's launcher could do before.
 
 ### Added
 - **Move a game** to another folder or drive, from Move… in its Manage menu. Heirloom checks there is room on the
