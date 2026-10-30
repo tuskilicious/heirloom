@@ -151,6 +151,16 @@ def test_commands_for_each_action(fake_game):
     assert logged_in.state()['user'] == 'Tester'
     assert logged_in._command(play)[-3:] == ['-y', 'launch', 'Fish']
 
+    # with the latest versions fetched within the hour, a game that is up to date skips fetching them again
+    logged_in._fetched = time.monotonic()
+    assert logged_in._command(play)[-1] == '--skip-version-check'
+    logged_in._fetched = time.monotonic() - 2 * 60 * 60
+    assert logged_in._command(play)[-1] == 'Fish', 'not with versions over an hour old'
+    LGDLFS().assets = {'Linux': [GameAsset(app_name='Fish', build_version='2')]}
+    updating = api()
+    updating._fetched = time.monotonic()
+    assert updating._command(play)[-1] == 'Fish', 'a game with an update is checked, and refused, as before'
+
 
 def test_updates_start_by_themselves(fake_game, monkeypatch):
     LGDLFS().assets = {'Linux': [GameAsset(app_name='Fish', build_version='2')]}

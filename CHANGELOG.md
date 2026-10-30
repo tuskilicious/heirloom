@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.29.0 "Kindling" (2026-10-30)
+
+Games start sooner after Play.
+
+### Changed
+- **Games start sooner.** Before a game started, Heirloom asked Epic whether its saved login was still good, fetched
+  the versions of every game to check this one was current, and checked for updates of Heirloom and the overlay, one
+  after another. Now:
+  - a saved login with time left is used as it is, and only logged in again if Epic refuses it;
+  - launching checks for no updates (the window's hourly refresh does that);
+  - Play in the window skips the version check when the window fetched the versions within the hour and the game
+    has no update;
+  - a newer cloud save is looked for at the same time as the launch is prepared.
+
+  Preparing to launch Celeste the way the window does went from 3.7 to 2.2 seconds (a dry run from source; the
+  installed build starts about 0.3 seconds faster than that).
+
 ## 0.28.3 "Homestead" (2026-10-30)
 
 Heirloom offers its own new releases the day they are out.
