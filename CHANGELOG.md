@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.30.0 "Lantern" (2026-10-30)
+
+The window opens in about half the time, and can wait in the tray from the moment Windows starts.
 
 ### Changed
 - **The window opens in about half the time.** Each time it opened, it first asked whether a Heirloom window was
