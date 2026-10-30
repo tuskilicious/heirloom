@@ -303,16 +303,20 @@ class HeirloomCore:
 
     def check_for_updates(self, force=False):
         cached = self.lgd.get_cached_version()
-        version_info = cached['data']
-        if force or not version_info or (datetime.now().timestamp() - cached['last_update']) > 24*3600:
-            version_info = self.lgdapi.get_version_information()
-            # The feed is upstream Legendary's: its release_info is about Legendary, but its other data
-            # (EGL settings, game workarounds) still applies. Heirloom's own release comes from GitHub.
+        version_info, fetched = cached['data'], cached['last_update']
+        now = datetime.now().timestamp()
+        if force or not version_info or now - fetched > 24*3600:
+            version_info, fetched = self.lgdapi.get_version_information(), now
+        # The feed is upstream Legendary's: its release_info is about Legendary, but its other data
+        # (EGL settings, game workarounds) still applies. Heirloom's own release comes from GitHub, asked
+        # each hour rather than each day, so a new release is offered the day it is out.
+        if fetched == now or now - version_info.get('heirloom_release_checked', 0) > 3600:
+            version_info['heirloom_release_checked'] = now
             try:
                 version_info['heirloom_release'] = self.lgdapi.get_heirloom_release()
             except Exception as e:
                 self.log.debug(f'Reading the latest Heirloom release failed: {e!r}')
-            self.lgd.set_cached_version(version_info)
+            self.lgd.set_cached_version(version_info, fetched)
 
         release = version_info.get('heirloom_release')
         self.update_available = bool(release) and is_newer(release['version'], __version__)
