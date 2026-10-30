@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.28.3 "Homestead" (2026-10-30)
+
+Heirloom offers its own new releases the day they are out.
+
+### Fixed
+- **A new Heirloom is offered within the hour.** Heirloom asked GitHub for a newer version of itself only once a
+  day, with the rest of the update feed, so a release could go unnoticed until the next day. It now asks each
+  hour; the feed is still fetched once a day.
+
 ## 0.28.2 "Homestead" (2026-10-30)
 
 Heirloom's window opens faster and stays smooth with a large library.
