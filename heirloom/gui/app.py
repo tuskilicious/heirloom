@@ -15,6 +15,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -68,13 +69,20 @@ RESIZABLE = ('cdn1.epicgames.com', 'cdn2.unrealengine.com')
 # landscape art for the banner of the game played last
 ART_TYPES = ('DieselGameBox', 'DieselStoreFrontWide', 'OfferImageWide')
 
-# downloads (and uninstalls and repairs) run one at a time, as heirloom installs only one game at a time
-DOWNLOADS = ('install', 'uninstall', 'repair', 'overlay')
+# downloads (and uninstalls, repairs, moves and imports) run one at a time, as heirloom changes only one game's
+# install at a time
+DOWNLOADS = ('install', 'uninstall', 'repair', 'overlay', 'move', 'import')
 COMMANDS = {
     'install': ['-y', 'install'],
     'uninstall': ['-y', 'uninstall'],
     'repair': ['-y', 'repair'],
-    'sync': ['-y', 'sync-saves'],
+    'move': ['-y', 'move'],
+    # with the game's DLC that is there too
+    'import': ['-y', 'import'],
+    # the save folder Epic gives is used, as --yes alone skips games without one chosen yet
+    'sync': ['-y', 'sync-saves', '--accept-path'],
+    # all the Ubisoft games of the account at once, which is how Epic activates them
+    'activate': ['-y', 'activate', '--uplay'],
     # the Epic overlay: installing also turns it on, and installing again updates it
     'overlay': ['-y', 'eos-overlay', 'install'],
     'overlay_remove': ['-y', 'eos-overlay', 'remove'],
@@ -195,9 +203,14 @@ def read_library(lgd: LGDLFS) -> list[dict[str, Any]]:
     latest = {(platform, asset.app_name): asset.build_version
               for platform, assets in (lgd.assets or {}).items() for asset in assets}
     playtime = lgd.get_playtime()
+    metas = {app_name: lgd.get_game_meta(app_name) for app_name in set(lgd.get_game_app_names()) | set(installed)}
+    # how much DLC with files of its own each game has, by the game's catalog id
+    downloadable = {app_name for _, app_name in latest}
+    dlcs = Counter(game.metadata.get('mainGameItem', {}).get('id') for game in metas.values()
+                   if game and game.is_dlc and game.app_name in downloadable)
     games = []
-    for app_name in set(lgd.get_game_app_names()) | set(installed):
-        game, igame = lgd.get_game_meta(app_name), installed.get(app_name)
+    for app_name, game in metas.items():
+        igame = installed.get(app_name)
         if game and game.is_dlc:
             continue
         version = latest.get((igame.platform if igame else 'Windows', app_name))
@@ -212,7 +225,9 @@ def read_library(lgd: LGDLFS) -> list[dict[str, Any]]:
             'update': bool(igame and version and version != igame.version),
             'size': igame.install_size if igame else None,
             'store': game.third_party_store if game else None,
+            'ubisoft': bool(game and game.partner_link_type == 'ubisoft'),
             'cloud_saves': bool(game and game.supports_cloud_saves),
+            'dlcs': dlcs[game.catalog_item_id] if game and game.catalog_item_id else 0,
             # seconds played, and when the last session ended
             'played': round(sum(session.duration.total_seconds() for session in sessions)),
             'last_played': max(session.end for session in sessions).isoformat() if sessions else None,
@@ -442,6 +457,59 @@ class GuiApi:
 
     def uninstall(self, app_name: str) -> None:
         self._jobs.add('uninstall', app_name, self._title(app_name))
+
+    def move(self, app_name: str, folder: str) -> None:
+        """Moves an installed game into folder, on another drive too when there is room for it there"""
+        if not Path(folder).is_absolute():
+            raise ValueError('Choose a whole path to move it to')
+        title, igame = self._title(app_name), self._lgd().get_installed_game(app_name)
+        if not igame:
+            raise ValueError(f'{title} is not installed')
+        # on the same drive it is only renamed
+        other_drive = Path(folder).anchor.lower() != Path(igame.install_path).anchor.lower()
+        if other_drive and (free := free_space(folder)) is not None and free < igame.install_size:
+            raise ValueError(f'Not enough space there: {title} takes {igame.install_size / 1024 ** 3:.1f} GiB')
+        self._jobs.add('move', app_name, title, [folder])
+
+    def import_game(self, app_name: str, folder: str) -> None:
+        """Adds a game that is already in folder (from another PC or a backup, say) rather than downloading it"""
+        if not Path(folder).is_absolute():
+            raise ValueError("Choose a whole path for the game's folder")
+        self._jobs.add('import', app_name, self._title(app_name), [folder])
+
+    def dlcs(self, app_name: str) -> list[dict[str, Any]]:
+        """The DLC of an installed game with files of its own, and whether each is installed, from the cached files"""
+        lgd = self._lgd()
+        game, igame = lgd.get_game_meta(app_name), lgd.get_installed_game(app_name)
+        if not game or not igame:
+            return []
+        # Epic's list of what the account can download, DLC included; DLC without files of its own isn't in it
+        owned = {asset.app_name for asset in (lgd.assets or {}).get(igame.platform, [])}
+        installed = {dlc.app_name for dlc in lgd.get_installed_list() if dlc.is_dlc}
+        dlcs = [dlc for dlc in map(lgd.get_game_meta, lgd.get_game_app_names())
+                if dlc and dlc.is_dlc and dlc.app_name in owned
+                and dlc.metadata.get('mainGameItem', {}).get('id') == game.catalog_item_id]
+        return [{'app_name': dlc.app_name, 'title': dlc.app_title, 'installed': dlc.app_name in installed}
+                for dlc in sorted(dlcs, key=lambda dlc: dlc.app_title.lower())]
+
+    def save_status(self, app_name: str) -> dict[str, Any]:
+        """
+        Whether a game's saves on this PC or in the cloud are newer, and when each was made. It asks Epic, as
+        "heirloom sync-saves" does, so it takes a moment.
+        """
+        from heirloom.core import HeirloomCore
+        core = HeirloomCore(override_config=self._config_file)
+        igame = core.get_installed_game(app_name)
+        if not igame or not core.login(quick=True):
+            raise ValueError('Could not ask Epic about the cloud saves')
+        saves = sorted(core.get_save_games(app_name), key=lambda save: save.datetime)
+        folder = igame.save_path or core.get_save_path(app_name, platform=igame.platform)
+        status, (local, cloud) = core.check_savegame_state(folder, saves[-1] if saves else None)
+        return {'status': status.name.lower(), 'folder': folder,
+                'local': local.isoformat() if local else None, 'cloud': cloud.isoformat() if cloud else None}
+
+    def activate_ubisoft(self) -> None:
+        self._jobs.add('activate', '', 'Ubisoft Connect')
 
     def repair(self, app_name: str) -> None:
         self._jobs.add('repair', app_name, self._title(app_name))
@@ -683,7 +751,10 @@ class GuiApi:
     def _title(self, app_name: str) -> str:
         self._read.wait()
         with self._lock:
-            return next((game['title'] for game in self._games if game['app_name'] == app_name), app_name)
+            title = next((game['title'] for game in self._games if game['app_name'] == app_name), None)
+        # DLC isn't in the library
+        game = self._lgd().get_game_meta(app_name) if title is None and app_name else None
+        return title or (game.app_title if game else app_name)
 
     def _job_finished(self, job: Job) -> None:
         if job.kind == 'login' and job.status == 'done':

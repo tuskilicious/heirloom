@@ -613,6 +613,8 @@ kbd {
 .sizes dd { margin: 2px 0 0; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .panel-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 14px; }
 .panel-actions button { height: 36px; padding: 0 16px; }
+/* a way around the dialog's main choice, on its own at the left */
+#install-locate { margin-right: auto; }
 
 /* Epic's free games: a row above the library */
 .free { margin: 0 0 30px; }

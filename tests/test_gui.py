@@ -63,14 +63,17 @@ def test_covers_at_card_size_from_epic():
 
 
 def test_library_from_cached_files(fake_game):
-    write_meta(fake_game, 'Fish', 'Fish Game', keyImages=[
+    write_meta(fake_game, 'Fish', 'Fish Game', id='fish', keyImages=[
         {'type': 'Thumbnail', 'url': 'https://cdn/fish-thumb.jpg'},
         {'type': 'DieselGameBoxTall', 'url': 'https://cdn/fish-tall.jpg'},
         {'type': 'DieselGameBox', 'url': 'https://cdn/fish-wide.jpg'}])
-    write_meta(fake_game, 'Goo', 'World of Goo', customAttributes={'CloudSaveFolder': {'value': '{AppData}/Goo'}})
+    write_meta(fake_game, 'Goo', 'World of Goo', customAttributes={'CloudSaveFolder': {'value': '{AppData}/Goo'},
+                                                                   'partnerLinkType': {'value': 'ubisoft'}})
     write_meta(fake_game, 'FishDLC', 'Fish Game Soundtrack', mainGameItem={'id': 'fish'})
+    # DLC that comes with the game has no download of its own, so isn't counted
+    write_meta(fake_game, 'FishHat', 'Fish Hat', mainGameItem={'id': 'fish'})
     lgd = LGDLFS()
-    lgd.assets = {'Linux': [GameAsset(app_name='Fish', build_version='2')],
+    lgd.assets = {'Linux': [GameAsset(app_name='Fish', build_version='2'), GameAsset(app_name='FishDLC')],
                   'Windows': [GameAsset(app_name='Goo', build_version='7')]}
     day = datetime(2026, 10, 26, 20, tzinfo=timezone.utc)
     lgd.add_playtime_session('Fish', PlaytimeSession(day, day + timedelta(hours=2), 0))
@@ -79,10 +82,11 @@ def test_library_from_cached_files(fake_game):
     fish, goo = read_library(LGDLFS())
     assert fish == {'app_name': 'Fish', 'title': 'Fish Game', 'cover': 'https://cdn/fish-tall.jpg',
                     'art': 'https://cdn/fish-wide.jpg', 'installed': True, 'version': '1', 'update': True,
-                    'size': 1024 ** 3, 'store': None, 'cloud_saves': False, 'played': 2.5 * 3600, 'last_played': '2026-10-26T22:00:00+00:00'}
+                    'size': 1024 ** 3, 'store': None, 'ubisoft': False, 'cloud_saves': False, 'dlcs': 1,
+                    'played': 2.5 * 3600, 'last_played': '2026-10-26T22:00:00+00:00'}
     assert goo == {'app_name': 'Goo', 'title': 'World of Goo', 'cover': '', 'art': '', 'installed': False,
-                   'version': '7', 'update': False, 'size': None, 'store': None, 'cloud_saves': True, 'played': 0,
-                   'last_played': None}, 'not installed, and DLC is left out'
+                   'version': '7', 'update': False, 'size': None, 'store': None, 'ubisoft': True,
+                   'cloud_saves': True, 'dlcs': 0, 'played': 0, 'last_played': None}, 'not installed, and DLC is left out'
 
 
 def run_jobs(jobs, kinds, until_done=True):
@@ -143,7 +147,13 @@ def test_commands_for_each_action(fake_game):
                                                                             'install', 'Fish']
     assert logged_out._command(Job(3, 'login', '', 'Epic Games account'))[-1] == 'auth'
     assert logged_out._command(Job(4, 'repair', 'Fish', 'Fish Game'))[-3:] == ['-y', 'repair', 'Fish']
-    assert logged_out._command(Job(5, 'sync', 'Fish', 'Fish Game'))[-3:] == ['-y', 'sync-saves', 'Fish']
+    assert logged_out._command(Job(5, 'sync', 'Fish', 'Fish Game'))[-4:] == ['-y', 'sync-saves', '--accept-path',
+                                                                            'Fish']
+    assert logged_out._command(Job(6, 'move', 'Fish', 'Fish Game', options=['/games']))[-4:] == [
+        '-y', 'move', 'Fish', '/games']
+    assert logged_out._command(Job(7, 'import', 'Fish', 'Fish Game', options=['/fish']))[-4:] == [
+        '-y', 'import', 'Fish', '/fish']
+    assert logged_out._command(Job(8, 'activate', '', 'Ubisoft Connect'))[-3:] == ['-y', 'activate', '--uplay']
 
     (fake_game / 'user.json').write_text(json.dumps({'account_id': 'abc', 'displayName': 'Tester',
                                                      'access_token': 'a', 'refresh_token': 'r'}))
@@ -263,6 +273,29 @@ def test_installing_with_a_folder_and_dlc(fake_game, tmp_path):
     assert api._command(install)[-5:] == ['install', 'Fish', '--base-path', str(tmp_path), '--skip-dlcs']
     with pytest.raises(ValueError):
         api.install('Fish', folder='games')
+
+
+def test_moving_adding_and_dlc_of_a_game(fake_game, tmp_path):
+    write_meta(fake_game, 'Fish', 'Fish Game', id='fish')
+    write_meta(fake_game, 'FishDLC', 'Fish Game Soundtrack', mainGameItem={'id': 'fish'})
+    write_meta(fake_game, 'GooDLC', 'Goo Hat', mainGameItem={'id': 'goo'})
+    LGDLFS().assets = {'Linux': [GameAsset(app_name='Fish'), GameAsset(app_name='FishDLC'),
+                                 GameAsset(app_name='GooDLC')]}
+    api = GuiApi(None, lambda: {}, command=lambda: [sys.executable, '-c', 'pass'])
+    assert api.dlcs('Fish') == [{'app_name': 'FishDLC', 'title': 'Fish Game Soundtrack', 'installed': False}]
+    assert api.dlcs('Goo') == [], 'only installed games have DLC to add'
+
+    api.move('Fish', str(tmp_path / 'Moved'))
+    api.import_game('Goo', str(tmp_path / 'Goo'))
+    api.install('FishDLC')
+    move, add, dlc = api.state()['jobs']
+    assert (move['kind'], move['options']) == ('move', [str(tmp_path / 'Moved')])
+    assert (add['kind'], add['options']) == ('import', [str(tmp_path / 'Goo')])
+    assert dlc['title'] == 'Fish Game Soundtrack', "DLC isn't in the library, its title comes from its metadata"
+    for call in (lambda: api.move('Fish', 'Moved'), lambda: api.import_game('Goo', 'Goo'),
+                 lambda: api.move('Goo', str(tmp_path))):
+        with pytest.raises(ValueError):
+            call()
 
 
 def test_settings_read_and_write_the_config(lgd_home, tmp_path):
