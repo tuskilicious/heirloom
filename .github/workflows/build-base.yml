@@ -86,6 +86,9 @@ jobs:
         $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
         if ($shortcut.TargetPath -ne "$dir\heirloom-gui.exe" -or $shortcut.Arguments) { throw "Start menu shortcut runs: $($shortcut.TargetPath) $($shortcut.Arguments)" }
         if ((Get-ItemProperty HKCU:\Environment).Path -notlike "*$dir*") { throw 'not added to PATH' }
+        $run = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+        $startup = (Get-ItemProperty $run -Name Heirloom -ErrorAction SilentlyContinue).Heirloom
+        if ($startup -ne "`"$dir\heirloom-gui.exe`" --background") { throw "starts with Windows as: $startup" }
         "installed: $version"
 
         Start-Process "$dir\unins000.exe" -ArgumentList $silent -Wait
@@ -94,6 +97,7 @@ jobs:
         if (Test-Path "$dir\heirloom.exe") { throw 'heirloom.exe is still there after uninstalling' }
         if (Test-Path $lnk) { throw 'the Start menu shortcut is still there after uninstalling' }
         if ((Get-ItemProperty HKCU:\Environment).Path -like "*$dir*") { throw 'the PATH entry is still there after uninstalling' }
+        if ((Get-ItemProperty $run).PSObject.Properties.Name -contains 'Heirloom') { throw 'still starts with Windows after uninstalling' }
         'uninstalled cleanly'
 
     - uses: actions/upload-artifact@v7

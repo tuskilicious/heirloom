@@ -39,6 +39,7 @@ SolidCompression=yes
 [Tasks]
 Name: "addtopath"; Description: "Add Heirloom to PATH, to use the ""heirloom"" command in a terminal"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "startup"; Description: "Start Heirloom with Windows, in the tray, so it opens at once and games update before you play (Settings turns this off)"
 
 [InstallDelete]
 ; files of the previous version that this one may not have
@@ -52,7 +53,9 @@ Name: "{autoprograms}\Heirloom"; Filename: "{app}\heirloom-gui.exe"; Comment: "Y
 Name: "{autodesktop}\Heirloom"; Filename: "{app}\heirloom-gui.exe"; Comment: "Your Epic Games library"; Tasks: desktopicon
 
 [Registry]
-; "Start with Windows", which the window turns on: taken away with Heirloom
+; "Start with Windows", ticked by default and turned on and off in the window's Settings too: taken away with
+; Heirloom. The value is what background.startup_command() writes
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Heirloom"; ValueData: """{app}\heirloom-gui.exe"" --background"; Tasks: startup
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "Heirloom"; Flags: uninsdeletevalue dontcreatekey
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; Tasks: addtopath; Check: NotInPath
 

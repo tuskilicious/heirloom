@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- **The window opens in about half the time.** Each time it opened, it first asked whether a Heirloom window was
+  already open, through a port that the last Heirloom to quit had left behind; Windows takes about two seconds to say
+  nothing answers there. It no longer waits for that, and Heirloom removes the port when it quits. With a copy of a
+  564-game library, the time to the window's first call to Heirloom went from 4.3 to 1.9 seconds.
+- **Covers load from the disk.** The window keeps its browser profile (in the `webview` folder next to Heirloom's
+  config), so covers it showed before come from the disk cache rather than from Epic each time it opens.
+- **A window brought back from the tray is up to date at once**, rather than at the next refresh a second later.
+- **The installer starts Heirloom with Windows**, in the tray, unless you untick it. It then opens at once, and games
+  update before you play. Settings turns it off.
+
 ## 0.29.0 "Kindling" (2026-10-30)
 
 Games start sooner after Play.
