@@ -26,6 +26,7 @@ const RING = '<svg class="meter" viewBox="0 0 24 24" aria-hidden="true">'
 
 let api;
 let state = {user: null, refreshing: false, notice: '', games: [], jobs: []};
+let libraryDrawn = '';
 let filter = 'all';
 let sort = 'title';
 // the notice closed with its X, until a different one comes
@@ -336,7 +337,8 @@ function card(game) {
     cards.set(game.app_name, entry);
   }
   const job = activeJob(game.app_name);
-  const key = JSON.stringify([game, job]);
+  // a game changes only with the revision of the games, so the card is not compared field by field
+  const key = `${state.revision}|${JSON.stringify(job)}`;
   if (key === entry.key) return entry;
   entry.key = key;
 
@@ -552,17 +554,23 @@ function renderJobs() {
 
 function render() {
   renderRail();
+  renderJobs();
+  // the library is drawn again only when the games or what is being done to them changed
+  const drawn = `${state.revision}|${state.refreshing}|${state.user}|${JSON.stringify(state.jobs)}`;
+  if (drawn === libraryDrawn) return;
+  libraryDrawn = drawn;
   renderShelves();
   renderHero();
   renderFree();
   renderLibrary();
-  renderJobs();
 }
 
 async function poll() {
   if (document.hidden) return;
   try {
-    state = await api.state();
+    // the games come only when they changed since the ones the page has
+    const next = await api.state(state.revision);
+    state = 'games' in next ? next : {...next, games: state.games, free_games: state.free_games};
   } catch (error) {
     console.error('Reading heirloom\'s state failed', error);
     return;

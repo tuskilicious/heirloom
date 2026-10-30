@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.28.2 "Homestead" (2026-10-30)
+
+Heirloom's window opens faster and stays smooth with a large library.
+
+### Fixed
+- **The window opens faster and no longer hitches every second.** It sent the whole library (about 300 KiB for 564
+  games) from Heirloom to the page once a second; now it sends the games only when they changed, which takes the
+  once-a-second work from about 14 ms to 1 ms. Heirloom also reads each game's details only when something needs
+  them, rather than all of them every time it starts: the window's own calls went from 0.3 s each to a few
+  milliseconds, and the library is read while the window opens rather than before. Commands such as
+  `heirloom launch` start sooner too.
+
 ## 0.28.1 "Homestead" (2026-10-29)
 
 Heirloom's window is fast again with a large library.

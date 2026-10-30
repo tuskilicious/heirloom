@@ -342,14 +342,22 @@ class GuiApi:
         # a newer Heirloom release: version, name and url
         self._update: dict[str, str] | None = None
         self._free_games: list[dict[str, Any]] = []
+        # counts the changes to the games and free games, so the page is sent them only when they changed
+        self._revision = 0
         self._jobs = Jobs(self._command, self._job_finished)
-        self._read_library()
+        # the library is read while the window opens, and the page's first state() waits for it
+        self._read = threading.Event()
+        threading.Thread(target=self._read_library, daemon=True).start()
 
-    def state(self) -> dict[str, Any]:
+    def state(self, revision: int | None = None) -> dict[str, Any]:
+        """What the page shows; the games are left out when the page has this revision of them already"""
+        self._read.wait()
         with self._lock:
-            return {'user': self._user, 'refreshing': self._refreshing, 'notice': self._notice,
-                    'update': self._update, 'games': self._games, 'free_games': self._free_games,
-                    'jobs': self._jobs.snapshot()}
+            state = {'user': self._user, 'refreshing': self._refreshing, 'notice': self._notice,
+                     'update': self._update, 'revision': self._revision, 'jobs': self._jobs.snapshot()}
+            if revision != self._revision:
+                state |= {'games': self._games, 'free_games': self._free_games}
+            return state
 
     def refresh(self) -> None:
         with self._lock:
@@ -663,6 +671,7 @@ class GuiApi:
         return [*self._heirloom(), *config, *COMMANDS[job.kind], *target, *job.options, *offline]
 
     def _title(self, app_name: str) -> str:
+        self._read.wait()
         with self._lock:
             return next((game['title'] for game in self._games if game['app_name'] == app_name), app_name)
 
@@ -673,11 +682,17 @@ class GuiApi:
             self._read_library()
 
     def _read_library(self) -> None:
-        lgd = self._lgd()
-        games = read_library(lgd)
-        user = logged_in_user(lgd)
-        with self._lock:
-            self._games, self._user = games, user
+        try:
+            lgd = self._lgd()
+            games = read_library(lgd)
+            user = logged_in_user(lgd)
+            with self._lock:
+                if games != self._games:
+                    self._games = games
+                    self._revision += 1
+                self._user = user
+        finally:
+            self._read.set()
 
     def _update_games(self) -> str:
         """Starts the updates of installed games by themselves, and says which"""
@@ -685,6 +700,7 @@ class GuiApi:
             return ''
         # games being played or updated, and updates stopped or failed while the window is open: Stop means stop,
         # and a failing update (a full disk, say) waits for the Update button rather than failing every hour
+        self._read.wait()
         skip = {job['app_name'] for job in self._jobs.snapshot()
                 if job['status'] in ('queued', 'running') or (job['kind'] == 'install' and job['status'] != 'done')}
         with self._lock:
@@ -709,7 +725,9 @@ class GuiApi:
                              if game and game.namespace}
                     free = free_games(core.country_code, f'{core.language_code}-{core.country_code}', owned)
                     with self._lock:
-                        self._free_games = free
+                        if free != self._free_games:
+                            self._free_games = free
+                            self._revision += 1
                 except Exception as e:
                     # the free games are a nicety: the library refreshes without them
                     log.warning(f'Could not get the free games: {e!r}')
