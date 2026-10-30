@@ -55,7 +55,17 @@ def test_newer_release_is_an_update(core, monkeypatch):
     monkeypatch.setattr(LGDAPI, 'get_heirloom_release', fetch)
     later = HeirloomCore()
     later.check_for_updates()
-    assert later.update_available, 'read from the cache for a day'
+    assert later.update_available, 'read from the cache within the hour'
+
+    # an hour on, GitHub is asked again for a newer Heirloom, but the feed is kept for its day
+    cached = later.lgd.get_cached_version()
+    cached['data']['heirloom_release_checked'] -= 2 * 3600
+    fetched = cached['last_update']
+    monkeypatch.setattr(LGDAPI, 'get_heirloom_release',
+                        lambda self: release_info(GITHUB_RELEASE | {'tag_name': '9.2.0'}))
+    later.check_for_updates()
+    assert later.get_update_info()['version'] == '9.2.0'
+    assert later.lgd.get_cached_version()['last_update'] == fetched, 'the feed was not fetched again'
 
 
 def test_current_release_is_no_update(core, monkeypatch):
@@ -71,7 +81,8 @@ def test_unreachable_github_is_no_update_and_keeps_the_feed(core, monkeypatch):
     monkeypatch.setattr(LGDAPI, 'get_heirloom_release', offline)
     core.check_for_updates(force=True)
     assert not core.update_available
-    assert core.lgd.get_cached_version()['data'] == {'legendary_config': {}}
+    assert 'heirloom_release' not in core.lgd.get_cached_version()['data']
+    assert core.lgd.get_cached_version()['data']['legendary_config'] == {}
 
 
 def test_window_offers_the_update(lgd_home, monkeypatch):

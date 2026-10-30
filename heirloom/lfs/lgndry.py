@@ -487,10 +487,11 @@ class LGDLFS:
 
         return self._update_info
 
-    def set_cached_version(self, version_data) -> None:
+    def set_cached_version(self, version_data, last_update: float | None = None) -> None:
+        """Caches the update feed; last_update is when it was fetched, now unless given"""
         if not version_data:
             return
-        self._update_info = dict(last_update=time(), data=version_data)
+        self._update_info = dict(last_update=time() if last_update is None else last_update, data=version_data)
         self._save_json('version.json', self._update_info)
 
     def get_cached_sdl_data(self, app_name: str) -> dict | None:
