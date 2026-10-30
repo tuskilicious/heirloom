@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.29.0 "Kindling" (2026-10-30)
+
+Games start sooner after Play.
 
 ### Changed
 - **Games start sooner.** Before a game started, Heirloom asked Epic whether its saved login was still good, fetched
