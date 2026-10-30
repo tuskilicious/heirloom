@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -344,6 +345,8 @@ class GuiApi:
         self._free_games: list[dict[str, Any]] = []
         # counts the changes to the games and free games, so the page is sent them only when they changed
         self._revision = 0
+        # when the latest versions of the games were last fetched (time.monotonic), 0 for not yet
+        self._fetched = 0.0
         self._jobs = Jobs(self._command, self._job_finished)
         # the library is read while the window opens, and the page's first state() waits for it
         self._read = threading.Event()
@@ -665,10 +668,17 @@ class GuiApi:
     def _command(self, job: Job) -> list[str]:
         config = ['-c', self._config_file] if self._config_file else []
         target = [job.app_name] if job.app_name else []
+        self._read.wait()
         with self._lock:
             # without a login only offline launches work, so try that rather than fail
             offline = ['--offline'] if job.kind == 'play' and not self._user else []
-        return [*self._heirloom(), *config, *COMMANDS[job.kind], *target, *job.options, *offline]
+            # with the latest versions fetched within the hour and no update for the game, heirloom need not
+            # fetch them again before it starts the game
+            fresh = time.monotonic() - self._fetched < 60 * 60 if self._fetched else False
+            current = fresh and any(game['app_name'] == job.app_name and game['installed'] and not game['update']
+                                    for game in self._games)
+            skip = ['--skip-version-check'] if job.kind == 'play' and self._user and current else []
+        return [*self._heirloom(), *config, *COMMANDS[job.kind], *target, *job.options, *offline, *skip]
 
     def _title(self, app_name: str) -> str:
         self._read.wait()
@@ -710,7 +720,7 @@ class GuiApi:
         return f'Updating by itself: {", ".join(game["title"] for game in games)}.' if games else ''
 
     def _refresh(self) -> None:
-        notice, update, refreshed = '', None, False
+        notice, update, refreshed, fetched = '', None, False, 0.0
         try:
             from heirloom.core import HeirloomCore
             core = HeirloomCore(override_config=self._config_file)
@@ -720,6 +730,7 @@ class GuiApi:
                 notice = 'Could not log in, try logging in again.'
             else:
                 core.get_game_and_dlc_list(update_assets=True)
+                fetched = time.monotonic()
                 try:
                     owned = {game.namespace for game in map(core.lgd.get_game_meta, core.lgd.get_game_app_names())
                              if game and game.namespace}
@@ -745,6 +756,8 @@ class GuiApi:
         self._read_library()
         # only with the latest versions just fetched, which needs the login to have worked
         if refreshed:
+            with self._lock:
+                self._fetched = fetched
             notice = ' '.join(filter(None, (notice, self._update_games())))
         with self._lock:
             self._notice, self._update, self._refreshing = notice, update, False

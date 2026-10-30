@@ -219,9 +219,11 @@ class HeirloomCore:
             self.log.error(f'Logging in failed with {e!r}, please try again.')
             return False
 
-    def _login(self, lock, force_refresh=False) -> bool:
+    def _login(self, lock, force_refresh=False, quick=False) -> bool:
         """
-        Attempts logging in with existing credentials.
+        Attempts logging in with existing credentials. Quick skips the update checks and uses a saved session with
+        time left as it is, without asking Epic first: for launching a game, where a refused session is refreshed
+        when it is refused.
 
         raises ValueError if no existing credentials or InvalidCredentialsError if the API return an error
         """
@@ -237,6 +239,14 @@ class HeirloomCore:
                 return True
             else:
                 self.logged_in = False
+
+        if quick and not force_refresh and lock.data['expires_at']:
+            dt_exp = datetime.fromisoformat(lock.data['expires_at'][:-1]).replace(tzinfo=timezone.utc)
+            if (dt_exp - datetime.now(timezone.utc)).total_seconds() > 600:
+                self.apply_lgd_config()
+                self.egs.use_session(lock.data)
+                self.logged_in = True
+                return True
 
         # run update check
         if self.update_check_enabled():
@@ -288,9 +298,9 @@ class HeirloomCore:
         self.logged_in = True
         return True
 
-    def login(self, force_refresh=False) -> bool:
+    def login(self, force_refresh=False, quick=False) -> bool:
         with self.lgd.userdata_lock as lock:
-            return self._login(lock, force_refresh=force_refresh)
+            return self._login(lock, force_refresh=force_refresh, quick=quick)
 
     def update_check_enabled(self):
         return not self.lgd.config.getboolean('Heirloom', 'disable_update_check', fallback=False)

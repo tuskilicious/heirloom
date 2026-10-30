@@ -83,6 +83,12 @@ class EPCAPI:
             self._pw_basic = egs_params['client_secret']
             self._oauth_basic = HTTPBasicAuth(self._user_basic, self._pw_basic)
 
+    def use_session(self, session):
+        """Uses a saved session as it is, without asking Epic whether it is still good"""
+        self.session.headers['Authorization'] = f'bearer {session["access_token"]}'
+        self.user = session
+        return self.user
+
     def resume_session(self, session):
         self.session.headers['Authorization'] = f'bearer {session["access_token"]}'
         r = self.session.get(f'https://{self._oauth_host}/account/api/oauth/verify',

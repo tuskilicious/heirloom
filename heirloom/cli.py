@@ -8,6 +8,7 @@ import os
 import shlex
 import subprocess
 import sys
+import threading
 import time
 import webbrowser
 from collections import defaultdict, namedtuple
@@ -21,6 +22,7 @@ from sys import exit, stdout
 from sys import platform as sys_platform
 
 from filelock import FileLock, Timeout
+from requests.exceptions import HTTPError
 
 from heirloom import __codename__, __version__
 from heirloom.core import HeirloomCore
@@ -683,14 +685,16 @@ class HeirloomCLI:
         args.offline = self.core.is_offline_game(app_name) or args.offline
         if not args.offline:
             logger.info('Logging in...')
-            if not self.core.login():
+            # a saved session with time left is used as it is, and refreshed below if Epic refuses it
+            if not self.core.login(quick=True):
                 logger.error('Login failed, cannot continue!')
                 exit(1)
 
             if not args.skip_version_check and not self.core.is_noupdate_game(app_name):
                 logger.info('Checking for updates...')
                 try:
-                    latest = self.core.get_asset(app_name, update=True, platform=igame.platform)
+                    latest = self._logged_in(lambda: self.core.get_asset(app_name, update=True,
+                                                                         platform=igame.platform))
                 except ValueError:
                     logger.fatal(f'Metadata for "{app_name}" does not exist, cannot launch!')
                     exit(1)
@@ -699,15 +703,24 @@ class HeirloomCLI:
                     logger.error('Game is out of date, please update or launch with update check skipping!')
                     exit(1)
 
-        params = self.core.get_launch_parameters(app_name=app_name, offline=args.offline,
-                                                 extra_args=extra, user=args.user_name_override,
-                                                 wine_bin=args.wine_bin, wine_pfx=args.wine_pfx,
-                                                 language=args.language, wrapper=args.wrapper,
-                                                 disable_wine=args.no_wine,
-                                                 executable_override=args.executable_override,
-                                                 crossover_app=args.crossover_app,
-                                                 crossover_bottle=args.crossover_bottle,
-                                                 addon_app_name=addon_app_name)
+        sync_saves = not args.dry_run and not args.json and not args.offline and not args.no_sync_saves             and not self.core.lgd.config.getboolean('Heirloom', 'disable_cloud_save_sync', fallback=False)
+        # a newer cloud save is looked for while the launch is prepared, and is in place before the game starts
+        saves = threading.Thread(target=self._sync_saves_around_launch, args=(igame, True), daemon=True)
+        if sync_saves:
+            saves.start()
+
+        def launch_parameters():
+            return self.core.get_launch_parameters(app_name=app_name, offline=args.offline,
+                                                   extra_args=extra, user=args.user_name_override,
+                                                   wine_bin=args.wine_bin, wine_pfx=args.wine_pfx,
+                                                   language=args.language, wrapper=args.wrapper,
+                                                   disable_wine=args.no_wine,
+                                                   executable_override=args.executable_override,
+                                                   crossover_app=args.crossover_app,
+                                                   crossover_bottle=args.crossover_bottle,
+                                                   addon_app_name=addon_app_name)
+
+        params = launch_parameters() if args.offline else self._logged_in(launch_parameters)
 
         if args.set_defaults:
             self.core.lgd.config[app_name] = dict()
@@ -776,10 +789,8 @@ class HeirloomCLI:
                 logger.info('Environment overrides: {}'.format(', '.join(
                     f'{k}={v}' for k, v in params.environment.items())))
         else:
-            sync_saves = not args.offline and not args.no_sync_saves and not self.core.lgd.config.getboolean(
-                'Heirloom', 'disable_cloud_save_sync', fallback=False)
             if sync_saves:
-                self._sync_saves_around_launch(igame, before_launch=True)
+                saves.join()
 
             logger.info(f'Launching {app_name}...')
             launching = GameLaunching(app_name, igame, full_params, full_env, params.working_directory)
@@ -814,6 +825,19 @@ class HeirloomCLI:
                 logger.info('Not uploading saves while the game may still be running.')
             else:
                 self._sync_saves_around_launch(igame, before_launch=False)
+
+    def _logged_in(self, call):
+        """Makes call, logging in again and making it once more if Epic refused the saved login"""
+        try:
+            return call()
+        except HTTPError as e:
+            if e.response is None or e.response.status_code not in (401, 403):
+                raise
+        logger.info('The saved login was refused, logging in again...')
+        if not self.core.login(force_refresh=True):
+            logger.error('Login failed, cannot continue!')
+            exit(1)
+        return call()
 
     def _sync_saves_around_launch(self, igame: InstalledGame, before_launch: bool) -> None:
         """

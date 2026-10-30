@@ -32,7 +32,7 @@ def saves(self, app_name=''):
 
 
 launch_parameters = HeirloomCore.get_launch_parameters
-HeirloomCore.login = lambda self, force_refresh=False: True
+HeirloomCore.login = lambda self, force_refresh=False, quick=False: True
 HeirloomCore.get_launch_parameters = lambda self, **kw: launch_parameters(self, **(kw | {'offline': True}))
 HeirloomCore.get_save_games = saves
 HeirloomCore.download_saves = lambda self, app_name='', **kw: print('downloaded', kw['manifest_name'] == manifest)
