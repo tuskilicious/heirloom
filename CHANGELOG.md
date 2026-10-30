@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.28.2 "Homestead" (2026-10-30)
+
+Heirloom's window opens faster and stays smooth with a large library.
 
 ### Fixed
 - **The window opens faster and no longer hitches every second.** It sent the whole library (about 300 KiB for 564
