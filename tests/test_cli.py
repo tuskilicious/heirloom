@@ -38,3 +38,16 @@ def test_status_offline(lgd_home):
 def launch_fish(monkeypatch, exit_code, *args):
     monkeypatch.setenv('EXIT_CODE', str(exit_code))
     return run('launch', 'Fish', '--offline', *args)
+
+
+def test_move_a_game_and_fail_when_its_folder_is_taken(fake_game, tmp_path):
+    games = tmp_path / 'Games'
+    result = run('move', 'Fish', str(games))
+    assert result.returncode == 0, result.stderr
+    assert (games / 'FishGame').is_dir() and not (tmp_path / 'FishGame').exists()
+    assert json.loads((fake_game / 'installed.json').read_text())['Fish']['install_path'] == str(games / 'FishGame')
+
+    (tmp_path / 'Taken' / 'FishGame').mkdir(parents=True)
+    result = run('move', 'Fish', str(tmp_path / 'Taken'))
+    assert result.returncode == 1, 'the window shows it failed'
+    assert (games / 'FishGame').is_dir(), 'left where it was'

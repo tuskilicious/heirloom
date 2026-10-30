@@ -9,9 +9,11 @@ const SVG = 'http://www.w3.org/2000/svg';
 const ACTIVE = new Set(['queued', 'running']);
 const DOWNLOADS = new Set(['install', 'uninstall', 'repair', 'overlay']);
 const DOING = {install: 'Installing', uninstall: 'Uninstalling', repair: 'Repairing', sync: 'Syncing saves',
-  play: 'Playing', login: 'Logging in', overlay: 'Installing', overlay_remove: 'Removing'};
+  play: 'Playing', login: 'Logging in', overlay: 'Installing', overlay_remove: 'Removing', move: 'Moving',
+  import: 'Adding', activate: 'Activating'};
 const DONE = {install: 'Installed', uninstall: 'Uninstalled', repair: 'Repaired', sync: 'Saves synced',
-  play: 'Game closed', login: 'Logged in', overlay: 'Installed and on', overlay_remove: 'Removed'};
+  play: 'Game closed', login: 'Logged in', overlay: 'Installed and on', overlay_remove: 'Removed', move: 'Moved',
+  import: 'Added', activate: 'Activated'};
 const SHELVES = {all: 'Library', installed: 'Installed', updates: 'Updates'};
 // how the library can be ordered; the library comes sorted by title, which breaks ties
 const SORTS = {
@@ -139,7 +141,10 @@ function actions(game, job) {
   if (job) {
     return DOWNLOADS.has(job.kind) ? [button('Stop', 'ghost', () => run(api.stop(job.id)), 'x')] : [];
   }
-  if (game.store) return [];
+  // games of other stores are played there; Ubisoft's need adding to the Ubisoft account first
+  if (game.store) {
+    return game.ubisoft ? [button('Activate', 'ghost', () => run(api.activate_ubisoft()), 'done')] : [];
+  }
   const install = () => run(api.install(game.app_name));
   // citron is kept for playing and updating, so a library of uninstalled games isn't a wall of it
   if (!game.installed) return [button('Install', 'ghost', () => openInstall(game), 'download')];
@@ -183,7 +188,19 @@ function showMenu(menu, anchor, children, at = null) {
   (menu.querySelector('[aria-checked="true"]') || menu.querySelector('[role^="menuitem"]')).focus();
 }
 
+const activate = (game) => (game.ubisoft
+  ? menuItem('Activate on Ubisoft Connect', 'done', () => run(api.activate_ubisoft())) : null);
+
 function openManage(game, anchor, at = null) {
+  if (!game.installed) {
+    showMenu($('#manage'), anchor, [
+      el('p', {className: 'menu-title', textContent: game.title}),
+      menuItem('Install…', 'download', () => openInstall(game)),
+      menuItem('Already on this PC…', 'folder', () => locateGame(game)),
+      activate(game),
+    ], at);
+    return;
+  }
   showMenu($('#manage'), anchor, [
     el('p', {className: 'menu-title', textContent: game.title}),
     game.update ? menuItem('Play without updating', 'play', () => run(api.play(game.app_name))) : null,
@@ -191,12 +208,85 @@ function openManage(game, anchor, at = null) {
     menuItem('Create desktop shortcut', 'desktop', () => run(api.create_shortcut(game.app_name))),
     menuItem('Launch options…', 'play', () => openLaunchOptions(game)),
     menuItem('Verify and repair', 'repair', () => run(api.repair(game.app_name))),
-    game.cloud_saves ? menuItem('Sync cloud saves', 'cloud', () => run(api.sync_saves(game.app_name))) : null,
+    menuItem('Move…', 'folder', () => moveGame(game)),
+    game.dlcs ? menuItem('DLC…', 'download', () => openDlcs(game)) : null,
+    game.cloud_saves ? menuItem('Cloud saves…', 'cloud', () => openSaves(game)) : null,
+    activate(game),
     el('hr'),
     menuItem('Uninstall', 'trash', () => {
       if (confirm(`Uninstall ${game.title}? Its files will be deleted.`)) run(api.uninstall(game.app_name));
     }, 'danger'),
   ], at);
+}
+
+// the dialog of the Manage menu's DLC and cloud saves, filled in with its title and rows
+function showDetail(title, ...children) {
+  $('#detail-title').textContent = title;
+  $('#detail-body').replaceChildren(...children.filter(Boolean));
+  if (!$('#detail').open) $('#detail').showModal();
+}
+
+const hint = (text, className = 'hint') => el('p', {className, textContent: text});
+// an action of the dialog: it closes, then the job starts
+const detailAction = (call) => () => {
+  $('#detail').close();
+  run(call());
+};
+
+async function moveGame(game) {
+  const chosen = await api.choose_folder((await api.settings()).install_dir);
+  if (!chosen) return;
+  try {
+    await run(api.move(game.app_name, chosen.folder));
+  } catch (failure) {
+    alert(failure.message || String(failure));
+  }
+}
+
+// adds a game from a folder it is already in, rather than downloading it
+async function locateGame(game, current = null) {
+  const chosen = await api.choose_folder(current || (await api.settings()).install_dir);
+  if (chosen) run(api.import_game(game.app_name, chosen.folder));
+}
+
+async function openDlcs(game) {
+  const dlcs = await api.dlcs(game.app_name);
+  showDetail(`DLC of ${game.title}`, dlcs.length ? el('ul', {className: 'rows'}, ...dlcs.map((dlc) => el('li', {className: 'row'},
+    el('span', {className: 'row-text'}, el('span', {className: 'what', textContent: dlc.title}),
+      el('span', {className: 'detail', textContent: dlc.installed ? 'Installed' : 'Not installed'})),
+    dlc.installed
+      ? iconButton('trash', `Uninstall ${dlc.title}`, 'danger', () => {
+        if (confirm(`Uninstall ${dlc.title}? Its files will be deleted.`)) detailAction(() => api.uninstall(dlc.app_name))();
+      })
+      : button('Install', 'ghost', detailAction(() => api.install(dlc.app_name)), 'download'))))
+    : hint('Its DLC comes with the game.'));
+}
+
+// when a save was made, as "today at 21:40"
+const savedAt = (iso) => `${formatDay(iso)} at ${new Date(iso).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}`;
+const SAVES = {
+  local_newer: (saves) => `The saves on this PC, from ${savedAt(saves.local)}, are newer than the cloud's`
+    + `${saves.cloud ? `, from ${savedAt(saves.cloud)}` : ''}. Syncing uploads them.`,
+  remote_newer: (saves) => `The cloud's saves, from ${savedAt(saves.cloud)}, are newer than the ones on this PC`
+    + `${saves.local ? `, from ${savedAt(saves.local)}` : ''}. Syncing downloads them.`,
+  same_age: (saves) => `In sync: the saves here and in the cloud are from ${savedAt(saves.cloud)}.`,
+  no_save: () => 'No saves yet, here or in the cloud.',
+};
+
+async function openSaves(game) {
+  const title = `Cloud saves of ${game.title}`;
+  const actions = el('div', {className: 'panel-actions'},
+    button('Sync now', 'primary', detailAction(() => api.sync_saves(game.app_name)), 'cloud'));
+  showDetail(title, hint('Asking Epic…'), actions);
+  let found;
+  try {
+    const saves = await api.save_status(game.app_name);
+    found = [hint(SAVES[saves.status](saves)), hint(saves.folder, 'hint path')];
+  } catch (failure) {
+    found = [hint('Could not ask Epic about them. Syncing may still work.')];
+  }
+  // unless it was closed, or another game's opened, meanwhile
+  if ($('#detail').open && $('#detail-title').textContent === title) showDetail(title, ...found, actions);
 }
 
 // the tiles over a cover being downloaded, and the order they light up in as it goes: scattered, the same every time
@@ -808,12 +898,13 @@ async function start() {
       || activeJob(found.game.app_name)) return;
     run(api.play(found.game.app_name));
   };
-  // a right click on an installed game opens its Manage menu where it was clicked
+  // a right click on a game opens its Manage menu where it was clicked
   $('#library').oncontextmenu = (event) => {
     const found = gameOf(event);
     if (!found) return;
     event.preventDefault();
-    if (found.game && found.game.installed) openManage(found.game, found.node, {x: event.clientX, y: event.clientY});
+    // games of other stores have nothing to manage here
+    if (found.game && !found.game.store) openManage(found.game, found.node, {x: event.clientX, y: event.clientY});
   };
   $('#activity-toggle').onclick = () => {
     const collapsed = $('#activity').classList.toggle('collapsed');
@@ -883,6 +974,12 @@ async function start() {
     closeInstall();
     run(api.install(game.app_name, folder === settings.install_dir ? null : folder, dlcs));
   };
+  $('#install-locate').onclick = () => {
+    const {game, folder} = installing;
+    closeInstall();
+    locateGame(game, folder);
+  };
+  $('#detail-close').onclick = () => $('#detail').close();
   $('#install-dir-change').onclick = async () => showSettings(await api.choose_install_dir());
   for (const name of ['max_download_speed', 'max_download_speed_while_playing']) {
     $(`#${name}`).onchange = (event) => saveSetting(name, event.target.value);

@@ -265,6 +265,9 @@
       </ul>
       <p id="install-warning" class="hint error" role="alert" hidden></p>
       <div class="panel-actions">
+        <button type="button" id="install-locate" class="ghost" title="Add it from a folder it is already in, rather than downloading it">
+          <svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg>Already on this PC…
+        </button>
         <button type="button" id="install-cancel" class="ghost">Cancel</button>
         <button type="button" id="install-start" class="primary">
           <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Install
@@ -293,6 +296,17 @@
         <button type="button" id="launch-save" class="primary">Save</button>
       </div>
     </section>
+  </dialog>
+
+  <!-- a game's DLC, or how its cloud saves stand: filled in by the page -->
+  <dialog id="detail" class="panel launch-dialog" aria-labelledby="detail-title">
+    <header class="panel-head">
+      <h2 id="detail-title"></h2>
+      <button type="button" id="detail-close" class="icon-button" title="Close">
+        <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>
+      </button>
+    </header>
+    <section id="detail-body"></section>
   </dialog>
 
   <aside id="activity" class="dock" aria-labelledby="dock-title" hidden>

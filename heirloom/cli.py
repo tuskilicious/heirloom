@@ -6,12 +6,14 @@ import json
 import logging
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 import threading
 import time
 import webbrowser
 from collections import defaultdict, namedtuple
+from contextlib import suppress
 from datetime import datetime, timezone
 from logging.handlers import QueueListener
 from multiprocessing import Queue as MPQueue
@@ -1747,7 +1749,7 @@ class HeirloomCLI:
         if not self.core.lgd.lock_installed():
             logger.fatal('Failed to acquire installed data lock, only one instance of Heirloom may '
                          'install/import/move applications at a time.')
-            return
+            exit(1)
 
         # make sure path is absolute
         args.app_path = os.path.normpath(Path(args.app_path).absolute())
@@ -1755,21 +1757,21 @@ class HeirloomCLI:
 
         if not Path(args.app_path).exists():
             logger.error(f'Specified path "{args.app_path}" does not exist!')
-            return
+            exit(1)
 
         if self.core.is_installed(args.app_name):
             logger.error('Game is already installed!')
-            return
+            exit(1)
 
         if not self.core.login():
             logger.error('Log in failed!')
-            return
+            exit(1)
 
         # do some basic checks
         game = self.core.get_game(args.app_name, update_meta=True, platform=args.platform)
         if not game:
             logger.fatal(f'Did not find game "{args.app_name}" on account.')
-            return
+            exit(1)
 
         if game.is_dlc:
             release_info = game.metadata.get('mainGameItem', {}).get('releaseInfo')
@@ -1779,10 +1781,10 @@ class HeirloomCLI:
                 if not self.core.is_installed(main_game_appname):
                     logger.error(f'Import candidate is DLC but base game "{main_game_title}" '
                                  f'(App name: "{main_game_appname}") is not installed!')
-                    return
+                    exit(1)
             else:
                 logger.fatal('Unable to get base game information for DLC, cannot continue.')
-                return
+                exit(1)
 
         # get everything needed for import from core, then run additional checks.
         manifest, igame = self.core.import_game(game, args.app_path, platform=args.platform)
@@ -1804,12 +1806,12 @@ class HeirloomCLI:
                 if folder and folder not in args.app_path:
                     new_path = Path(args.app_path, folder)
                     logger.info(f'Did you mean "{new_path}"?')
-            return
+            exit(1)
 
         if not game.is_dlc and not Path(exe_path).exists() and not args.disable_check:
             logger.error(f'Game executable could not be found at "{exe_path}", '
                          f'please verify that the specified path is correct.')
-            return
+            exit(1)
 
         if ratio < 0.95:
             logger.warning('Some files are missing from the game installation, install may not '
@@ -1839,7 +1841,9 @@ class HeirloomCLI:
                 if import_dlc:
                     for dlc in dlcs:
                         args.app_name = dlc.app_name
-                        self.import_game(args)
+                        # DLC that isn't there is skipped: the game itself was imported
+                        with suppress(SystemExit):
+                            self.import_game(args)
 
         logger.info(f'{"DLC" if game.is_dlc else "Game"} "{game.app_title}" has been imported.')
 
@@ -3048,13 +3052,13 @@ class HeirloomCLI:
         if not self.core.lgd.lock_installed():
             logger.fatal('Failed to acquire installed data lock, only one instance of Heirloom may '
                          'install/import/move applications at a time.')
-            return
+            exit(1)
 
         app_name = self._resolve_aliases(args.app_name)
         igame = self.core.get_installed_game(app_name, skip_sync=True)
         if not igame:
             logger.error(f'No installed game found for "{app_name}"')
-            return
+            exit(1)
 
         old_base, game_folder = os.path.split(igame.install_path.replace('\\', '/'))
         new_path = str(Path(args.new_path, game_folder))
@@ -3062,22 +3066,20 @@ class HeirloomCLI:
 
         if not args.skip_move:
             try:
-                if not Path(args.new_path).exists():
-                    Path(args.new_path).mkdir(parents=True)
-
-                Path(igame.install_path).rename(new_path)
+                if Path(new_path).exists():
+                    raise FileExistsError(new_path)
+                Path(args.new_path).mkdir(parents=True, exist_ok=True)
+                # to another drive this copies the files, then deletes the old ones
+                shutil.move(igame.install_path, new_path)
             except Exception as e:
-                if isinstance(e, OSError) and e.errno == 18:
-                    logger.error(f'Moving to a different drive is not supported. Move the folder manually to '
-                                 f'"{new_path}" and run "heirloom move {app_name} "{args.new_path}" --skip-move"')
-                elif isinstance(e, FileExistsError):
+                if isinstance(e, FileExistsError):
                     logger.error(f'The target path already contains a folder called "{game_folder}", '
                                  f'please remove or rename it first.')
                 else:
-                    logger.error(f'Moving failed with unknown error {e!r}.')
                     logger.info(f'Try moving the folder manually to "{new_path}" and running '
                                 f'"heirloom move {app_name} "{args.new_path}" --skip-move"')
-                return
+                    logger.error(f'Moving failed with unknown error {e!r}.')
+                exit(1)
         else:
             logger.info('Not moving, just rewriting heirloom metadata...')
 

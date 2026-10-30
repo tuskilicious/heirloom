@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.31.0 "Workbench" (2026-10-30)
+
+The window can now move games, add ones already on disk, manage DLC, show how cloud saves stand, and activate
+Ubisoft games, all things only the terminal or Epic's launcher could do before.
+
+### Added
+- **Move a game** to another folder or drive, from Move… in its Manage menu. Heirloom checks there is room on the
+  other drive first. `heirloom move` now moves across drives too, by copying the files and then deleting the old ones.
+- **Add a game that's already on this PC**, from a copy or another drive, rather than downloading it again: "Already
+  on this PC…" in the install dialog, or in the menu you get by right-clicking a game that isn't installed. Its DLC
+  that is there is added too.
+- **DLC after installing.** DLC… in the Manage menu lists the game's DLC that has files of its own, and installs or
+  uninstalls each one. It only shows for games that have such DLC.
+- **Cloud saves… in the Manage menu** shows whether the saves on this PC or the cloud's are newer, when each was made,
+  and where they are, with Sync now.
+- **Activate on Ubisoft Connect.** Ubisoft games show an Activate button, which adds all your Ubisoft games from Epic
+  to your Ubisoft account, as `heirloom activate --uplay` does.
+
+### Fixed
+- **Sync cloud saves did nothing for a game whose save folder wasn't set yet.** It now uses the folder Epic gives.
+- **`heirloom move` and `heirloom import` exit with code 1 when they fail**, so the window shows them as failed.
+
 ## 0.30.0 "Lantern" (2026-10-30)
 
 The window opens in about half the time, and can wait in the tray from the moment Windows starts.
