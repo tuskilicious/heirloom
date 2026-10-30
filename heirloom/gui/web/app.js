@@ -918,6 +918,8 @@ async function start() {
   await poll();
   api.refresh();
   setInterval(poll, 1000);
+  // a window brought back from the tray is up to date at once, rather than at the next poll
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
 }
 
 if (window.pywebview && window.pywebview.api) start();

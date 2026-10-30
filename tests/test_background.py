@@ -1,5 +1,6 @@
 """Keeping "heirloom gui" going in the background: one window at a time, and starting with Windows."""
 import threading
+import time
 
 import pytest
 
@@ -18,7 +19,9 @@ def test_a_second_window_brings_back_the_first(tmp_path):
 def test_a_stale_port_file_is_taken_over(tmp_path):
     port_file = tmp_path / 'window.port'
     port_file.write_text('1')
+    started = time.monotonic()
     assert claim_window(port_file, lambda: None), 'no window answers on that port, so this one opens'
+    assert time.monotonic() - started < 1, 'without waiting for the refusal'
     assert port_file.read_text() != '1'
 
 

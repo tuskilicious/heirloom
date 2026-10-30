@@ -34,7 +34,9 @@ def claim_window(port_file: Path, on_show: Callable[[], None]) -> bool:
     next one, through a socket on localhost whose port is kept in port_file.
     """
     try:
-        with socket.create_connection(('127.0.0.1', int(port_file.read_text())), timeout=2) as other:
+        # an open window accepts at once; with none, Windows takes about two seconds to refuse, so it is not waited
+        # for: the port file is left behind each time Heirloom quits
+        with socket.create_connection(('127.0.0.1', int(port_file.read_text())), timeout=0.25) as other:
             other.sendall(SHOW)
             return False
     except (OSError, ValueError):

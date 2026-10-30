@@ -781,7 +781,9 @@ def run(config_file: str | None, load_themes: Callable[[], dict[str, Theme]], ba
             window.show()
             window.restore()
 
-    if not claim_window(api._lgd().path / 'window.port', show):
+    config_dir = api._lgd().path
+    port_file = config_dir / 'window.port'
+    if not claim_window(port_file, show):
         return
     window = webview.create_window('Heirloom', url=str(WEB / 'index.html'), js_api=api, width=1280, height=820,
                                    min_size=(760, 560), background_color='#01211a', hidden=background and tray)
@@ -810,7 +812,10 @@ def run(config_file: str | None, load_themes: Callable[[], dict[str, Theme]], ba
 
     threading.Thread(target=refresh_hourly, daemon=True).start()
     try:
-        webview.start()
+        # a profile of its own that is kept, so covers come from the disk cache rather than Epic each time
+        webview.start(private_mode=False, storage_path=str(config_dir / 'webview'))
     finally:
         quitting.set()
         api._close()
+        # the next "heirloom gui" need not ask a window that is gone
+        port_file.unlink(missing_ok=True)
