@@ -73,8 +73,6 @@ class LGDLFS:
         self._achievements: dict | None = None
         # EGS asset data
         self._assets: dict[str, list[GameAsset]] | None = None
-        # EGS metadata
-        self._game_metadata: dict[str, dict] = dict()
         # Heirloom update check info
         self._update_info: dict | None = None
         # EOS Overlay install/update check info
@@ -170,14 +168,6 @@ class LGDLFS:
         except Exception as e:
             self.log.debug(f'Loading installed games failed: {e!r}')
             self._installed = None
-
-        # load existing app metadata
-        for gm_file in (self.path / 'metadata').iterdir():
-            try:
-                _meta = json.loads(gm_file.read_text(encoding='utf-8'))
-                self._game_metadata[_meta['app_name']] = _meta
-            except Exception as e:
-                self.log.debug(f'Loading game meta file "{gm_file.name}" failed: {e!r}')
 
         # load auto-aliases if enabled
         self.aliases: dict[str, str] = dict()
@@ -310,7 +300,27 @@ class LGDLFS:
         with self._get_manifest_filename(app_name, version, platform).open('wb') as f:
             manifest.write(f)
 
+    @cached_property
+    def _game_metadata(self) -> dict[str, dict]:
+        """EGS metadata of every game, read when first needed: a large library takes a while to read"""
+        metadata = {}
+        for gm_file in (self.path / 'metadata').iterdir():
+            try:
+                _meta = json.loads(gm_file.read_text(encoding='utf-8'))
+                metadata[_meta['app_name']] = _meta
+            except Exception as e:
+                self.log.debug(f'Loading game meta file "{gm_file.name}" failed: {e!r}')
+        return metadata
+
     def get_game_meta(self, app_name: str) -> Game | None:
+        if '_game_metadata' not in self.__dict__:
+            # one game, such as the one being launched, without reading every other
+            try:
+                _meta = self._load_json(f'metadata/{app_name}.json')
+                if _meta.get('app_name') == app_name:
+                    return Game.from_json(_meta)
+            except Exception:
+                pass
         if _meta := self._game_metadata.get(app_name, None):
             return Game.from_json(_meta)
         return None
