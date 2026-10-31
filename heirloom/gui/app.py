@@ -23,6 +23,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
+import requests
+
+from heirloom import plugin_store
 from heirloom.downloader.queue import TimeWindow, heirloom_command, start_job, stop_job
 from heirloom.downloader.throttle import parse_speed
 from heirloom.gui.background import (
@@ -49,8 +52,6 @@ if TYPE_CHECKING:
 log = logging.getLogger('GUI')
 
 WEB = Path(__file__).parent / 'web'
-# plugins that come with Heirloom, to install from the window
-STORE = Path(__file__).parent.parent / 'store'
 # the window's own look, Keeper Light, in web/style.css
 WINDOW_THEME = 'heirloom'
 # switches in Settings, and the config options they turn the other way: each is on unless disabled
@@ -90,6 +91,8 @@ COMMANDS = {
     'sync': ['-y', 'sync-saves', '--accept-path'],
     # all the Ubisoft games of the account at once, which is how Epic activates them
     'activate': ['-y', 'activate', '--uplay'],
+    # a plugin's own command, in the job's options
+    'plugin': ['-y'],
     # the Epic overlay: installing also turns it on, and installing again updates it
     'overlay': ['-y', 'eos-overlay', 'install'],
     'overlay_remove': ['-y', 'eos-overlay', 'remove'],
@@ -97,6 +100,8 @@ COMMANDS = {
     'login': ['auth'],
 }
 
+# what a plugin's action may print for the window to show
+OUTPUT_LINES = 200
 PROGRESS = re.compile(r'= Progress: (\d+(?:\.\d+)?)%')
 SPEED = re.compile(r'\+ Download\s+- ([\d.]+ MiB/s) \(raw\)')
 LOG_LINE = re.compile(r'^\[[\w.-]+\] [A-Z]+: (.*)$')
@@ -141,7 +146,6 @@ def free_games(country: str, locale: str, owned: set[str]) -> list[dict[str, Any
     The games Epic gives away now and next: title, cover, store page, whether it is free now (or from start),
     until when, and whether it is in the library already (by namespace, from owned)
     """
-    import requests
     response = requests.get(FREE_GAMES, params={'locale': locale, 'country': country, 'allowCountries': country},
                             headers={'User-Agent': 'Heirloom'}, timeout=20)
     response.raise_for_status()
@@ -275,6 +279,8 @@ class Job:
     message: str = ''
     # what was chosen for it, such as an install's folder and DLC, as heirloom's options
     options: list[str] = field(default_factory=list)
+    # everything a plugin's action printed, to show when it's done (at most OUTPUT_LINES)
+    output: list[str] = field(default_factory=list)
 
 
 class Jobs:
@@ -365,6 +371,8 @@ class Jobs:
 
     @staticmethod
     def _read(job: Job, line: str) -> None:
+        if job.kind == 'plugin' and len(job.output) < OUTPUT_LINES:
+            job.output.append(match[1] if (match := LOG_LINE.match(line)) else line)
         if match := PROGRESS.search(line):
             job.progress = float(match[1])
         elif match := SPEED.search(line):
@@ -400,6 +408,8 @@ class GuiApi:
         # when the latest versions of the games were last fetched (time.monotonic), 0 for not yet
         self._fetched = 0.0
         self._jobs = Jobs(self._command, self._job_finished)
+        # the plugin store's index and when it was fetched (time.monotonic)
+        self._index: tuple[list[dict[str, str]] | None, float] = (None, 0.0)
         # the library is read while the window opens, and the page's first state() waits for it
         self._read = threading.Event()
         threading.Thread(target=self._read_library, daemon=True).start()
@@ -601,14 +611,27 @@ class GuiApi:
         open_in_file_manager(folder)
 
     def plugins(self) -> dict[str, Any]:
-        """The plugins in the plugins folder, and the ones of the store"""
+        """
+        The plugins in the plugins folder, with why one failed to load and the newer version in the store, if any;
+        and the plugins of the store, from github.com/tuskilicious/heirloom-plugins (None when it can't be reached)
+        """
         manager = PluginManager(self._lgd().path / 'plugins')
-        found, enabled = manager.discover(), manager.enabled()
+        found, enabled, errors = manager.discover(), manager.enabled(), manager.load_errors()
+        index, store_error = self._plugin_index()
+        available = {entry['name']: entry for entry in index or []}
         return {
-            'installed': [{'name': name, 'title': manifest.common_name, 'description': manifest.description,
-                           'enabled': name in enabled} for name, (_, manifest) in found.items()],
-            'store': [{'name': name, 'title': manifest.common_name, 'description': manifest.description,
-                       'installed': name in found} for name, (_, manifest) in PluginManager(STORE).discover().items()],
+            'installed': [{
+                'name': name, 'title': manifest.common_name, 'description': manifest.description,
+                'version': manifest.version, 'enabled': name in enabled,
+                'error': errors[name].removeprefix('failed to load: ') if name in enabled and name in errors else None,
+                'actions': [{'title': title, 'command': command} for title, command in manifest.actions],
+                'update': entry['version'] if (entry := available.get(name))
+                and plugin_store.newer(entry['version'], manifest.version) else None,
+            } for name, (_, manifest) in found.items()],
+            'store': [{'name': entry['name'], 'title': entry['common_name'], 'description': entry['description'],
+                       'version': entry['version'], 'installed': entry['name'] in found}
+                      for entry in index] if index is not None else None,
+            'store_error': store_error,
         }
 
     def set_plugin(self, name: str, enabled: bool) -> dict[str, Any]:
@@ -620,23 +643,34 @@ class GuiApi:
         return self.plugins()
 
     def install_plugin(self, name: str) -> dict[str, Any]:
-        """Copies a plugin of the store into the plugins folder and turns it on"""
-        source = PluginManager(STORE).discover().get(name)
-        manager = PluginManager(self._lgd().path / 'plugins')
-        if not source or name in manager.discover():
-            raise ValueError(f'No plugin named "{name}" to install')
-        shutil.copytree(source[0], manager.folder / source[0].name, ignore=shutil.ignore_patterns('__pycache__'))
-        manager.set_enabled(name, True)
+        """Downloads a plugin of the store into the plugins folder, or updates it there, and turns it on"""
+        index, error = self._plugin_index(fresh=True)
+        if index is None:
+            raise ValueError(error)
+        folder = self._lgd().path / 'plugins'
+        try:
+            plugin_store.install(folder, name, index)
+        except requests.RequestException as e:
+            raise ValueError(f'Could not download the plugin from GitHub: {e}') from None
+        PluginManager(folder).set_enabled(name, True)
         return self.plugins()
+
+    def update_plugin(self, name: str) -> dict[str, Any]:
+        return self.install_plugin(name)
 
     def remove_plugin(self, name: str) -> dict[str, Any]:
         """Turns a plugin off and deletes its folder"""
-        manager = PluginManager(self._lgd().path / 'plugins')
-        if not (found := manager.discover().get(name)):
-            raise ValueError(f'No plugin named "{name}"')
-        manager.set_enabled(name, False)
-        shutil.rmtree(found[0])
+        plugin_store.remove(self._lgd().path / 'plugins', name)
         return self.plugins()
+
+    def run_plugin_action(self, name: str, command: str) -> None:
+        """Runs one of the buttons a turned-on plugin adds, "heirloom <command>", as a job that keeps what it prints"""
+        manager = PluginManager(self._lgd().path / 'plugins')
+        found = manager.discover().get(name)
+        action = next((title for title, action in found[1].actions if action == command), None) if found else None
+        if action is None or name not in manager.enabled():
+            raise ValueError(f'"{name}" has no action "{command}", or is turned off')
+        self._jobs.add('plugin', '', action, [command])
 
     def create_shortcut(self, app_name: str) -> None:
         """A desktop shortcut that plays the game, with its icon; the terminal it runs in starts minimized"""
@@ -823,6 +857,21 @@ class GuiApi:
         lgd.config.set('Heirloom', 'window_theme', name)
         lgd.save_config()
         return self.themes()
+
+    def _plugin_index(self, fresh: bool = False) -> tuple[list[dict[str, str]] | None, str]:
+        """The store's index, fetched again after ten minutes; None and why when GitHub can't be reached"""
+        with self._lock:
+            index, fetched = self._index
+        if index is not None and not fresh and time.monotonic() - fetched < 10 * 60:
+            return index, ''
+        try:
+            index = plugin_store.fetch_index()
+        except (requests.RequestException, ValueError) as e:
+            log.warning(f'Could not get the plugin list: {e!r}')
+            return None, "Couldn't reach the plugin store on GitHub. Check your connection, then open Customize again."
+        with self._lock:
+            self._index = (index, time.monotonic())
+        return index, ''
 
     def _close(self) -> None:
         self._jobs.stop_downloads()

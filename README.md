@@ -692,12 +692,16 @@ optional arguments:
 
 
 Command: plugins
-usage: heirloom plugins [-h] [{list,enable,disable}] [<name>]
+usage: heirloom plugins [-h]
+                        [{list,enable,disable,store,install,update,remove}]
+                        [<name>]
 
 positional arguments:
-  {list,enable,disable}
-                        What to do (default: list)
-  <name>                Plugin to enable or disable
+  {list,enable,disable,store,install,update,remove}
+                        What to do (default: list); "store" lists the plugins
+                        to install from github.com/tuskilicious/heirloom-
+                        plugins
+  <name>                Plugin to enable, disable, install, update or remove
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -811,16 +815,28 @@ heirloom plugins enable session-log
 heirloom plugins disable session-log
 ````
 
-Heirloom comes with a few plugins to install from Customize's plugin store, which copies one into the plugins folder and turns it on:
+Plugins to install live in their own repository, [tuskilicious/heirloom-plugins](https://github.com/tuskilicious/heirloom-plugins), and Heirloom downloads one only when you install it: from Customize's plugin store in the window, or in a terminal:
+
+````
+heirloom plugins store
+heirloom plugins install discord-presence
+heirloom plugins update discord-presence
+heirloom plugins remove discord-presence
+````
 
 | Plugin | What it does |
 |--------|--------------|
-| Notifications (`notifications`) | A desktop notification when a game finishes installing or updating, the window's automatic updates included |
+| Discord Rich Presence (`discord-presence`) | Shows the game you're playing in your Discord status, with the time played so far |
+| Notifications (`notifications`) | A desktop notification when a game finishes installing or updating, the window's automatic updates included (Windows shows it with notifications turned on) |
 | High performance while playing (`power-plan`) | Switches Windows to the High performance power plan while a game runs, and back afterwards (laptops with Modern Standby have no such plan) |
 | Close the Epic Games Launcher (`close-epic-launcher`) | Closes the Epic Games Launcher when a game starts, so it doesn't run in the background while you play |
-| Library worth (`library-worth`) | Adds `heirloom worth`: what your games and DLC cost on the Epic Games Store in your country, at full price and today, with the most valuable (`--top <n>`, `--json`) |
+| Library worth (`library-worth`) | What your games and DLC cost on the Epic Games Store in your country, at full price and today: a button in Customize, or `heirloom worth` (`--top <n>`, `--json`) |
 
-They are in [`heirloom/store`](heirloom/store), and make good examples.
+The window offers updates when the repository has a newer version, and shows why a plugin failed to load. A plugin can add buttons to the window with `actions` in its `plugin.json`, each running one of its commands and showing what it printed:
+
+````json
+"actions": [{"title": "Work out my library's worth", "command": "worth"}]
+````
 
 The backend's `setup(plugin)` function subscribes to events and can add commands:
 

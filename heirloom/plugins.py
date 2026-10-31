@@ -90,6 +90,8 @@ class PluginManifest:
     use_backend: bool = True
     # theme files (see heirloom.themes) this plugin provides while enabled
     themes: tuple[str, ...] = ()
+    # buttons the window shows for it, as (title, command): each runs "heirloom <command>", one the plugin adds
+    actions: tuple[tuple[str, str], ...] = ()
 
     @classmethod
     def read(cls, folder: Path) -> PluginManifest:
@@ -100,11 +102,20 @@ class PluginManifest:
         manifest = cls(name=name, common_name=data.get('common_name') or name,
                        description=data.get('description', ''), version=data.get('version', ''),
                        backend=data.get('backend') or 'main.py', use_backend=data.get('useBackend', True),
-                       themes=tuple(data.get('themes', [])))
+                       themes=tuple(data.get('themes', [])),
+                       actions=tuple(_action(action) for action in data.get('actions', [])))
         for key, path in [('backend', manifest.backend), *(('themes', theme) for theme in manifest.themes)]:
             if not (folder / path).resolve().is_relative_to(folder.resolve()):
                 raise ValueError(f'"{key}" must name files inside the plugin folder, got {path!r}')
         return manifest
+
+
+def _action(action: Any) -> tuple[str, str]:
+    title, command = (action.get('title'), action.get('command')) if isinstance(action, dict) else (None, None)
+    if not isinstance(title, str) or not title.strip() or not isinstance(command, str)             or not re.fullmatch(r'[a-z0-9][a-z0-9-]*', command):
+        raise ValueError(f'an action needs a "title" and a "command" of lowercase letters, digits and "-", '
+                         f'got {action!r}')
+    return title.strip(), command
 
 
 class Plugin:
@@ -141,7 +152,8 @@ class PluginManager:
         found: dict[str, tuple[Path, PluginManifest]] = {}
         if not self.folder.is_dir():
             return found
-        for folder in sorted(p for p in self.folder.iterdir() if p.is_dir()):
+        # hidden folders aren't plugins: the plugin store unpacks into them while installing
+        for folder in sorted(p for p in self.folder.iterdir() if p.is_dir() and not p.name.startswith('.')):
             try:
                 manifest = PluginManifest.read(folder)
             except Exception as e:
@@ -156,6 +168,28 @@ class PluginManager:
     @property
     def _enabled_file(self) -> Path:
         return self.folder / 'enabled.json'
+
+    @property
+    def _errors_file(self) -> Path:
+        return self.folder / 'errors.json'
+
+    def load_errors(self) -> dict[str, str]:
+        """Why plugins failed to load the last time a heirloom command loaded them, by name"""
+        try:
+            errors = json.loads(self._errors_file.read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            return {}
+        return {str(name): str(error) for name, error in errors.items()} if isinstance(errors, dict) else {}
+
+    def _record_errors(self, loaded: set[str], failed: dict[str, str]) -> None:
+        """Keeps load failures for the window, which runs no plugins itself; a plugin that loads clears its own"""
+        before = self.load_errors()
+        errors = {name: error for name, error in before.items() if name not in loaded} | failed
+        if errors != before:
+            try:
+                self._errors_file.write_text(json.dumps(errors, indent=2), encoding='utf-8')
+            except OSError as e:
+                logger.debug(f'Could not keep the plugin errors: {e!r}')
 
     def enabled(self) -> set[str]:
         try:
@@ -174,6 +208,7 @@ class PluginManager:
     def load(self, subparsers: Any) -> None:
         """Runs every enabled plugin's setup() and adds its commands to the CLI"""
         enabled = self.enabled()
+        failed: dict[str, str] = {}
         for name, (folder, manifest) in self.discover().items():
             if name not in enabled:
                 continue
@@ -182,7 +217,7 @@ class PluginManager:
                 if manifest.use_backend:
                     _import_backend(folder / manifest.backend, name).setup(plugin)
             except Exception as e:
-                self.errors[name] = f'failed to load: {e!r}'
+                self.errors[name] = failed[name] = f'failed to load: {e!r}'
                 logger.error(f'Plugin "{name}" failed to load: {e!r}',
                              exc_info=logger.isEnabledFor(logging.DEBUG))
                 continue
@@ -196,6 +231,8 @@ class PluginManager:
                     continue
                 subparsers.add_parser(command, parents=[parser], help=f'{help_text} [plugin: {name}]')
                 self.commands[command] = (plugin, command_handler)
+        if enabled:
+            self._record_errors(set(self.plugins), failed)
 
     def theme_files(self) -> list[tuple[str, Path]]:
         """Theme files of the loaded plugins, as (plugin name, path)"""
