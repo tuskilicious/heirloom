@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "heirloom-gl"
-version = "0.33.0"
+version = "0.34.0"
 dependencies = [
     "requests",
     "filelock",
@@ -82,8 +82,6 @@ filterwarnings = ["error::DeprecationWarning:heirloom.*"]
 [tool.mypy]
 python_version = "3.10"
 files = ["heirloom"]
-# plugins of the store, loaded by path (each a main.py) rather than imported
-exclude = ["^heirloom/store/"]
 check_untyped_defs = true
 warn_unused_ignores = true
 warn_redundant_casts = true

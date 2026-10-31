@@ -609,6 +609,12 @@ kbd {
 .advanced summary { width: fit-content; color: var(--muted); font-size: 13px; cursor: pointer; }
 .advanced summary:hover { color: var(--text); }
 .hint.error { color: var(--danger); }
+.detail.error { color: var(--danger); }
+.hint a { color: inherit; }
+/* what a plugin's action printed */
+.output { max-height: 50vh; margin: 8px 0; padding: 12px 14px; overflow: auto; border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--bg) 60%, transparent); font: 12.5px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace;
+  white-space: pre-wrap; }
 .switch:disabled { opacity: .45; cursor: default; }
 
 /* the install dialog: three sizes side by side, then where it goes */

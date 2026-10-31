@@ -1,6 +1,0 @@
-{
-  "name": "power-plan",
-  "common_name": "High performance while playing",
-  "description": "Switches Windows to the High performance power plan while a game runs, and back afterwards",
-  "version": "1.0.0"
-}
