@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.35.0 "Gallery" (2026-11-01)
+
+Themes that rearrange the window, and a library you can drive with a controller.
+
+### Added
+- **Four themes that change the layout**, in Customize:
+  - **Big picture**, for a TV and a controller: a bar along the top, a tall banner for the game you're on with its
+    art glowing behind the page, and one row of large covers that scrolls sideways.
+  - **Compact list**: a dense table, one row per game with its status, size, time played and last played. The
+    headings sort by their column, and about forty games fit on screen.
+  - **Showcase**: a banner most of the window high with a huge headline and slowly drifting art, and big covers that
+    float into place as you scroll.
+  - **Retro arcade**: neon on black behind CRT scanlines, the sidebar as a cabinet's lit marquee, installed games
+    glowing cyan, and PRESS START flashing over the cover under the pointer.
+- **Keyboard and gamepad control**, in every theme:
+  - The arrow keys, or a gamepad's D-pad or stick, move between games.
+  - Enter or A plays, updates or opens Install.
+  - The Menu key or Y opens Manage.
+  - B closes a dialog or menu.
+- **Theme tiles**: the theme picker shows each theme as a small preview in its colours.
+
 ## 0.34.0 "Guildhall" (2026-10-31)
 
 Plugins that do what they say, in the window, from their own repository.

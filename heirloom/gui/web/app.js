@@ -453,12 +453,15 @@ function card(game) {
       title: el('h3', {className: 'title'}),
       status: el('p', {className: 'status'}),
       trophies: el('p', {className: 'status trophies', hidden: true}),
+      // size, time played and last played, which Compact list shows as columns
+      meta: el('p', {className: 'meta'}),
       buttons: el('div', {className: 'actions'}),
       key: '',
       shown: false,
     };
-    entry.info = el('div', {className: 'info'}, entry.title, entry.status, entry.trophies);
-    entry.node = el('article', {className: 'card'}, entry.cover);
+    entry.info = el('div', {className: 'info'}, entry.title, entry.status, entry.trophies, entry.meta);
+    // focusable for moving through the library with the arrow keys or a gamepad (see moveFocus)
+    entry.node = el('article', {className: 'card', tabIndex: -1}, entry.cover);
     entry.node.dataset.app = game.app_name;
     cards.set(game.app_name, entry);
   }
@@ -490,6 +493,11 @@ function card(game) {
   entry.badge.textContent = playing ? 'Playing' : 'Update';
   entry.badge.classList.toggle('playing', playing);
   entry.title.textContent = game.title;
+  entry.node.setAttribute('aria-label', game.title);
+  entry.meta.replaceChildren(
+    el('span', {className: 'meta-size', textContent: game.size ? formatSize(game.size) : ''}),
+    el('span', {className: 'meta-played', textContent: game.played ? formatPlayed(game.played).replace(/ played$/, '') : ''}),
+    el('span', {className: 'meta-last', textContent: game.last_played ? formatDay(game.last_played).replace(/^on /, '') : ''}));
   entry.node.title = game.version ? `${game.title} (version ${game.version})` : game.title;
   entry.status.textContent = statusText(game, job);
   entry.status.classList.toggle('lit', Boolean(game.update && !job) || playing);
@@ -555,6 +563,8 @@ function renderLibrary() {
     entry.shown = show;
     count += show;
   });
+  const first = visibleCards()[0];
+  if (first && !visibleCards().some((node) => node.tabIndex === 0)) first.tabIndex = 0;
   $('#empty').hidden = loading || count > 0;
   $('#empty-text').textContent = emptyText(query);
   $('#empty-login').hidden = Boolean(state.user || state.games.length || loggingIn());
@@ -585,10 +595,16 @@ function moveMarker() {
   $('#shelf-marker').style.setProperty('--y', `${active.offsetTop}px`);
 }
 
+// a theme whose hero shows the focused game sets --hero: focus (Big Picture)
+const heroFollowsFocus = () => getComputedStyle(document.documentElement).getPropertyValue('--hero').trim() === 'focus';
+// the game the keyboard or gamepad is on, for such a hero
+let spotlight = null;
+
 function renderHero() {
   const played = state.games.filter((game) => game.installed && game.last_played)
     .sort((a, b) => b.last_played.localeCompare(a.last_played));
-  const game = filter === 'all' && !$('#search').value.trim() ? played[0] : null;
+  const focused = spotlight && heroFollowsFocus() ? state.games.find((game) => game.app_name === spotlight) : null;
+  const game = focused || (filter === 'all' && !$('#search').value.trim() ? played[0] : null);
   $('#hero').hidden = !game;
   $('#ambient').hidden = !game;
   if (!game) return;
@@ -601,8 +617,9 @@ function renderHero() {
   if (art.getAttribute('src') !== src) art.src = $('#ambient').src = src;
   art.hidden = $('#ambient').hidden = !src;
   $('#hero-title').textContent = game.title;
-  $('#hero-meta').textContent = job ? progressText(job)
-    : `${formatPlayed(game.played)} · last played ${formatDay(game.last_played)}`;
+  $('#hero-meta').textContent = job ? progressText(job) : game.last_played
+    ? `${formatPlayed(game.played)} · last played ${formatDay(game.last_played)}` : statusText(game, null);
+  $('#hero').querySelector('.hero-note').textContent = focused ? '' : 'Pick up where you left off';
   $('#hero-actions').replaceChildren(...actions(game, job));
 }
 
@@ -784,6 +801,13 @@ function showOverlay(info) {
   ].filter(Boolean));
 }
 
+// a theme's tile: a little window in its colours
+function themePreview(colors) {
+  const preview = el('span', {className: 'theme-preview', ariaHidden: 'true'}, el('i'), el('i'), el('i'), el('i'));
+  for (const [name, value] of Object.entries(colors)) preview.style.setProperty(`--p-${name}`, value);
+  return preview;
+}
+
 async function showThemes(info) {
   const themes = info || await api.themes();
   document.documentElement.dataset.theme = themes.active;
@@ -793,6 +817,7 @@ async function showThemes(info) {
   $('#theme-list').hidden = !choice;
   $('#themes-hint').hidden = choice;
   $('#theme-list').replaceChildren(...themes.themes.map((theme) => el('label', {className: 'choice'},
+    themePreview(theme.colors),
     el('input', {
       type: 'radio', name: 'theme', value: theme.name, checked: theme.name === themes.active,
       onchange: async () => showThemes(await api.use_theme(theme.name)),
@@ -872,6 +897,97 @@ function showPluginOutput() {
     : hint(job.status === 'done' ? 'Done, with nothing to show.' : finishedText(job)));
 }
 
+// moving through the library with the arrow keys or a gamepad: the nearest card that way, on screen
+const visibleCards = () => [...$('#library').children].filter((node) => node.dataset.app && !node.hidden);
+
+function moveFocus(from, direction) {
+  const [dx, dy] = {left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1]}[direction];
+  const box = from.getBoundingClientRect();
+  const [cx, cy] = [box.left + box.width / 2, box.top + box.height / 2];
+  let best = null;
+  let bestScore = Infinity;
+  for (const node of visibleCards()) {
+    const other = node.getBoundingClientRect();
+    const [x, y] = [other.left + other.width / 2 - cx, other.top + other.height / 2 - cy];
+    const along = dx ? x * dx : y * dy;
+    // ahead that way, and the one most in line rather than merely closest
+    if (node === from || along < 4) continue;
+    const score = along + 3 * Math.abs(dx ? y : x);
+    if (score < bestScore) [best, bestScore] = [node, score];
+  }
+  if (!best) return;
+  best.focus({preventScroll: true});
+  best.scrollIntoView({block: 'nearest', inline: 'nearest',
+    behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+}
+
+// what Enter on a card, or A on a gamepad, does: play, update, install or activate
+function primaryAction(game) {
+  if (!game || activeJob(game.app_name)) return;
+  if (game.store) {
+    if (game.ubisoft) run(api.activate_ubisoft());
+  } else if (!game.installed) openInstall(game);
+  else run(game.update ? api.install(game.app_name) : api.play(game.app_name));
+}
+
+// a gamepad, polled while one is connected: the D-pad or left stick moves, A chooses, B goes back, Y opens Manage.
+// A direction held repeats, after a pause
+let padFrame = 0;
+const padHeld = new Map();
+
+function pollGamepad() {
+  const pad = [...navigator.getGamepads()].find(Boolean);
+  if (!pad) {
+    padFrame = 0;
+    return;
+  }
+  const button = (index) => Boolean(pad.buttons[index] && pad.buttons[index].pressed);
+  const [x = 0, y = 0] = pad.axes;
+  const pressed = {up: button(12) || y < -0.6, down: button(13) || y > 0.6, left: button(14) || x < -0.6,
+    right: button(15) || x > 0.6, a: button(0), b: button(1), y: button(3)};
+  const now = performance.now();
+  for (const [name, down] of Object.entries(pressed)) {
+    const next = padHeld.get(name);
+    if (!down) padHeld.delete(name);
+    else if (next === undefined || (now >= next && !'aby'.includes(name))) {
+      padHeld.set(name, now + (next === undefined ? 380 : 110));
+      padPress(name);
+    }
+  }
+  padFrame = requestAnimationFrame(pollGamepad);
+}
+
+function padPress(name) {
+  document.documentElement.dataset.input = 'pad';
+  const menu = document.querySelector('.menu:popover-open');
+  const dialog = document.querySelector('dialog[open]');
+  if (name === 'b') {
+    if (menu) menu.hidePopover();
+    else if (dialog) dialog.close();
+    return;
+  }
+  if (menu || dialog) {
+    // inside a menu or dialog: up and down go through its controls, A presses one
+    const controls = [...(menu || dialog).querySelectorAll('button, input, summary')]
+      .filter((control) => !control.disabled && control.offsetParent !== null);
+    const index = controls.indexOf(document.activeElement);
+    if (name === 'a' && index >= 0) document.activeElement.click();
+    const step = {up: -1, left: -1, down: 1, right: 1}[name];
+    if (step && controls.length) controls[(index + step + controls.length) % controls.length].focus();
+    return;
+  }
+  const current = document.activeElement && document.activeElement.closest('.card[data-app]');
+  if (!current) {
+    const first = visibleCards()[0];
+    if (first) first.focus();
+    return;
+  }
+  const game = state.games.find((candidate) => candidate.app_name === current.dataset.app);
+  if (name === 'a') primaryAction(game);
+  else if (name === 'y' && game && !game.store) openManage(game, current);
+  else if (name !== 'y') moveFocus(current, name);
+}
+
 // names the cards on screen for a view transition, by their place in the library, so each glides from where it
 // was to where it is; the rest of a large library is left out, and stays cheap
 function nameCards() {
@@ -907,6 +1023,9 @@ function saveView() {
 function setSort(name) {
   sort = name;
   $('#sort-name').textContent = SORTS[name][0];
+  for (const heading of document.querySelectorAll('[data-sort]')) {
+    heading.setAttribute('aria-pressed', String(heading.dataset.sort === name));
+  }
   smoothly(renderLibrary);
 }
 
@@ -1043,6 +1162,41 @@ async function start() {
   $('#launch-options').onkeydown = (event) => {
     if (event.key === 'Enter') saveLaunchOptions();
   };
+  for (const heading of document.querySelectorAll('[data-sort]')) {
+    heading.onclick = () => {
+      setSort(heading.dataset.sort);
+      saveView();
+    };
+  }
+  library.addEventListener('focusin', (event) => {
+    const node = event.target.closest('.card[data-app]');
+    if (!node) return;
+    for (const other of library.querySelectorAll('.card[tabindex="0"]')) other.tabIndex = -1;
+    node.tabIndex = 0;
+    if (heroFollowsFocus() && spotlight !== node.dataset.app) {
+      spotlight = node.dataset.app;
+      renderHero();
+    }
+  });
+  library.addEventListener('keydown', (event) => {
+    const node = event.target;
+    if (!node.matches('.card[data-app]')) return;
+    const step = {ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down'}[event.key];
+    if (step) {
+      event.preventDefault();
+      moveFocus(node, step);
+    } else if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      primaryAction(gameOf(event).game);
+    } else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+      event.preventDefault();
+      const {game} = gameOf(event);
+      if (game && !game.store) openManage(game, node);
+    }
+  });
+  window.addEventListener('gamepadconnected', () => {
+    if (!padFrame) padFrame = requestAnimationFrame(pollGamepad);
+  });
   const closeInstall = () => {
     installing = null;
     $('#install').close();

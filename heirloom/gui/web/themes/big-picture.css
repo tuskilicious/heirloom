@@ -1,0 +1,101 @@
+/*
+  Big picture: Heirloom for a TV and a controller. The sidebar becomes a bar along the top, the game you're on fills a
+  tall banner with its art glowing behind the page, and the library is one row of large covers that scrolls sideways.
+  Move with the arrow keys or a gamepad's D-pad or stick; Enter or A plays, B goes back, Y opens Manage.
+  A window theme that comes with Heirloom.
+*/
+:root {
+  --bg: #06080e;
+  --surface: #111622;
+  --surface-raised: #1b2231;
+  --border: #283245;
+  --text: #f4f7fc;
+  --muted: #9aa6bc;
+  --accent: #5ee2ff;
+  --accent-text: #00161d;
+  --logo: #ffffff;
+  --danger: #ff8597;
+  --radius: 14px;
+  --radius-control: 10px;
+  --card-width: 216px;
+  --font: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  /* the banner shows the game the keyboard or gamepad is on (see heroFollowsFocus in app.js) */
+  --hero: focus;
+}
+
+body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; font-size: 16px; }
+
+/* the sidebar, as a bar along the top */
+.rail,
+.rail.collapsed {
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  width: auto;
+  height: 68px;
+  padding: 0 28px;
+  border-right: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  backdrop-filter: blur(24px) saturate(1.4);
+}
+.brand { margin: 0 22px 0 0; padding: 0; }
+.rail.collapsed .logo { display: block; }
+.rail.collapsed .mark { display: none; }
+.rail.collapsed :is(.label, .count) { opacity: 1; }
+.shelves { flex-direction: row; gap: 4px; }
+.shelf-marker, #rail-toggle { display: none; }
+.rail-item { width: auto; height: 46px; padding: 0 16px; border-radius: 999px; font-size: 15px; }
+.rail-item .label { flex: none; }
+.shelves .rail-item[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+.shelves .rail-item[aria-pressed="true"] .icon { color: var(--bg); filter: none; }
+.shelves .rail-item[aria-pressed="true"] .count { background: color-mix(in srgb, var(--bg) 14%, transparent); color: var(--bg); }
+.rail-foot { flex-direction: row; gap: 4px; margin: 0 0 0 auto; padding: 0; border: 0; }
+.rail-foot .rail-item .label { display: none; }
+.rail-foot .rail-item { width: 46px; padding: 0; justify-content: center; }
+
+.main { --gutter: 52px; padding-bottom: 48px; }
+.top { position: static; margin: 26px 0 6px; padding: 0; border: 0; background: none; backdrop-filter: none; box-shadow: none; }
+#heading { font-size: 30px; }
+
+/* the game you're on, large; its art spills behind the whole page */
+.ambient { inset: 0; width: 100vw; height: 100vh; filter: blur(70px) saturate(1.5); opacity: .5; mask-image: none; }
+.hero { min-height: max(340px, 50vh); margin: 14px 0 26px; border-radius: 22px; box-shadow: 0 40px 80px -40px rgb(0 0 0 / 80%); }
+.hero-body { max-width: 780px; padding: 46px 52px; }
+.hero-title { font-size: clamp(36px, 4.6vw, 66px); letter-spacing: -.03em; }
+.hero-meta { font-size: 17px; }
+.hero .actions > button { height: 54px; padding: 0 32px; font-size: 18px; border-radius: 999px; }
+.hero .actions .icon-button { width: 54px; }
+.free { display: none; }
+
+/* the library: one row of covers, scrolling sideways */
+.grid {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: var(--card-width);
+  gap: 24px;
+  margin: 0 calc(-1 * var(--gutter));
+  padding: 22px var(--gutter) 40px;
+  overflow-x: auto;
+  scroll-padding-inline: var(--gutter);
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+.card { scroll-snap-align: start; }
+.cover { border-radius: 16px; transition: transform .35s var(--spring), translate .35s var(--spring), box-shadow .3s var(--ease); }
+.title { font-size: 16px; }
+.info .status { font-size: 13px; }
+.card:focus-visible .cover,
+[data-input="pad"] .card:focus .cover {
+  transform: scale(1.1);
+  translate: 0 -4px;
+  box-shadow: 0 0 0 4px var(--accent), 0 0 70px -6px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+/* the cover you're on shows its buttons; the rest stay covers */
+.card:focus-within .cover .actions { opacity: 1; transform: none; }
+
+.panel { font-size: 15px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cover { transition: none; }
+}

@@ -499,12 +499,20 @@ def test_theme_css_for_the_window(lgd_home, tmp_path):
     (window_dir / 'paper_white.css').write_text(':root { --bg: #fff; }')
 
     api = GuiApi(None, lambda: themes)
-    assert api.themes() == {'active': 'heirloom', 'css': '', 'themes': [
-        {'name': 'heirloom', 'title': 'Heirloom'}, {'name': 'fluent', 'title': 'Fluent'},
-        {'name': 'impeccable', 'title': 'Impeccable'}, {'name': 'neon', 'title': 'neon'},
-        {'name': 'paper_white', 'title': 'Paper white'}]}, \
+    found = api.themes()
+    assert (found['active'], found['css']) == ('heirloom', '')
+    assert [(theme['name'], theme['title']) for theme in found['themes']] == [
+        ('heirloom', 'Heirloom'), ('big-picture', 'Big picture'), ('compact-list', 'Compact list'),
+        ('fluent', 'Fluent'), ('impeccable', 'Impeccable'), ('retro-arcade', 'Retro arcade'),
+        ('showcase', 'Showcase'), ('neon', 'neon'), ('paper_white', 'Paper white')], \
         "its own look and the ones that come with it, then themes with CSS and CSS files, " \
         "not terminal themes or the same CSS twice"
+    colors = {theme['name']: theme['colors'] for theme in found['themes']}
+    assert colors['neon'] == colors['heirloom'] | {'accent': '#00f0ff'}, "the window's own where a theme sets none"
+    assert colors['paper_white']['bg'] == '#fff' and colors['big-picture']['accent'] == '#5ee2ff'
+    # the layout themes restyle what the page has: the hero following focus, the columns of Compact list
+    assert '--hero: focus' in api.use_theme('big-picture')['css']
+    assert '.library-head' in api.use_theme('compact-list')['css']
     assert 'Chakra Petch' in api.use_theme('impeccable')['css']
     switched = api.use_theme('paper_white')
     assert (switched['active'], switched['css']) == ('paper_white', ':root { --bg: #fff; }')

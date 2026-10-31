@@ -115,6 +115,14 @@
       <div id="free-list" class="free-list"></div>
     </section>
 
+    <!-- column headings, which only Compact list shows; each sorts by its column -->
+    <div id="library-head" class="library-head" role="group" aria-label="Sort by">
+      <button type="button" data-sort="title" aria-pressed="false">Game</button>
+      <span>Status</span>
+      <button type="button" data-sort="size" aria-pressed="false">Size</button>
+      <button type="button" data-sort="played" aria-pressed="false">Played</button>
+      <button type="button" data-sort="recent" aria-pressed="false">Last played</button>
+    </div>
     <section id="library" class="grid" aria-label="Your games"></section>
     <div id="empty" class="empty" hidden>
       <svg class="mark" viewBox="16 16 272 400" aria-hidden="true"><use href="#logo"/></svg>

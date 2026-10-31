@@ -1,0 +1,132 @@
+/*
+  Compact list: the library as a dense table, one row per game with a small cover, its status, size, time played and
+  when it was last played. The headings sort by their column. No banner and no free games row, so about forty games
+  fit on screen. A window theme that comes with Heirloom.
+*/
+:root {
+  --bg: #111315;
+  --surface: #191c1f;
+  --surface-raised: #23272b;
+  --border: #2e3338;
+  --text: #e8eaed;
+  --muted: #9aa0a6;
+  --accent: #8ab4f8;
+  --accent-text: #0b1d36;
+  --logo: #e8eaed;
+  --danger: #f28b82;
+  --radius: 10px;
+  --radius-control: 6px;
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --glass: var(--surface);
+  --glass-strong: var(--surface);
+  --columns: 30px minmax(0, 1fr) minmax(110px, 170px) 76px 96px 104px 116px;
+}
+
+.ambient, .hero, .free { display: none !important; }
+.top { margin-bottom: 0; border-radius: var(--radius) var(--radius) 0 0; }
+
+.library-head,
+.card .cover {
+  display: grid;
+  grid-template-columns: var(--columns);
+  align-items: center;
+  gap: 16px;
+}
+
+/* the column headings, staying under the top bar */
+.library-head {
+  position: sticky;
+  top: 80px;
+  z-index: 1;
+  margin: 0 0 4px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.library-head > :first-child { grid-column: 1 / 3; }
+.library-head button {
+  justify-self: start;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+.library-head button:hover { color: var(--text); }
+.library-head button[aria-pressed="true"] { color: var(--accent); }
+.library-head button[aria-pressed="true"]::after { content: " ↓"; }
+
+.grid { display: flex; flex-direction: column; gap: 1px; }
+.card { gap: 0; }
+.card.rising { animation: none; }
+.skeleton { display: none; }
+
+/* a game's row */
+.card .cover {
+  aspect-ratio: auto;
+  height: 48px;
+  padding: 0 14px;
+  place-items: center start;
+  overflow: visible;
+  border-radius: var(--radius-control);
+  background: transparent;
+  transition: background-color .12s;
+}
+.card:nth-child(odd) .cover { background: color-mix(in srgb, var(--surface) 60%, transparent); }
+.card:is(:hover, :focus-within) .cover {
+  background: var(--surface-raised);
+  transform: none;
+  translate: none;
+  box-shadow: none;
+}
+.card:focus-visible .cover,
+[data-input="pad"] .card:focus .cover { translate: none; box-shadow: inset 0 0 0 2px var(--accent); }
+.cover::before, .cover::after, .tiles { display: none; }
+.cover img,
+.cover .initials {
+  position: static;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 40px;
+  border-radius: 4px;
+  background: var(--surface-raised);
+  font-size: 11px;
+  object-fit: cover;
+}
+
+/* the title, status and columns become cells of the row */
+.info, .meta { display: contents; }
+.title { -webkit-line-clamp: 1; font-size: 14px; font-weight: 500; }
+.info .status { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trophies { display: none !important; }
+.meta span { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Update or Playing, as a dot before the cover */
+.badge { top: 50%; left: 3px; width: 7px; height: 7px; padding: 0; font-size: 0; translate: 0 -50%; }
+
+.cover .actions {
+  position: static;
+  justify-content: flex-end;
+  justify-self: end;
+  padding: 0;
+  background: none;
+  opacity: 0;
+  transform: none;
+}
+.card:is(:hover, :focus-within) .cover .actions { opacity: 1; }
+.cover .actions > button { flex: none; height: 30px; padding: 0 12px; font-size: 13px; }
+.cover .actions .icon-button { width: 30px; padding: 0; }
+
+@media (max-width: 1000px) {
+  :root { --columns: 30px minmax(0, 1fr) minmax(110px, 150px) 76px 116px; }
+  .library-head > :nth-child(4), .library-head > :nth-child(5), .meta-played, .meta-last { display: none; }
+}

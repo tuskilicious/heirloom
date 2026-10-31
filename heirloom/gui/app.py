@@ -52,8 +52,9 @@ if TYPE_CHECKING:
 log = logging.getLogger('GUI')
 
 WEB = Path(__file__).parent / 'web'
-# the window's own look, Keeper Light, in web/style.css
+# the window's own look, Keeper Light, in web/style.css, and its main colours
 WINDOW_THEME = 'heirloom'
+WINDOW_COLORS = {'bg': '#01211a', 'surface': '#0b3028', 'accent': '#f3fb88', 'text': '#f7faf2'}
 # switches in Settings, and the config options they turn the other way: each is on unless disabled
 SWITCHES = {'cloud_saves': 'disable_cloud_save_sync', 'auto_updates': 'disable_auto_updates',
             'update_notice': 'disable_update_notice'}
@@ -202,6 +203,15 @@ def window_themes(themes: dict[str, Theme], themes_dir: Path) -> dict[str, tuple
             continue
         found[path.stem] = (_title(path), css)
     return found
+
+
+def theme_colors(css: str) -> dict[str, str]:
+    """A theme's main colours, for its tile in the theme picker: the window's own where it sets none"""
+    colors = dict(WINDOW_COLORS)
+    for name in colors:
+        if match := re.search(rf'--{name}:\s*(#[0-9a-fA-F]{{3,8}})\b', css):
+            colors[name] = match[1]
+    return colors
 
 
 def _title(css_file: Path) -> str:
@@ -847,7 +857,8 @@ class GuiApi:
         name = lgd.config.get('Heirloom', 'window_theme', fallback=WINDOW_THEME)
         active = name if name in themes else WINDOW_THEME
         return {'active': active, 'css': themes[active][1],
-                'themes': [{'name': name, 'title': title} for name, (title, _) in themes.items()]}
+                'themes': [{'name': name, 'title': title, 'colors': theme_colors(css)}
+                           for name, (title, css) in themes.items()]}
 
     def use_theme(self, name: str) -> dict[str, Any]:
         # a fresh read of the config, so changes heirloom made to it meanwhile are kept
