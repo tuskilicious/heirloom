@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.33.0 "Courier" (2026-10-31)
+
+Downloads you control: which goes next, when updates run, and how they download.
 
 ### Added
 - **Download next.** A waiting download in the downloads panel has a button that moves it ahead of the others
