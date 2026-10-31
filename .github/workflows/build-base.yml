@@ -47,7 +47,6 @@ jobs:
         --onefile
         --name heirloom
         --add-data gui/web:heirloom/gui/web
-        --add-data store:heirloom/store
         ${{ steps.strip.outputs.option }}
         -i ../assets/windows_icon.ico
         cli.py

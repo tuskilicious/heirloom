@@ -116,7 +116,8 @@ def test_downloads_run_one_at_a_time_and_report_progress():
     assert started == ['ok', 'fail']
     assert ok | {'id': 0} == {'id': 0, 'kind': 'install', 'app_name': 'ok', 'title': 'ok', 'status': 'done',
                               'progress': 42.5, 'speed': '12.34 MiB/s',
-                              'message': 'Preparing download for "Fish Game" (Fish)...', 'options': []}
+                              'message': 'Preparing download for "Fish Game" (Fish)...', 'options': [],
+                              'output': []}, 'only a plugin action keeps what it printed'
     assert failing['status'] == 'failed' and failing['message'] == 'Not enough free disk space'
     assert [job.app_name for job in finished] == ['ok', 'fail']
 

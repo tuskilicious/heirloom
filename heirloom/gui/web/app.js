@@ -8,10 +8,10 @@ const $ = (selector) => document.querySelector(selector);
 const SVG = 'http://www.w3.org/2000/svg';
 const ACTIVE = new Set(['queued', 'running']);
 const DOWNLOADS = new Set(['install', 'uninstall', 'repair', 'overlay']);
-const DOING = {install: 'Installing', uninstall: 'Uninstalling', repair: 'Repairing', sync: 'Syncing saves',
+const DOING = {plugin: 'Running', install: 'Installing', uninstall: 'Uninstalling', repair: 'Repairing', sync: 'Syncing saves',
   play: 'Playing', login: 'Logging in', overlay: 'Installing', overlay_remove: 'Removing', move: 'Moving',
   import: 'Adding', activate: 'Activating'};
-const DONE = {install: 'Installed', uninstall: 'Uninstalled', repair: 'Repaired', sync: 'Saves synced',
+const DONE = {plugin: 'Done', install: 'Installed', uninstall: 'Uninstalled', repair: 'Repaired', sync: 'Saves synced',
   play: 'Game closed', login: 'Logged in', overlay: 'Installed and on', overlay_remove: 'Removed', move: 'Moved',
   import: 'Added', activate: 'Activated'};
 const SHELVES = {all: 'Library', installed: 'Installed', updates: 'Updates'};
@@ -642,7 +642,8 @@ function jobRow(job, next) {
   let row = rows.get(job.id);
   if (!row) {
     const game = state.games.find((candidate) => candidate.app_name === job.app_name);
-    const thumb = game && game.cover ? el('img', {src: game.cover, alt: ''}) : icon(job.kind === 'login' ? 'account' : 'games');
+    const thumb = game && game.cover ? el('img', {src: game.cover, alt: ''})
+      : icon({login: 'account', plugin: 'theme'}[job.kind] || 'games');
     row = {detail: el('span', {className: 'detail'}), end: el('span', {className: 'job-end'}), kind: '',
       next: iconButton('updates', `Download ${job.title} next`, '', () => run(api.download_next(job.id)))};
     row.node = el('li', {}, el('span', {className: 'thumb'}, thumb),
@@ -712,6 +713,7 @@ async function poll() {
     return;
   }
   render();
+  showPluginOutput();
   const overlay = state.jobs.filter((job) => job.kind.startsWith('overlay')).map((job) => job.status).join();
   if (overlay !== overlayJobs) {
     overlayJobs = overlay;
@@ -798,24 +800,42 @@ async function showThemes(info) {
     el('span', {textContent: theme.title}))));
 }
 
-// a plugin's name and what it does, then what can be done with it
-function pluginRow(plugin, ...controls) {
+// a plugin's name and what it does (or why it failed), then what can be done with it
+function pluginRow(plugin, detail, ...controls) {
   return el('li', {className: 'row'},
     el('span', {className: 'row-text'}, el('span', {className: 'what', textContent: plugin.title}),
-      el('span', {className: 'detail', textContent: plugin.description})),
+      el('span', {className: 'detail', textContent: plugin.description}),
+      detail ? el('span', {className: `detail${detail.error ? ' error' : ''}`, textContent: detail.text}) : null),
     ...controls);
 }
 
 function showPlugins(plugins) {
-  const update = async (call) => showPlugins(await call);
+  const error = $('#plugins-error');
+  const update = async (call) => {
+    try {
+      showPlugins(await call);
+    } catch (failure) {
+      error.textContent = failure.message || String(failure);
+      error.hidden = false;
+    }
+  };
+  error.hidden = true;
   $('#plugins-hint').hidden = plugins.installed.length > 0;
   $('#plugin-list').replaceChildren(...plugins.installed.map((plugin) => pluginRow(plugin,
+    plugin.error ? {error: true, text: `Didn't load: ${plugin.error}`}
+      : plugin.update ? {text: `Version ${plugin.update} is out, you have ${plugin.version}`} : null,
+    // its buttons, while it's on
+    ...(plugin.enabled ? plugin.actions : []).map((action) => button(action.title, 'ghost', () => {
+      $('#customize').close();
+      run(api.run_plugin_action(plugin.name, action.command));
+    }, 'play')),
+    plugin.update ? iconButton('updates', `Update ${plugin.title}`, '', () => update(api.update_plugin(plugin.name))) : null,
     el('input', {
       type: 'checkbox', role: 'switch', className: 'switch', checked: plugin.enabled,
       ariaLabel: `${plugin.title} on`,
       onchange: (event) => {
-        // plugins run inside Heirloom with your Epic account and files; the store's come with Heirloom
-        const fromStore = plugins.store.some((entry) => entry.name === plugin.name);
+        // plugins run inside Heirloom with your Epic account and files; the store's are reviewed
+        const fromStore = (plugins.store || []).some((entry) => entry.name === plugin.name);
         if (event.target.checked && !fromStore
           && !confirm(`Turn on ${plugin.title}? Plugins run inside Heirloom with access to your Epic account `
             + 'and files, so only turn on ones you trust.')) {
@@ -828,9 +848,28 @@ function showPlugins(plugins) {
     iconButton('trash', `Remove ${plugin.title}`, 'danger', () => {
       if (confirm(`Remove ${plugin.title}? Its folder is deleted.`)) update(api.remove_plugin(plugin.name));
     }))));
-  $('#store-list').replaceChildren(...plugins.store.map((plugin) => pluginRow(plugin, plugin.installed
+  $('#store-hint').hidden = plugins.store !== null;
+  $('#store-hint').textContent = plugins.store_error || '';
+  $('#store-list').replaceChildren(...(plugins.store || []).map((plugin) => pluginRow(plugin, null, plugin.installed
     ? el('span', {className: 'installed', textContent: 'Installed'})
-    : button('Install', 'ghost', () => update(api.install_plugin(plugin.name)), 'download'))));
+    : button('Install', 'ghost', (event) => {
+      event.currentTarget.disabled = true;
+      event.currentTarget.lastChild.textContent = 'Installing…';
+      update(api.install_plugin(plugin.name));
+    }, 'download'))));
+}
+
+// what a plugin's action printed, shown once it's done
+const shownOutput = new Set();
+
+function showPluginOutput() {
+  const job = state.jobs.find((candidate) => candidate.kind === 'plugin' && !ACTIVE.has(candidate.status)
+    && !shownOutput.has(candidate.id));
+  if (!job || $('#detail').open) return;
+  shownOutput.add(job.id);
+  const output = job.output.join('\n').trim();
+  showDetail(job.title, output ? el('pre', {className: 'output', textContent: output})
+    : hint(job.status === 'done' ? 'Done, with nothing to show.' : finishedText(job)));
 }
 
 // names the cards on screen for a view transition, by their place in the library, so each glides from where it

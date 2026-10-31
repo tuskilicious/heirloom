@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.34.0 "Guildhall" (2026-10-31)
+
+Plugins that do what they say, in the window, from their own repository.
+
+### Changed
+- **Plugins live in their own repository**, [tuskilicious/heirloom-plugins](https://github.com/tuskilicious/heirloom-plugins),
+  and Heirloom downloads one only when you install it. Customize's plugin store lists them from there. In a
+  terminal: `heirloom plugins store`, and `heirloom plugins install|update|remove <name>`. Plugins you already have
+  keep working, and the window offers their updates.
+
+### Added
+- **Plugins can add buttons to the window.** Library worth now has "Work out my library's worth" in Customize, and the
+  window shows what it found.
+- **Discord Rich Presence is in the plugin store**, to install with one click.
+- **Customize shows why a plugin didn't load**, rather than it silently doing nothing.
+
+### Fixed
+- **Notifications come from Heirloom** rather than Windows PowerShell (update the plugin in Customize). Windows only
+  shows them with notifications turned on, in Settings → System → Notifications.
+
 ## 0.33.0 "Courier" (2026-10-31)
 
 Downloads you control: which goes next, when updates run, and how they download.

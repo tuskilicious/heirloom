@@ -23,10 +23,11 @@ from platform import platform
 from sys import exit, stdout
 from sys import platform as sys_platform
 
+import requests
 from filelock import FileLock, Timeout
 from requests.exceptions import HTTPError
 
-from heirloom import __codename__, __version__
+from heirloom import __codename__, __version__, plugin_store
 from heirloom.core import HeirloomCore
 from heirloom.downloader.queue import (
     DownloadQueue,
@@ -971,6 +972,33 @@ class HeirloomCLI:
     def manage_plugins(self, args):
         available = self.plugins.discover()
 
+        if args.action in ('install', 'update', 'remove') and not args.plugin_name:
+            logger.error(f'Name the plugin to {args.action}, e.g. "heirloom plugins {args.action} discord-presence".')
+            exit(1)
+        if args.action == 'store':
+            return self._plugin_store(available)
+        if args.action in ('install', 'update'):
+            if args.action == 'update' and args.plugin_name not in available:
+                logger.error(f'No plugin named "{args.plugin_name}" is installed.')
+                exit(1)
+            try:
+                manifest = plugin_store.install(self.plugins.folder, args.plugin_name)
+            except (requests.RequestException, ValueError, OSError) as e:
+                logger.error(f'Could not {args.action} "{args.plugin_name}": {e}')
+                exit(1)
+            self.plugins.set_enabled(manifest.name, True)
+            logger.info(f'{"Installed" if args.action == "install" else "Updated"} {manifest.common_name} '
+                        f'{manifest.version}, and turned it on.')
+            return
+        if args.action == 'remove':
+            try:
+                plugin_store.remove(self.plugins.folder, args.plugin_name)
+            except (ValueError, OSError) as e:
+                logger.error(str(e))
+                exit(1)
+            logger.info(f'Removed plugin "{args.plugin_name}".')
+            return
+
         if args.action in ('enable', 'disable'):
             if args.plugin_name not in available:
                 logger.error(f'No plugin named "{args.plugin_name}" in "{self.plugins.folder}".')
@@ -1002,6 +1030,26 @@ class HeirloomCLI:
         for folder_name, error in self.plugins.errors.items():
             if folder_name not in available:
                 print(' ' + out.alert(f'{folder_name}: {error}'))
+
+    def _plugin_store(self, available):
+        """Lists the plugins of Heirloom's plugin repository, and which are installed"""
+        try:
+            index = plugin_store.fetch_index()
+        except (requests.RequestException, ValueError) as e:
+            logger.error(f'Could not get the list of plugins from GitHub: {e}')
+            exit(1)
+        out = self.out
+        print(f'Plugins from github.com/{plugin_store.REPOSITORY}:')
+        for entry in index:
+            installed = available.get(entry['name'])
+            if not installed:
+                status = 'install with "heirloom plugins install ' + entry['name'] + '"'
+            elif plugin_store.newer(entry['version'], installed[1].version):
+                status = f'installed {installed[1].version}, update with "heirloom plugins update {entry["name"]}"'
+            else:
+                status = 'installed'
+            print(f' {out.bullet(entry["common_name"])} ({entry["name"]}) {entry["version"]} [{status}]')
+            print(f'     {entry["description"]}')
 
     def gui(self, args):
         try:
@@ -3570,9 +3618,12 @@ def main():
     achievements_parser.add_argument('--json', dest='json', action='store_true',
                                      help='Output information in JSON format')
 
-    plugins_parser.add_argument('action', nargs='?', default='list', choices=('list', 'enable', 'disable'),
-                                help='What to do (default: list)')
-    plugins_parser.add_argument('plugin_name', nargs='?', metavar='<name>', help='Plugin to enable or disable')
+    plugins_parser.add_argument('action', nargs='?', default='list',
+                                choices=('list', 'enable', 'disable', 'store', 'install', 'update', 'remove'),
+                                help='What to do (default: list); "store" lists the plugins to install from '
+                                     'github.com/tuskilicious/heirloom-plugins')
+    plugins_parser.add_argument('plugin_name', nargs='?', metavar='<name>',
+                                help='Plugin to enable, disable, install, update or remove')
 
     themes_parser.add_argument('action', nargs='?', default='list', choices=('list', 'use'),
                                help='What to do (default: list)')

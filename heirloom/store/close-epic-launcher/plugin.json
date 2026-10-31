@@ -1,6 +1,0 @@
-{
-  "name": "close-epic-launcher",
-  "common_name": "Close the Epic Games Launcher",
-  "description": "Closes the Epic Games Launcher when a game starts, so it doesn't run in the background while you play",
-  "version": "1.0.0"
-}

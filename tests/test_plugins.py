@@ -35,7 +35,13 @@ def test_manifest_defaults_and_validation(tmp_path):
     manifest = PluginManifest.read(folder)
     assert (manifest.common_name, manifest.backend) == ('my-plugin_2', 'main.py')
 
-    for bad in ({}, {'name': 'Upper'}, {'name': 'has space'}, {'name': 'ok', 'backend': '../escape.py'}):
+    (folder / 'plugin.json').write_text(json.dumps({'name': 'worth', 'actions': [
+        {'title': " Work out my library's worth ", 'command': 'worth'}]}))
+    assert PluginManifest.read(folder).actions == (("Work out my library's worth", 'worth'),)
+
+    for bad in ({}, {'name': 'Upper'}, {'name': 'has space'}, {'name': 'ok', 'backend': '../escape.py'},
+                {'name': 'ok', 'actions': [{'title': 'Run', 'command': 'rm -rf'}]},
+                {'name': 'ok', 'actions': [{'command': 'worth'}]}, {'name': 'ok', 'actions': ['worth']}):
         (folder / 'plugin.json').write_text(json.dumps(bad))
         with pytest.raises(ValueError):
             PluginManifest.read(folder)
@@ -93,6 +99,14 @@ def test_loads_only_enabled_plugins_and_isolates_failures(tmp_path, subparsers):
     calls = __import__('heirloom_plugin_good').CALLS
     assert calls == [event], 'a failing handler does not stop the next one'
     assert event.session == [], 'a plugin whose setup() failed gets no events'
+
+    assert manager.load_errors() == {'boom': manager.errors['boom'], 'typo': manager.errors['typo']}, \
+        'kept for the window, which loads no plugins itself'
+
+    # fixed, it loads, and its error is gone; the others' stay until they load
+    (plugins_dir / 'typo' / 'main.py').write_text('def setup(plugin):\n    pass\n')
+    PluginManager(plugins_dir).load(argparse.ArgumentParser().add_subparsers())
+    assert set(PluginManager(plugins_dir).load_errors()) == {'boom'}
 
     assert sub.choices['install'] is original_install, 'plugins cannot replace built-in commands'
     args = parser.parse_args(['hello', 'world'])

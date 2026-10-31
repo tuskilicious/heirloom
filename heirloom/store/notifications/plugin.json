@@ -1,6 +1,0 @@
-{
-  "name": "notifications",
-  "common_name": "Notifications",
-  "description": "A desktop notification when a game finishes installing or updating",
-  "version": "1.0.0"
-}
