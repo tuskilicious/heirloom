@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.32.0 "Mantelpiece" (2026-10-31)
+
+Your Epic achievements, in the window: per game, and as a count on the cards.
 
 ### Added
 - **Achievements in the window.** Achievements… in a game's menu (Manage, or right-click) lists its achievements:
