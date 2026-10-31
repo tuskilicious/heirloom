@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.35.0 "Gallery" (2026-11-01)
+
+Themes that rearrange the window, and a library you can drive with a controller.
 
 ### Added
 - **Four themes that change the layout**, in Customize:
