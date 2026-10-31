@@ -823,3 +823,7 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* the achievements of a game, in the dialog of the Manage menu: the locked ones dimmed */
+.achievement-icon { flex: none; width: 44px; height: 44px; border-radius: 8px; object-fit: cover; }
+.achievement:not(.unlocked) .achievement-icon { opacity: .55; filter: grayscale(1); }

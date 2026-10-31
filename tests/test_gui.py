@@ -11,6 +11,7 @@ from heirloom.gui.app import (
     GuiApi,
     Job,
     Jobs,
+    fetch_achievements,
     free_games,
     image_url,
     read_library,
@@ -83,10 +84,10 @@ def test_library_from_cached_files(fake_game):
     assert fish == {'app_name': 'Fish', 'title': 'Fish Game', 'cover': 'https://cdn/fish-tall.jpg',
                     'art': 'https://cdn/fish-wide.jpg', 'installed': True, 'version': '1', 'update': True,
                     'size': 1024 ** 3, 'store': None, 'ubisoft': False, 'cloud_saves': False, 'dlcs': 1,
-                    'played': 2.5 * 3600, 'last_played': '2026-10-26T22:00:00+00:00'}
+                    'played': 2.5 * 3600, 'last_played': '2026-10-26T22:00:00+00:00', 'achievements': None}
     assert goo == {'app_name': 'Goo', 'title': 'World of Goo', 'cover': '', 'art': '', 'installed': False,
                    'version': '7', 'update': False, 'size': None, 'store': None, 'ubisoft': True,
-                   'cloud_saves': True, 'dlcs': 0, 'played': 0, 'last_played': None}, 'not installed, and DLC is left out'
+                   'cloud_saves': True, 'dlcs': 0, 'played': 0, 'last_played': None, 'achievements': None},         'not installed, and DLC is left out'
 
 
 def run_jobs(jobs, kinds, until_done=True):
@@ -296,6 +297,84 @@ def test_moving_adding_and_dlc_of_a_game(fake_game, tmp_path):
                  lambda: api.move('Goo', str(tmp_path))):
         with pytest.raises(ValueError):
             call()
+
+
+def write_achievements(lgd_home, app_name, title, namespace, total):
+    (lgd_home / 'metadata' / f'{app_name}.json').write_text(json.dumps({
+        'app_name': app_name, 'app_title': title, 'metadata': {'namespace': namespace}, 'asset_infos': {},
+        'achievements': {'namespace': namespace, 'total_achievements': total, 'achievements': [{}] * total}}))
+
+
+def test_achievement_counts_on_the_cards(fake_game):
+    write_achievements(fake_game, 'Fish', 'Fish Game', 'fish', 40)
+    write_achievements(fake_game, 'Goo', 'World of Goo', 'goo', 12)
+    write_achievements(fake_game, 'Hat', 'Hat Game', 'hat', 5)
+    write_meta(fake_game, 'Plain', 'Plain Game')
+    # Epic answered for Fish, and had nothing unlocked for Hat; Goo wasn't asked about
+    LGDLFS().achievements = {'fish': {'totalUnlocked': 12}, 'hat': None}
+    counts = {game['app_name']: game['achievements'] for game in read_library(LGDLFS())}
+    assert counts == {'Fish': {'total': 40, 'unlocked': 12}, 'Goo': {'total': 12, 'unlocked': None},
+                      'Hat': {'total': 5, 'unlocked': 0}, 'Plain': None}
+
+
+def test_achievements_of_a_game(fake_game, monkeypatch):
+    unlocked = datetime(2026, 10, 30, 21, 40, tzinfo=timezone.utc)
+
+    def achievement(name, **found):
+        return {'display_name': name, 'description': f'{name}!', 'icon_link': f'https://cdn/{name}.png',
+                'unlocked': False, 'progress': 0.0, 'xp': 10, 'unlock_date': None, 'rarity': {'percent': 4.5}} | found
+
+    class Core:
+        def __init__(self, override_config=None):
+            pass
+
+        def get_game(self, app_name):
+            return Game(app_name=app_name, app_title='Fish Game') if app_name == 'Fish' else None
+
+        def login(self, quick=False):
+            return quick
+
+        def get_achievements(self, game, update=False):
+            assert update, "yours are asked for, as they change while playing"
+            return {'user_unlocked': 1, 'total_achievements': 4, 'user_xp': 10, 'total_product_xp': 40,
+                    'completed': [achievement('First', unlocked=True, progress=1.0, unlock_date=unlocked)],
+                    'in_progress': [achievement('Halfway', progress=0.5)],
+                    'uninitiated': [achievement('Last', rarity=None)],
+                    'hidden': [achievement('Secret')]}
+
+    monkeypatch.setattr('heirloom.core.HeirloomCore', Core)
+    found = GuiApi(None, lambda: {}).achievements('Fish')
+    assert {key: found[key] for key in ('unlocked', 'total', 'xp', 'total_xp', 'hidden')} == {
+        'unlocked': 1, 'total': 4, 'xp': 10, 'total_xp': 40, 'hidden': 1}, 'hidden ones are only counted'
+    assert [item['name'] for item in found['achievements']] == ['First', 'Halfway', 'Last']
+    assert found['achievements'][0] == {'name': 'First', 'description': 'First!', 'icon': 'https://cdn/First.png',
+                                        'unlocked': True, 'progress': 1.0, 'xp': 10,
+                                        'date': '2026-10-30T21:40:00+00:00', 'rarity': 4.5}
+    assert found['achievements'][2]['rarity'] is None
+    json.dumps(found)
+    with pytest.raises(ValueError):
+        GuiApi(None, lambda: {}).achievements('Goo')
+
+
+def test_achievements_are_fetched_only_for_games_with_them(fake_game):
+    write_achievements(fake_game, 'Fish', 'Fish Game', 'fish', 40)
+    write_achievements(fake_game, 'Broken', 'Broken Game', 'broken', 3)
+    write_meta(fake_game, 'Plain', 'Plain Game')
+    asked = []
+
+    class Core:
+        lgd = LGDLFS()
+
+        def get_game(self, app_name):
+            return self.lgd.get_game_meta(app_name)
+
+        def get_user_achievements(self, namespace, update=False):
+            asked.append((namespace, update))
+            if namespace == 'broken':
+                raise ConnectionError('Epic is down')
+
+    fetch_achievements(Core(), ['Plain', 'Broken', 'Fish', 'Missing'])
+    assert asked == [('broken', True), ('fish', True)], 'one failing game leaves the others'
 
 
 def test_settings_read_and_write_the_config(lgd_home, tmp_path):

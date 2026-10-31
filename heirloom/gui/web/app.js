@@ -188,6 +188,8 @@ function showMenu(menu, anchor, children, at = null) {
   (menu.querySelector('[aria-checked="true"]') || menu.querySelector('[role^="menuitem"]')).focus();
 }
 
+const achievementsItem = (game) => (game.achievements
+  ? menuItem('Achievements…', 'done', () => openAchievements(game)) : null);
 const activate = (game) => (game.ubisoft
   ? menuItem('Activate on Ubisoft Connect', 'done', () => run(api.activate_ubisoft())) : null);
 
@@ -197,6 +199,7 @@ function openManage(game, anchor, at = null) {
       el('p', {className: 'menu-title', textContent: game.title}),
       menuItem('Install…', 'download', () => openInstall(game)),
       menuItem('Already on this PC…', 'folder', () => locateGame(game)),
+      achievementsItem(game),
       activate(game),
     ], at);
     return;
@@ -207,6 +210,7 @@ function openManage(game, anchor, at = null) {
     menuItem('Open folder', 'folder', () => run(api.open_folder(game.app_name))),
     menuItem('Create desktop shortcut', 'desktop', () => run(api.create_shortcut(game.app_name))),
     menuItem('Launch options…', 'play', () => openLaunchOptions(game)),
+    achievementsItem(game),
     menuItem('Verify and repair', 'repair', () => run(api.repair(game.app_name))),
     menuItem('Move…', 'folder', () => moveGame(game)),
     game.dlcs ? menuItem('DLC…', 'download', () => openDlcs(game)) : null,
@@ -287,6 +291,37 @@ async function openSaves(game) {
   }
   // unless it was closed, or another game's opened, meanwhile
   if ($('#detail').open && $('#detail-title').textContent === title) showDetail(title, ...found, actions);
+}
+
+// one achievement: its icon, name and what it takes, then when you got it or how far along you are, and how rare it is
+function achievementRow(item) {
+  const rarity = item.rarity === null ? '' : `${item.rarity}% of players`;
+  const how = item.unlocked ? (item.date ? `Unlocked ${savedAt(item.date)}` : 'Unlocked')
+    : item.progress > 0 ? `${Math.floor(item.progress * 100)}% done` : '';
+  return el('li', {className: `row achievement${item.unlocked ? ' unlocked' : ''}`},
+    item.icon ? el('img', {src: item.icon, alt: '', loading: 'lazy', className: 'achievement-icon'}) : null,
+    el('span', {className: 'row-text'}, el('span', {className: 'what', textContent: item.name}),
+      el('span', {className: 'detail', textContent: item.description}),
+      el('span', {className: 'detail', textContent: [how, rarity].filter(Boolean).join(' · ')})));
+}
+
+async function openAchievements(game) {
+  const title = `Achievements of ${game.title}`;
+  showDetail(title, hint('Asking Epic…'));
+  let found;
+  try {
+    const got = await api.achievements(game.app_name);
+    found = got ? [
+      hint(`${got.unlocked} of ${got.total} unlocked · ${got.xp} of ${got.total_xp} XP`),
+      el('ul', {className: 'rows'}, ...got.achievements.map(achievementRow)),
+      got.hidden ? hint(`And ${plural(got.hidden, 'hidden achievement')}, shown once unlocked.`) : null,
+    ] : [hint('This game has no achievements.')];
+  } catch (failure) {
+    found = [hint('Could not ask Epic about them. Try again in a moment.')];
+  }
+  // unless it was closed, or another game's opened, meanwhile
+  if ($('#detail').open && $('#detail-title').textContent === title) showDetail(title, ...found);
+  poll();
 }
 
 // the tiles over a cover being downloaded, and the order they light up in as it goes: scattered, the same every time
@@ -417,11 +452,12 @@ function card(game) {
       badge: el('span', {className: 'badge', hidden: true}),
       title: el('h3', {className: 'title'}),
       status: el('p', {className: 'status'}),
+      trophies: el('p', {className: 'status trophies', hidden: true}),
       buttons: el('div', {className: 'actions'}),
       key: '',
       shown: false,
     };
-    entry.info = el('div', {className: 'info'}, entry.title, entry.status);
+    entry.info = el('div', {className: 'info'}, entry.title, entry.status, entry.trophies);
     entry.node = el('article', {className: 'card'}, entry.cover);
     entry.node.dataset.app = game.app_name;
     cards.set(game.app_name, entry);
@@ -457,6 +493,10 @@ function card(game) {
   entry.node.title = game.version ? `${game.title} (version ${game.version})` : game.title;
   entry.status.textContent = statusText(game, job);
   entry.status.classList.toggle('lit', Boolean(game.update && !job) || playing);
+  // your achievements, once Heirloom has asked Epic for them
+  const trophies = game.achievements && game.achievements.unlocked !== null ? game.achievements : null;
+  entry.trophies.hidden = !trophies;
+  entry.trophies.textContent = trophies ? `${trophies.unlocked}/${trophies.total} achievements` : '';
   entry.buttons.replaceChildren(...actions(game, job));
   return entry;
 }
