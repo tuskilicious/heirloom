@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.34.0 "Guildhall" (2026-10-31)
+
+Plugins that do what they say, in the window, from their own repository.
 
 ### Changed
 - **Plugins live in their own repository**, [tuskilicious/heirloom-plugins](https://github.com/tuskilicious/heirloom-plugins),
