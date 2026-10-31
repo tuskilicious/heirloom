@@ -638,18 +638,22 @@ function jobEnd(job, kind) {
   return stop;
 }
 
-function jobRow(job) {
+function jobRow(job, next) {
   let row = rows.get(job.id);
   if (!row) {
     const game = state.games.find((candidate) => candidate.app_name === job.app_name);
     const thumb = game && game.cover ? el('img', {src: game.cover, alt: ''}) : icon(job.kind === 'login' ? 'account' : 'games');
-    row = {detail: el('span', {className: 'detail'}), end: el('span', {className: 'job-end'}), kind: ''};
+    row = {detail: el('span', {className: 'detail'}), end: el('span', {className: 'job-end'}), kind: '',
+      next: iconButton('updates', `Download ${job.title} next`, '', () => run(api.download_next(job.id)))};
     row.node = el('li', {}, el('span', {className: 'thumb'}, thumb),
-      el('span', {className: 'job-text'}, el('span', {className: 'what', textContent: job.title}), row.detail), row.end);
+      el('span', {className: 'job-text'}, el('span', {className: 'what', textContent: job.title}), row.detail),
+      el('span', {className: 'job-controls'}, row.next, row.end));
     rows.set(job.id, row);
   }
   const active = ACTIVE.has(job.status);
   row.node.className = `job ${job.status}`;
+  // a waiting download can go ahead of the others waiting
+  row.next.hidden = job.status !== 'queued' || !DOWNLOADS.has(job.kind) || job.id === next;
   row.detail.textContent = active ? progressText(job) : finishedText(job);
   const kind = !active ? job.status : DOWNLOADS.has(job.kind) ? 'ring' : 'live';
   if (kind !== row.kind) {
@@ -674,7 +678,9 @@ function renderJobs() {
   $('#dock-title').textContent = title;
   $('#dock-progress').style.setProperty('--done', String(running ? (running.progress || 0) / 100 : 0));
   $('#activity-clear').disabled = active.length === jobs.length;
-  const nodes = jobs.map(jobRow);
+  // the waiting download that starts next
+  const next = (state.jobs.find((job) => job.status === 'queued' && DOWNLOADS.has(job.kind)) || {}).id;
+  const nodes = jobs.map((job) => jobRow(job, next));
   const order = jobs.map((job) => job.id).join();
   if (order !== jobOrder) {
     jobOrder = order;
@@ -717,8 +723,15 @@ async function poll() {
 function showSettings(settings) {
   $('#install-dir').textContent = settings.install_dir;
   $('#install-dir').title = settings.install_dir;
-  for (const name of ['max_download_speed', 'max_download_speed_while_playing']) {
+  for (const name of ['max_download_speed', 'max_download_speed_while_playing', 'max_workers', 'max_memory',
+    'preferred_cdn']) {
     if (document.activeElement !== $(`#${name}`)) $(`#${name}`).value = settings[name];
+  }
+  // not while one end is being set, before the other
+  if (![$('#window-start'), $('#window-end')].includes(document.activeElement)) {
+    const [start = '', end = ''] = settings.update_window ? settings.update_window.split('-') : [];
+    $('#window-start').value = start;
+    $('#window-end').value = end;
   }
   for (const name of ['auto_updates', 'cloud_saves', 'update_notice', 'starts_with_windows']) {
     $(`#${name}`).checked = settings[name];
@@ -1021,8 +1034,16 @@ async function start() {
   };
   $('#detail-close').onclick = () => $('#detail').close();
   $('#install-dir-change').onclick = async () => showSettings(await api.choose_install_dir());
-  for (const name of ['max_download_speed', 'max_download_speed_while_playing']) {
+  for (const name of ['max_download_speed', 'max_download_speed_while_playing', 'max_workers', 'max_memory',
+    'preferred_cdn']) {
     $(`#${name}`).onchange = (event) => saveSetting(name, event.target.value);
+  }
+  // saved once both ends are set, or both emptied
+  for (const end of ['#window-start', '#window-end']) {
+    $(end).onchange = () => {
+      const [start, until] = [$('#window-start').value, $('#window-end').value];
+      if (Boolean(start) === Boolean(until)) saveSetting('update_window', start ? `${start}-${until}` : '');
+    };
   }
   for (const name of ['auto_updates', 'cloud_saves', 'update_notice', 'starts_with_windows']) {
     $(`#${name}`).onchange = (event) => saveSetting(name, event.target.checked);

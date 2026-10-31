@@ -18,11 +18,12 @@ import time
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
-from heirloom.downloader.queue import heirloom_command, start_job, stop_job
+from heirloom.downloader.queue import TimeWindow, heirloom_command, start_job, stop_job
 from heirloom.downloader.throttle import parse_speed
 from heirloom.gui.background import (
     Tray,
@@ -56,6 +57,9 @@ WINDOW_THEME = 'heirloom'
 SWITCHES = {'cloud_saves': 'disable_cloud_save_sync', 'auto_updates': 'disable_auto_updates',
             'update_notice': 'disable_update_notice'}
 SPEEDS = ('max_download_speed', 'max_download_speed_while_playing')
+# download options for the few who need them, as whole numbers, 0 for heirloom's own choice: download threads, and
+# the memory in MiB that downloads use
+COUNTS = ('max_workers', 'max_memory')
 # Epic's public list of the games given away now and next
 FREE_GAMES = 'https://store-site-backend-static-ipv4.ak.epicgames.com/freeGamesPromotions'
 STORE_PAGE = 'https://store.epicgames.com/p/'
@@ -292,6 +296,16 @@ class Jobs:
         with self._lock:
             self._jobs.append(Job(len(self._jobs) + 1, kind, app_name, title, options=options or []))
         self._start_next()
+
+    def download_next(self, job_id: int) -> None:
+        """Moves a waiting download ahead of the other waiting ones"""
+        with self._lock:
+            job = next(job for job in self._jobs if job.id == job_id)
+            if job.status != 'queued':
+                return
+            self._jobs.remove(job)
+            first = next((index for index, other in enumerate(self._jobs) if other.status == 'queued'), len(self._jobs))
+            self._jobs.insert(first, job)
 
     def stop(self, job_id: int) -> None:
         with self._lock:
@@ -665,6 +679,12 @@ class GuiApi:
         return {
             'install_dir': str(Path(config.get('Heirloom', 'install_dir', fallback='~/Games')).expanduser()),
             **speeds,
+            # automatic updates start only in this time of day, as "01:00-07:00"; empty for any time
+            'update_window': config.get('Heirloom', 'download_window', fallback=''),
+            **{name: int(count) if (count := config.get('Heirloom', name, fallback='')).isdigit() else 0
+               for name in COUNTS},
+            # a download server to use when Epic offers it, as part of its hostname
+            'preferred_cdn': config.get('Heirloom', 'preferred_cdn', fallback=''),
             **{name: not config.getboolean('Heirloom', option, fallback=defaults.get(name, False))
                for name, option in SWITCHES.items()},
             **self.background(),
@@ -686,12 +706,34 @@ class GuiApi:
             speed = str(value).strip() or '0'
             parse_speed(speed)
             lgd.config.set('Heirloom', name, speed)
+        elif name == 'update_window':
+            # the queue of "heirloom queue" keeps to it too
+            text = str(value).strip()
+            self._set_option(lgd, 'download_window', str(TimeWindow.parse(text)) if text else '')
+        elif name in COUNTS:
+            count = str(value).strip() or '0'
+            if not count.isdigit():
+                raise ValueError('Use a whole number, 0 for Heirloom to choose')
+            self._set_option(lgd, name, '' if count == '0' else str(int(count)))
+        elif name == 'preferred_cdn':
+            host = str(value).strip().lower()
+            if not re.fullmatch(r'[a-z0-9.-]*', host):
+                raise ValueError('Use a server name, such as fastly-download.epicgames.com')
+            self._set_option(lgd, 'preferred_cdn', host)
         elif name in SWITCHES and isinstance(value, bool):
             lgd.config.set('Heirloom', SWITCHES[name], str(not value).lower())
         else:
             raise ValueError(f'No setting named "{name}"')
         lgd.save_config()
         return self.settings()
+
+    @staticmethod
+    def _set_option(lgd: LGDLFS, option: str, value: str) -> None:
+        """Sets an option of the config's Heirloom section, or removes it for an empty value: the default then"""
+        if value:
+            lgd.config.set('Heirloom', option, value)
+        else:
+            lgd.config.remove_option('Heirloom', option)
 
     def choose_install_dir(self) -> dict[str, Any]:
         """Asks for the install folder with the system's folder dialog, and keeps the choice"""
@@ -738,6 +780,9 @@ class GuiApi:
 
     def stop(self, job_id: int) -> None:
         self._jobs.stop(job_id)
+
+    def download_next(self, job_id: int) -> None:
+        self._jobs.download_next(job_id)
 
     def view(self) -> dict[str, Any]:
         """How the window was left: the shelf, the sort order, and whether the sidebar was collapsed"""
@@ -842,7 +887,15 @@ class GuiApi:
 
     def _update_games(self) -> str:
         """Starts the updates of installed games by themselves, and says which"""
-        if self._lgd().config.getboolean('Heirloom', 'disable_auto_updates', fallback=False):
+        config = self._lgd().config
+        if config.getboolean('Heirloom', 'disable_auto_updates', fallback=False):
+            return ''
+        # outside the update window they wait for the hourly refresh inside it
+        try:
+            window = TimeWindow.parse(text) if (text := config.get('Heirloom', 'download_window', fallback='')) else None
+        except ValueError:
+            window = None
+        if window and not window.contains(datetime.now()):
             return ''
         # games being played or updated, and updates stopped or failed while the window is open: Stop means stop,
         # and a failing update (a full disk, say) waits for the Update button rather than failing every hour
