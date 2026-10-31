@@ -30,7 +30,8 @@ def fake_game(lgd_home, tmp_path):
         exe.write_text('#!/bin/sh\nsleep 1\nexit "$EXIT_CODE"\n')
         exe.chmod(0o755)
 
-    (lgd_home / 'metadata').mkdir(parents=True)
+    # a GuiApi of the test before may still be reading its library, and makes the folders where heirloom's are now
+    (lgd_home / 'metadata').mkdir(parents=True, exist_ok=True)
     (lgd_home / 'metadata' / 'Fish.json').write_text(json.dumps({
         'app_name': 'Fish', 'app_title': 'Fish Game', 'metadata': {}, 'asset_infos': {}}))
     (lgd_home / 'installed.json').write_text(json.dumps({'Fish': {

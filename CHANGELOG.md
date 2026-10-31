@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.32.0 "Mantelpiece" (2026-10-31)
+
+Your Epic achievements, in the window: per game, and as a count on the cards.
+
+### Added
+- **Achievements in the window.** Achievements… in a game's menu (Manage, or right-click) lists its achievements:
+  the ones you unlocked and when, the ones in progress and how far along you are, and the share of players who have
+  each. Hidden ones are counted, and shown once unlocked.
+- **Cards show "12/40 achievements"** for games whose achievements Heirloom has asked Epic about: installed games, at
+  each refresh; a game, when it closes after playing; and any game whose Achievements… you opened.
+
 ## 0.31.0 "Workbench" (2026-10-30)
 
 The window can now move games, add ones already on disk, manage DLC, show how cloud saves stand, and activate

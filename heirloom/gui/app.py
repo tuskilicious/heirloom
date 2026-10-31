@@ -19,7 +19,7 @@ from collections import Counter
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 from heirloom.downloader.queue import heirloom_command, start_job, stop_job
@@ -41,6 +41,9 @@ from heirloom.models.game import Game
 from heirloom.plugins import PluginManager
 from heirloom.themes import Theme
 from heirloom.utils.env import is_windows_mac_or_pyi
+
+if TYPE_CHECKING:
+    from heirloom.core import HeirloomCore
 
 log = logging.getLogger('GUI')
 
@@ -203,6 +206,8 @@ def read_library(lgd: LGDLFS) -> list[dict[str, Any]]:
     latest = {(platform, asset.app_name): asset.build_version
               for platform, assets in (lgd.assets or {}).items() for asset in assets}
     playtime = lgd.get_playtime()
+    # your achievements of the games Heirloom asked Epic about, by namespace: None for games with none unlocked
+    unlocked = lgd.achievements or {}
     metas = {app_name: lgd.get_game_meta(app_name) for app_name in set(lgd.get_game_app_names()) | set(installed)}
     # how much DLC with files of its own each game has, by the game's catalog id
     downloadable = {app_name for _, app_name in latest}
@@ -231,8 +236,26 @@ def read_library(lgd: LGDLFS) -> list[dict[str, Any]]:
             # seconds played, and when the last session ended
             'played': round(sum(session.duration.total_seconds() for session in sessions)),
             'last_played': max(session.end for session in sessions).isoformat() if sessions else None,
+            # how many it has, and how many you unlocked if known
+            'achievements': {
+                'total': game.achievements.total_achievements,
+                'unlocked': (unlocked[game.namespace] or {}).get('totalUnlocked', 0) if game.namespace in unlocked else None,
+            } if game and game.achievements and game.achievements.total_achievements else None,
         })
     return sorted(games, key=lambda game: game['title'].lower())
+
+
+def fetch_achievements(core: HeirloomCore, app_names: list[str]) -> None:
+    """Asks Epic which achievements of these games you unlocked, one call each, and keeps that for the cards"""
+    for app_name in app_names:
+        game = core.get_game(app_name)
+        if not game or not game.achievements or not game.achievements.total_achievements:
+            continue
+        try:
+            core.get_user_achievements(game.namespace, update=True)
+        except Exception as e:
+            # the counts are a nicety: the library refreshes without them
+            log.warning(f'Could not get the achievements of {app_name}: {e!r}')
 
 
 @dataclass
@@ -508,6 +531,35 @@ class GuiApi:
         return {'status': status.name.lower(), 'folder': folder,
                 'local': local.isoformat() if local else None, 'cloud': cloud.isoformat() if cloud else None}
 
+    def achievements(self, app_name: str) -> dict[str, Any] | None:
+        """
+        A game's achievements and which you unlocked: unlocked ones first, newest first, then the ones in progress,
+        then the rest. It asks Epic for yours, so it takes a moment; None for a game without achievements.
+        """
+        from heirloom.core import HeirloomCore
+        core = HeirloomCore(override_config=self._config_file)
+        game = core.get_game(app_name)
+        if not game or not core.login(quick=True):
+            raise ValueError('Could not ask Epic about the achievements')
+        found = core.get_achievements(game, update=True)
+        # the card's count too
+        self._read_library()
+        if not found:
+            return None
+        return {
+            'unlocked': found['user_unlocked'], 'total': found['total_achievements'],
+            'xp': found['user_xp'], 'total_xp': found['total_product_xp'],
+            'achievements': [{
+                'name': item['display_name'], 'description': item['description'], 'icon': item['icon_link'],
+                'unlocked': item['unlocked'], 'progress': item['progress'], 'xp': item['xp'],
+                'date': item['unlock_date'].isoformat() if item['unlock_date'] else None,
+                # the share of players who have it, in percent
+                'rarity': (item['rarity'] or {}).get('percent'),
+            } for item in found['completed'] + found['in_progress'] + found['uninitiated']],
+            # hidden ones are only counted, so they stay a surprise
+            'hidden': len(found['hidden']),
+        }
+
     def activate_ubisoft(self) -> None:
         self._jobs.add('activate', '', 'Ubisoft Connect')
 
@@ -761,6 +813,19 @@ class GuiApi:
             self.refresh()
         elif job.kind in DOWNLOADS:
             self._read_library()
+        elif job.kind == 'play':
+            # achievements are unlocked while playing
+            threading.Thread(target=self._played, args=(job.app_name,), daemon=True).start()
+
+    def _played(self, app_name: str) -> None:
+        try:
+            from heirloom.core import HeirloomCore
+            core = HeirloomCore(override_config=self._config_file)
+            if core.login(quick=True):
+                fetch_achievements(core, [app_name])
+        except Exception as e:
+            log.warning(f'Could not get the achievements of {app_name}: {e!r}')
+        self._read_library()
 
     def _read_library(self) -> None:
         try:
@@ -814,6 +879,7 @@ class GuiApi:
                     # the free games are a nicety: the library refreshes without them
                     log.warning(f'Could not get the free games: {e!r}')
                 # games the Epic Games Launcher installed are added, rather than offered for download again
+                fetch_achievements(core, [igame.app_name for igame in core.get_installed_list()])
                 if imported := core.egl_import_new():
                     titles = ', '.join(core.get_installed_game(app_name).title for app_name in imported)
                     notice = f'Added from the Epic Games Launcher: {titles}.'
