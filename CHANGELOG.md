@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.33.0 "Courier" (2026-10-31)
+
+Downloads you control: which goes next, when updates run, and how they download.
+
+### Added
+- **Download next.** A waiting download in the downloads panel has a button that moves it ahead of the others
+  waiting, so it starts when the current one finishes.
+- **Update games only between set hours**, overnight say, under Settings → Downloads. Automatic updates start only
+  then; Update by hand works any time. It's the `download_window` option that `heirloom queue` keeps to as well.
+- **Advanced download settings**, folded away under Settings → Downloads: the number of download threads, the
+  memory downloads use, and a preferred download server. Empty or 0 keeps Heirloom's own choice.
+
 ## 0.32.0 "Mantelpiece" (2026-10-31)
 
 Your Epic achievements, in the window: per game, and as a count on the cards.

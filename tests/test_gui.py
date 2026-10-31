@@ -136,6 +136,19 @@ def test_a_second_download_waits_and_stop_ends_the_first_cleanly():
     assert waiting['status'] == 'done', 'the next download starts after the stop'
 
 
+def test_a_waiting_download_can_go_next():
+    started = []
+    jobs, _ = fake_jobs(started)
+    run_jobs(jobs, ['slow', 'a', 'b', 'c'], until_done=False)
+    slow, a, b, c = jobs.snapshot()
+    jobs.download_next(c['id'])
+    jobs.download_next(slow['id'])
+    assert [job['app_name'] for job in jobs.snapshot()] == ['slow', 'c', 'a', 'b'], 'a running one stays put'
+    jobs.stop(slow['id'])
+    run_jobs(jobs, [])
+    assert started == ['slow', 'c', 'a', 'b']
+
+
 def test_commands_for_each_action(fake_game):
     def api():
         return GuiApi('custom.ini', lambda: {}, command=lambda: ['heirloom'])
@@ -192,6 +205,20 @@ def test_updates_start_by_themselves(fake_game, monkeypatch):
     (fake_game / 'config.ini').write_text('[Heirloom]\ndisable_auto_updates = true\n')
     started.clear()
     assert api_starting(started)._update_games() == '' and not started, 'turned off'
+
+    # only overnight: at noon they wait, and start at the refresh after one o'clock
+    (fake_game / 'config.ini').write_text('[Heirloom]\ndownload_window = 23:00-02:00\n')
+    hour = 12
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 10, 31, hour)
+
+    monkeypatch.setattr('heirloom.gui.app.datetime', Clock)
+    assert api_starting(started)._update_games() == '' and not started, 'outside the update window'
+    hour = 1
+    assert api_starting(started)._update_games() and started == [('install', 'Fish')]
 
 
 @pytest.mark.skipif(sys.platform != 'win32', reason='the window offers the overlay on Windows only')
@@ -399,6 +426,25 @@ def test_settings_read_and_write_the_config(lgd_home, tmp_path):
         with pytest.raises(ValueError):
             api.set_setting(name, value)
     assert api.settings()['max_download_speed'] == 0.49, 'a refused value changes nothing'
+
+    assert {name: settings[name] for name in ('update_window', 'max_workers', 'max_memory', 'preferred_cdn')} == {
+        'update_window': '', 'max_workers': 0, 'max_memory': 0, 'preferred_cdn': ''}, "heirloom's own choices"
+    api.set_setting('update_window', ' 1:00 - 7:30 ')
+    api.set_setting('max_memory', '4096')
+    settings = api.set_setting('preferred_cdn', 'Fastly-Download.epicgames.com')
+    assert (settings['update_window'], settings['max_memory'], settings['preferred_cdn']) == \
+        ('01:00-07:30', 4096, 'fastly-download.epicgames.com')
+    config = (lgd_home / 'config.ini').read_text()
+    assert 'download_window = 01:00-07:30' in config, 'the same option "heirloom queue" keeps to'
+    for name in ('update_window', 'max_memory', 'preferred_cdn'):
+        api.set_setting(name, '0' if name == 'max_memory' else '')
+    config = (lgd_home / 'config.ini').read_text()
+    assert not any(option in config for option in ('download_window', 'max_memory', 'preferred_cdn')), \
+        'emptied, the default is used again'
+    for name, value in (('update_window', '7:00'), ('update_window', '01:00-01:00'), ('max_workers', '-2'),
+                        ('max_workers', '2.5'), ('preferred_cdn', 'https://cdn/x')):
+        with pytest.raises(ValueError):
+            api.set_setting(name, value)
 
 
 def test_the_window_opens_as_it_was_left(lgd_home):
