@@ -1,0 +1,117 @@
+/*
+  Retro arcade: neon on black behind a CRT's scanlines and curved-glass shading. The sidebar is a cabinet's lit
+  marquee, the type a pixel font, installed games glow cyan, and the cover under the pointer flashes PRESS START.
+  The pixel font is Press Start 2P, in fonts/ under the SIL Open Font License (OFL-PressStart2P.txt); without it a
+  monospace font stands in. A window theme that comes with Heirloom.
+*/
+@font-face { font-family: "Press Start 2P"; font-display: swap; src: url("themes/fonts/press-start-2p-latin-400-normal.woff2") format("woff2"); }
+
+:root {
+  --bg: #07010f;
+  --surface: #12052a;
+  --surface-raised: #1f0a45;
+  --border: #3d1a7c;
+  --text: #f3ebff;
+  --muted: #a690d8;
+  --accent: #ff2fd0;
+  --accent-text: #07010f;
+  --cyan: #00f0ff;
+  --gold: #ffe600;
+  --logo: var(--cyan);
+  --danger: #ff5c5c;
+  --progress: var(--cyan);
+  --unlit: grayscale(1) brightness(.42) contrast(1.25);
+  --radius: 3px;
+  --radius-control: 2px;
+  --font: "Press Start 2P", "Cascadia Mono", Consolas, ui-monospace, monospace;
+  --shadow: 0 0 0 transparent;
+  --glass: color-mix(in srgb, var(--bg) 90%, transparent);
+  --glass-strong: var(--bg);
+  --glass-edge: var(--border);
+  --glass-shine: none;
+}
+
+body { font-size: 11px; line-height: 1.8; }
+
+/* the screen: scanlines, and the dark corners of curved glass, over everything but dialogs */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(0deg, rgb(0 0 0 / 0) 0 2px, rgb(0 0 0 / 26%) 2px 3px),
+    radial-gradient(ellipse at center, transparent 58%, rgb(0 0 0 / 62%) 100%);
+  animation: crt-flicker 6s steps(1) infinite;
+}
+
+button { border-radius: var(--radius-control); text-transform: uppercase; letter-spacing: .04em; }
+.primary { box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 70%, transparent); }
+.primary:hover:not(:disabled) { box-shadow: 0 0 28px var(--accent); }
+
+/* the sidebar: an arcade cabinet's marquee */
+.rail {
+  border-right: 3px solid var(--accent);
+  background: linear-gradient(180deg, #2b0b63 0%, var(--surface) 40%, var(--bg));
+  box-shadow: 0 0 30px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.brand { filter: drop-shadow(0 0 6px var(--cyan)) drop-shadow(0 0 16px var(--cyan)); }
+.rail-item { color: #d9c9ff; font-size: 9px; letter-spacing: .06em; text-transform: uppercase; }
+.rail-item:hover:not(:disabled) { color: var(--cyan); text-shadow: 0 0 8px var(--cyan); }
+.shelves .rail-item[aria-pressed="true"] { color: var(--gold); text-shadow: 0 0 8px var(--gold); }
+.shelf-marker::before { background: var(--gold); box-shadow: 0 0 12px var(--gold); }
+.count { font-size: 8px; }
+
+.top { border: 2px solid var(--border); box-shadow: 0 0 0 1px var(--bg), 0 0 22px -4px color-mix(in srgb, var(--cyan) 50%, transparent); }
+#heading { font-size: 20px; color: var(--accent); text-shadow: 0 0 10px var(--accent), 3px 3px 0 #3d1a7c; text-transform: uppercase; }
+.summary, #search { font-size: 10px; }
+
+.hero { border: 3px solid var(--cyan); box-shadow: 0 0 34px -4px var(--cyan); }
+.hero-art { image-rendering: pixelated; }
+.hero-note { color: var(--gold); font-size: 10px; text-shadow: 0 0 8px var(--gold); text-transform: uppercase; }
+.hero-title { font-size: clamp(18px, 2.6vw, 32px); line-height: 1.35; text-shadow: 0 0 14px var(--accent), 4px 4px 0 #3d1a7c; text-transform: uppercase; }
+.hero-meta { font-size: 10px; }
+
+/* covers in glowing frames: cyan when installed, magenta under the pointer */
+.cover { border: 3px solid var(--border); border-radius: var(--radius); }
+.cover::before { background: repeating-linear-gradient(0deg, transparent 0 3px, rgb(255 255 255 / 6%) 3px 4px); transform: none; }
+.card[data-state="installed"] .cover { border-color: var(--cyan); box-shadow: 0 0 14px -2px var(--cyan); }
+.card:hover .cover,
+.card:focus-visible .cover,
+[data-input="pad"] .card:focus .cover {
+  transform: none;
+  translate: 0 -4px;
+  border-color: var(--accent);
+  box-shadow: 0 0 22px var(--accent), inset 0 0 24px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.info { border: 2px solid var(--border); border-radius: 0; background: rgb(7 1 15 / 90%); }
+.title { font-size: 9.5px; line-height: 1.7; text-transform: uppercase; }
+.info .status, .status { font-size: 8.5px; }
+.badge { border-radius: 0; font-size: 8px; box-shadow: 0 0 10px var(--accent); }
+
+/* PRESS START, blinking over the cover under the pointer */
+.cover .actions { background: linear-gradient(transparent, rgb(7 1 15 / 92%) 55%); }
+.cover .actions::before {
+  content: "PRESS START";
+  position: absolute;
+  inset: 14px 0 auto;
+  color: var(--gold);
+  font-size: 10px;
+  text-align: center;
+  text-shadow: 0 0 8px var(--gold);
+  animation: blink 1s steps(1) infinite;
+}
+.cover .actions > button { height: 30px; font-size: 9px; }
+
+.panel { border: 3px solid var(--accent); box-shadow: 0 0 40px -6px var(--accent); }
+.panel-head h2 { font-size: 15px; color: var(--accent); text-transform: uppercase; }
+.panel h3 { color: var(--cyan); font-size: 10px; }
+.menu { border: 2px solid var(--cyan); box-shadow: 0 0 22px -4px var(--cyan); }
+
+@keyframes blink { 50% { opacity: 0; } }
+@keyframes crt-flicker { 0%, 100% { opacity: 1; } 97% { opacity: .82; } }
+
+@media (prefers-reduced-motion: reduce) {
+  body::after, .cover .actions::before { animation: none; }
+}

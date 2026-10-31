@@ -1,0 +1,75 @@
+/*
+  Showcase: the library as a magazine spread. A banner most of the window high, its art drifting slowly, under a
+  headline in huge type; big covers two or three across, which float up into place as you scroll, and the light of
+  the game you played last washing over the page. A window theme that comes with Heirloom.
+*/
+:root {
+  --bg: #0c0a10;
+  --surface: #18141e;
+  --surface-raised: #231d2b;
+  --border: #33293e;
+  --text: #fbf7ff;
+  --muted: #b5a8c4;
+  --accent: #ff5ea8;
+  --accent-text: #2b0017;
+  --logo: #fbf7ff;
+  --danger: #ff8a7a;
+  --radius: 24px;
+  --radius-control: 999px;
+  --card-width: 290px;
+  --font: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --shadow: 0 30px 70px -30px rgb(0 0 0 / 85%);
+}
+
+.main { --gutter: 48px; }
+.ambient { height: 100vh; opacity: .55; filter: blur(110px) saturate(1.8); }
+#heading { font-size: 40px; font-weight: 800; letter-spacing: -.035em; }
+
+/* the banner: most of the window high, its headline in huge type */
+.hero { min-height: max(420px, 68vh); margin: 8px 0 64px; border-radius: 32px; box-shadow: var(--shadow); }
+.hero-art { animation: ken-burns 46s ease-in-out infinite alternate; transform-origin: 65% 35%; }
+.hero::after {
+  background:
+    linear-gradient(0deg, var(--bg) 0%, color-mix(in srgb, var(--bg) 70%, transparent) 30%, transparent 70%),
+    linear-gradient(90deg, color-mix(in srgb, var(--bg) 70%, transparent), transparent 60%);
+}
+.hero-body { max-width: 900px; padding: 64px 64px 56px; gap: 12px; }
+.hero-note { font-size: 12px; letter-spacing: .32em; text-transform: uppercase; }
+.hero-title {
+  font-size: clamp(48px, 7vw, 108px);
+  font-weight: 800;
+  letter-spacing: -.045em;
+  line-height: .92;
+  background: linear-gradient(100deg, var(--text) 35%, var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.hero-meta { font-size: 16px; }
+.hero .actions > button { height: 52px; padding: 0 30px; font-size: 16px; }
+.hero .actions .icon-button { width: 52px; }
+
+.free-title { font-size: 15px; letter-spacing: .2em; }
+
+/* big covers, which float up into place as they scroll into view */
+.grid { gap: 52px 34px; }
+.cover { border-radius: var(--radius); box-shadow: var(--shadow); }
+.info { inset: auto 14px 14px; padding: 14px 16px; border-radius: 16px; }
+.title { font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+.info .status { font-size: 13px; }
+.card:hover .cover { translate: 0 -10px; }
+
+@supports (animation-timeline: view()) {
+  .card:not(.rising) { animation: float-in linear both; animation-timeline: view(); animation-range: entry 0% cover 30%; }
+  /* the middle of each row trails a little behind, so the rows move like layers */
+  .card:nth-child(3n + 2):not(.rising) { animation-range: entry 8% cover 38%; }
+  .hero-body { animation: hero-lift linear both; animation-timeline: scroll(root); animation-range: 0 70vh; }
+}
+
+@keyframes ken-burns { from { transform: scale(1.04); } to { transform: scale(1.2) translate(-3%, 2%); } }
+@keyframes float-in { from { opacity: 0; transform: translateY(70px) scale(.94); } }
+@keyframes hero-lift { to { opacity: .15; transform: translateY(-90px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-art, .card:not(.rising), .hero-body { animation: none !important; }
+}

@@ -465,6 +465,15 @@ kbd {
 }
 
 .info .status { font-size: 12px; }
+/* size, time played and last played: columns in Compact list, hidden otherwise */
+.meta { display: none; margin: 0; }
+.library-head { display: none; }
+/* a card reached with the keyboard or a gamepad lifts and glows like one under the pointer */
+.card { outline: none; }
+.card:focus-visible .cover, [data-input="pad"] .card:focus .cover {
+  translate: 0 -6px;
+  box-shadow: 0 0 0 3px var(--accent), 0 18px 40px -10px color-mix(in srgb, var(--accent) 45%, transparent);
+}
 
 /* the plate makes way for the buttons under the pointer or the keyboard */
 .card:is(:hover, :focus-within) .cover:has(.actions:not(:empty)) .info { opacity: 0; transform: translateY(8px); }
@@ -578,6 +587,24 @@ kbd {
 .choice:has(:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .choice:has(:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .choice input { accent-color: var(--accent); margin: 0; }
+/* a theme's tile: a little window in its colours, a sidebar and three covers */
+.choice:has(.theme-preview) { flex-direction: column; align-items: flex-start; gap: 8px; padding: 10px; border-radius: var(--radius-control); }
+.choice:has(.theme-preview) input { position: absolute; opacity: 0; }
+.choice:has(.theme-preview) { position: relative; }
+.theme-preview {
+  display: grid;
+  grid-template-columns: 14px repeat(3, 1fr);
+  gap: 4px;
+  width: 96px;
+  height: 58px;
+  padding: 6px;
+  border-radius: 6px;
+  background: var(--p-bg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--p-text) 14%, transparent);
+}
+.theme-preview i { border-radius: 3px; background: var(--p-surface); }
+.theme-preview i:first-child { background: color-mix(in srgb, var(--p-surface) 70%, var(--p-bg)); }
+.theme-preview i:nth-child(3) { background: var(--p-accent); }
 
 .rows { margin: 8px 0; padding: 0; list-style: none; }
 .row { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
