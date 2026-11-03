@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.37.1 "Caretaker" (2026-11-04)
+
+A test of Heirloom installing its own update, with no other changes. If you have 0.37.0 from the installer, it
+arrives by itself once the window is closed.
+
 ## 0.37.0 "Caretaker" (2026-11-04)
 
 Heirloom keeps itself up to date.
