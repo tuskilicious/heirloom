@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.35.1 "Gallery" (2026-11-03)
+
+A controller you can see, and a Showcase that scrolls smoothly.
 
 ### Fixed
 - **A controller now shows what it's on.** In dialogs and menus it moved between controls with nothing to show where
