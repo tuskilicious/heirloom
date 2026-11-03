@@ -33,7 +33,7 @@ def installed_by_setup() -> bool:
 def other_heirlooms_running() -> bool:
     """Whether another heirloom.exe uses the files to replace: a game started from a shortcut, or a download"""
     output = subprocess.run(['tasklist', '/fi', 'imagename eq heirloom.exe', '/fo', 'csv', '/nh'], capture_output=True,
-                            text=True, check=True, creationflags=subprocess.CREATE_NO_WINDOW).stdout
+                            text=True, check=True, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)).stdout
     return output.lower().count('heirloom.exe') > 1
 
 
@@ -76,5 +76,6 @@ def start_install(setup: Path) -> None:
         arguments.append('/MERGETASKS="!startup"')
     env = os.environ | {'HL_PID': str(os.getpid()), 'HL_SETUP': str(setup), 'HL_ARGUMENTS': ' '.join(arguments),
                         'HL_REOPEN': str(Path(sys.executable).with_name('heirloom-gui.exe'))}
+    flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0) | getattr(subprocess, 'CREATE_BREAKAWAY_FROM_JOB', 0)
     subprocess.Popen(['powershell', '-NoProfile', '-NonInteractive', '-Command', INSTALL], env=env,
-                     creationflags=subprocess.CREATE_NO_WINDOW | subprocess.CREATE_BREAKAWAY_FROM_JOB)
+                     creationflags=flags)
