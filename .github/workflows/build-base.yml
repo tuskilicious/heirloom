@@ -90,6 +90,21 @@ jobs:
         if ($startup -ne "`"$dir\heirloom-gui.exe`" --background") { throw "starts with Windows as: $startup" }
         "installed: $version"
 
+        # updating itself: silently over the copy that's there, keeping "starts with Windows" off, and reopening it
+        Remove-ItemProperty $run -Name Heirloom
+        New-Item "$dir\_internal\stale" | Out-Null
+        $update = Join-Path $env:RUNNER_TEMP 'self_update'
+        New-Item -ItemType Directory $update | Out-Null
+        Copy-Item installer\Output\heirloom_windows_x64_setup.exe "$update\setup.exe"
+        uv run python -c "import sys; from pathlib import Path; from heirloom.gui.self_update import start_install; sys.executable = sys.argv[1]; start_install(Path(sys.argv[2]))" "$dir\heirloom.exe" "$update\setup.exe"
+        for ($i = 0; $i -lt 120 -and -not (Get-Process heirloom -ErrorAction SilentlyContinue | Where-Object Path -eq "$dir\heirloom.exe"); $i++) { Start-Sleep 1 }
+        Get-Content "$update\setup.log" -Tail 5
+        if (-not (Get-Process heirloom -ErrorAction SilentlyContinue | Where-Object Path -eq "$dir\heirloom.exe")) { throw 'Heirloom did not reopen after updating itself' }
+        Get-Process heirloom | Where-Object Path -eq "$dir\heirloom.exe" | Stop-Process -Force
+        if (Test-Path "$dir\_internal\stale") { throw 'the update did not replace the old files' }
+        if ((Get-ItemProperty $run).PSObject.Properties.Name -contains 'Heirloom') { throw 'the update turned starting with Windows back on' }
+        'updated itself'
+
         Start-Process "$dir\unins000.exe" -ArgumentList $silent -Wait
         # the uninstaller finishes from a copy of itself
         for ($i = 0; $i -lt 60 -and (Test-Path "$dir\heirloom.exe"); $i++) { Start-Sleep 1 }

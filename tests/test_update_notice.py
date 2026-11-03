@@ -1,11 +1,16 @@
 """Heirloom's own update notice, from its latest GitHub release."""
+import hashlib
+import time
+
 import pytest
 import requests
 
 from heirloom import __version__
 from heirloom.api.lgd import LGDAPI, is_newer, release_info
 from heirloom.core import HeirloomCore
-from heirloom.gui.app import GuiApi
+from heirloom.gui.app import GuiApi, Job
+from heirloom.gui.self_update import DOWNLOAD_PREFIX, fetch_setup
+from heirloom.lfs.lgndry import LGDLFS
 
 GITHUB_RELEASE = {
     'tag_name': '9.1.0',
@@ -24,6 +29,7 @@ def test_release_reads_like_the_feeds_release_info():
         'summary': 'Heirloom learns to grow tomatoes.',
         'gh_url': 'https://github.com/tuskilicious/heirloom/releases/tag/9.1.0',
         'critical': False,
+        'setup': {'url': 'https://github.com/dl/heirloom_windows_x64_setup.exe', 'sha256': ''},
         'downloads': {'windows': 'https://github.com/dl/heirloom_windows_x64_setup.exe',
                       'macos': 'https://github.com/dl/heirloom_macOS.zip'},
     }, 'the installer is preferred, and a platform without its file has no download'
@@ -101,3 +107,85 @@ def test_window_offers_the_update(lgd_home, monkeypatch):
     monkeypatch.setattr(HeirloomCore, 'update_notice_enabled', lambda self: False)
     api._refresh()
     assert api.state()['update'] is None, 'disable_update_notice hides it in the window too'
+
+
+@pytest.fixture
+def setup_files(lgd_home, monkeypatch):
+    """A window that came from the installer, and a release whose installer holds these bytes"""
+    monkeypatch.setattr('heirloom.gui.app.installed_by_setup', lambda: True)
+    monkeypatch.setattr('heirloom.gui.app.other_heirlooms_running', lambda: False)
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def raise_for_status(self):
+            pass
+
+        def iter_content(self, _):
+            return [b'installer']
+
+    monkeypatch.setattr('heirloom.gui.self_update.requests.get', lambda *_, **__: Response())
+    return {'version': '9.1.0', 'setup': {'url': f'{DOWNLOAD_PREFIX}9.1.0/setup.exe',
+                                          'sha256': hashlib.sha256(b'installer').hexdigest()}}
+
+
+def fetched_api(release):
+    api = GuiApi(None, lambda: {})
+    assert api._self_update(release) == ''
+    for _ in range(100):
+        if not api._fetching_setup:
+            break
+        time.sleep(0.02)
+    return api
+
+
+def test_a_new_release_waits_ready_and_installs_once(setup_files, monkeypatch):
+    started = []
+    monkeypatch.setattr('heirloom.gui.app.start_install', started.append)
+    api = fetched_api(setup_files)
+    assert api.state()['update_ready'] and api._setup.read_bytes() == b'installer'
+
+    api._jobs._jobs[:] = [Job(1, 'play', 'Fish', 'Fish Game', 'running')]
+    assert not api._install_update() and not started, 'not while a game is running'
+    api._jobs._jobs[:] = [Job(1, 'play', 'Fish', 'Fish Game', 'done')]
+    monkeypatch.setattr('heirloom.gui.app.other_heirlooms_running', lambda: True)
+    assert not api._install_update() and not started, 'nor while a shortcut or a terminal is using its files'
+    monkeypatch.setattr('heirloom.gui.app.other_heirlooms_running', lambda: False)
+
+    setup = api._setup
+    assert api._install_update() and started == [setup]
+
+    # it reopened on the old version, so the install failed
+    assert 'could not install itself' in GuiApi(None, lambda: {})._self_update(setup_files), 'one try for each release'
+    assert not fetched_api(None).state()['update_ready'] and not setup.parent.exists(), 'up to date: cleared up'
+
+
+def test_an_installer_that_does_not_match_is_not_kept(setup_files):
+    setup_files['setup']['sha256'] = '0' * 64
+    api = fetched_api(setup_files)
+    assert not api.state()['update_ready']
+    assert not list((LGDLFS().path / 'self_update').iterdir()), 'neither it nor its partial download stays'
+
+
+@pytest.mark.parametrize('setup', [{'url': 'https://example.com/setup.exe', 'sha256': 'abc'},
+                                   {'url': f'{DOWNLOAD_PREFIX}9.1.0/setup.exe', 'sha256': ''}])
+def test_an_installer_from_elsewhere_or_without_a_checksum_is_refused(setup_files, setup, tmp_path):
+    with pytest.raises(ValueError):
+        fetch_setup(setup, tmp_path / 'update' / 'setup.exe')
+    assert not (tmp_path / 'update').exists()
+
+
+def test_turned_off_or_outside_the_installer_nothing_is_downloaded(setup_files, monkeypatch):
+    api = GuiApi(None, lambda: {})
+    lgd = api._lgd()
+    lgd.config.set('Heirloom', 'disable_self_update', 'true')
+    lgd.save_config()
+    assert api._self_update(setup_files) == '' and not api._fetching_setup
+    lgd.config.set('Heirloom', 'disable_self_update', 'false')
+    lgd.save_config()
+    monkeypatch.setattr('heirloom.gui.app.installed_by_setup', lambda: False)
+    assert api._self_update(setup_files) == '' and not api._fetching_setup
