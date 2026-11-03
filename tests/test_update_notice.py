@@ -74,6 +74,26 @@ def test_newer_release_is_an_update(core, monkeypatch):
     assert later.lgd.get_cached_version()['last_update'] == fetched, 'the feed was not fetched again'
 
 
+def test_a_refresh_of_the_window_asks_github_within_the_hour(core, monkeypatch):
+    monkeypatch.setattr(LGDAPI, 'get_heirloom_release', lambda self: release_info(GITHUB_RELEASE))
+    core.check_for_updates(force=True)
+    monkeypatch.setattr(LGDAPI, 'get_heirloom_release',
+                        lambda self: release_info(GITHUB_RELEASE | {'tag_name': '9.2.0'}))
+
+    def login(self):
+        self.check_for_updates()
+        return True
+
+    monkeypatch.setattr('heirloom.gui.app.logged_in_user', lambda lgd: 'Tester')
+    monkeypatch.setattr(HeirloomCore, 'login', login)
+    monkeypatch.setattr(HeirloomCore, 'get_game_and_dlc_list', lambda self, **kwargs: None)
+    monkeypatch.setattr(HeirloomCore, 'update_notice_enabled', lambda self: True)
+    monkeypatch.setattr('heirloom.gui.app.free_games', lambda *_: [])
+    api = GuiApi(None, lambda: {})
+    api._refresh()
+    assert api.state()['update']['version'] == '9.2.0'
+
+
 def test_current_release_is_no_update(core, monkeypatch):
     monkeypatch.setattr(LGDAPI, 'get_heirloom_release',
                         lambda self: release_info(GITHUB_RELEASE | {'tag_name': __version__}))

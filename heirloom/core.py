@@ -126,6 +126,8 @@ class HeirloomCore:
             self.log.warning('Could not determine locale, falling back to en-US')
 
         self.update_available = False
+        # the window asks GitHub at each refresh, rather than each hour
+        self.force_release_check = False
         self.force_show_update = False
         self.webview_killswitch = False
         self.overlay_update_available = False
@@ -320,7 +322,7 @@ class HeirloomCore:
         # The feed is upstream Legendary's: its release_info is about Legendary, but its other data
         # (EGL settings, game workarounds) still applies. Heirloom's own release comes from GitHub, asked
         # each hour rather than each day, so a new release is offered the day it is out.
-        if fetched == now or now - version_info.get('heirloom_release_checked', 0) > 3600:
+        if self.force_release_check or fetched == now or now - version_info.get('heirloom_release_checked', 0) > 3600:
             version_info['heirloom_release_checked'] = now
             try:
                 version_info['heirloom_release'] = self.lgdapi.get_heirloom_release()

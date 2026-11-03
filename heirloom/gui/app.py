@@ -1128,6 +1128,7 @@ class GuiApi:
         try:
             from heirloom.core import HeirloomCore
             core = HeirloomCore(override_config=self._config_file)
+            core.force_release_check = True
             if not logged_in_user(core.lgd):
                 notice = 'Log in to see your games.'
             elif not core.login():
