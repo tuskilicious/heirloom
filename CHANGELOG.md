@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.37.0 "Caretaker" (2026-11-04)
+
+Heirloom keeps itself up to date.
 
 ### New
 - **Heirloom installs its own updates.** When a new version is out it downloads the installer and checks it against
