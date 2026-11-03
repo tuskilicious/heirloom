@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- **Refresh now always looks for a new Heirloom.** It could wait up to an hour since the last look.
+
 ## 0.37.1 "Caretaker" (2026-11-04)
 
 A test of Heirloom installing its own update, with no other changes. If you have 0.37.0 from the installer, it
