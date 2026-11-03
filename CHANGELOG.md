@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.36.0 "Cabinet" (2026-11-03)
+
+A page for each game, collections of your own, and updates that always show.
 
 ### New
 - **A page for each game.** Click a game, press Space, or press X on a controller to see its art, developer, sizes,
@@ -11,7 +13,7 @@
 
 ### Fixed
 - **An update now always shows in the window.** The window could keep using its cached copy of the old page after an
-  update, sometimes for days, so new features and fixes didn't appear even though they were installed.
+  update, so new features and fixes didn't appear even though they were installed.
 
 ## 0.35.1 "Gallery" (2026-11-03)
 
