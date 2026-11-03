@@ -1,5 +1,6 @@
 """The backend of "heirloom gui": the library it shows, the jobs it runs, and theme CSS. No window needed."""
 import json
+import socket
 import sys
 import time
 from datetime import datetime, timedelta, timezone
@@ -14,6 +15,7 @@ from heirloom.gui.app import (
     fetch_achievements,
     free_games,
     image_url,
+    page_port,
     read_library,
 )
 from heirloom.lfs.lgndry import LGDLFS
@@ -84,10 +86,12 @@ def test_library_from_cached_files(fake_game):
     assert fish == {'app_name': 'Fish', 'title': 'Fish Game', 'cover': 'https://cdn/fish-tall.jpg',
                     'art': 'https://cdn/fish-wide.jpg', 'installed': True, 'version': '1', 'update': True,
                     'size': 1024 ** 3, 'store': None, 'ubisoft': False, 'cloud_saves': False, 'dlcs': 1,
-                    'played': 2.5 * 3600, 'last_played': '2026-10-26T22:00:00+00:00', 'achievements': None}
+                    'played': 2.5 * 3600, 'last_played': '2026-10-26T22:00:00+00:00', 'achievements': None,
+                    'developer': None, 'added': None, 'about': None}
     assert goo == {'app_name': 'Goo', 'title': 'World of Goo', 'cover': '', 'art': '', 'installed': False,
                    'version': '7', 'update': False, 'size': None, 'store': None, 'ubisoft': True,
-                   'cloud_saves': True, 'dlcs': 0, 'played': 0, 'last_played': None, 'achievements': None},         'not installed, and DLC is left out'
+                   'cloud_saves': True, 'dlcs': 0, 'played': 0, 'last_played': None, 'achievements': None,
+                   'developer': None, 'added': None, 'about': None},         'not installed, and DLC is left out'
 
 
 def run_jobs(jobs, kinds, until_done=True):
@@ -457,6 +461,72 @@ def test_the_window_opens_as_it_was_left(lgd_home):
         'kept between runs, and anything unknown left out'
     (lgd_home / 'window.json').write_text('not json')
     assert api.view()['sort'] == 'title'
+
+
+def test_an_updated_page_is_served_on_a_port_of_its_own(tmp_path, monkeypatch):
+    monkeypatch.setattr('heirloom.gui.app.WEB', tmp_path)
+    (tmp_path / 'app.js').write_text('old')
+    old = page_port()
+    assert page_port() == old, 'the same page keeps its port, and so its cache'
+    (tmp_path / 'app.js').write_text('new')
+    assert page_port() != old, "or the browser's cache keeps showing the old page after an update"
+
+    new = page_port()
+    with socket.socket() as taken:
+        taken.bind(('127.0.0.1', new))
+        assert page_port() == new + 1, 'a port in use is passed over'
+
+
+def test_what_a_games_page_says_about_it(lgd_home):
+    (lgd_home / 'metadata').mkdir(parents=True)
+    write_meta(lgd_home, 'Bird', 'Bird Game', developer='Nest', description='Bird Game',
+               creationDate='2019-01-01T00:00:00.000Z',
+               releaseInfo=[{'dateAdded': '2020-05-06T00:00:00.000Z'}])
+    write_meta(lgd_home, 'Cat', 'Cat Game', description='Catch mice.', creationDate='2021-01-01T00:00:00.000Z')
+    write_meta(lgd_home, 'Dog', 'Dog Game', description='Short.', longDescription='Dig for bones.')
+    bird, cat, dog = read_library(LGDLFS())
+    assert (bird['developer'], bird['added'], bird['about']) == ('Nest', '2020-05-06T00:00:00.000Z', None), \
+        'a description that only repeats the title says nothing'
+    assert (cat['developer'], cat['added'], cat['about']) == (None, '2021-01-01T00:00:00.000Z', 'Catch mice.')
+    assert dog['about'] == 'Dig for bones.'
+
+
+def test_collections_are_kept_between_runs(lgd_home):
+    api = GuiApi(None, lambda: {})
+    assert api.collections() == []
+    api.save_collections([{'name': ' Co-op ', 'games': ['Fish', 'Goo', 'Fish']}, {'name': 'Backlog', 'games': []}])
+    assert GuiApi(None, lambda: {}).collections() == [{'name': 'Co-op', 'games': ['Fish', 'Goo']},
+                                                      {'name': 'Backlog', 'games': []}], \
+        'in order, with names trimmed and games listed once'
+
+
+@pytest.mark.parametrize('bad', [
+    'Co-op', [{'name': '', 'games': []}], [{'name': 'x' * 41, 'games': []}], [{'name': 'Co-op'}],
+    [{'name': 'Co-op', 'games': [1]}], [{'name': 'Co-op', 'games': []}, {'name': 'CO-OP', 'games': []}], ['Co-op']])
+def test_collections_that_cant_be_kept_are_refused(lgd_home, bad):
+    api = GuiApi(None, lambda: {})
+    api.save_collections([{'name': 'Mine', 'games': ['Fish']}])
+    with pytest.raises(ValueError):
+        api.save_collections(bad)
+    assert api.collections() == [{'name': 'Mine', 'games': ['Fish']}], 'what you had is untouched'
+
+
+def test_a_collections_file_that_cant_be_read_is_set_aside(lgd_home):
+    lgd_home.mkdir(parents=True, exist_ok=True)
+    (lgd_home / 'collections.json').write_text('{broken')
+    api = GuiApi(None, lambda: {})
+    assert api.collections() == []
+    api.save_collections([{'name': 'New', 'games': []}])
+    assert (lgd_home / 'collections.json.bad').read_text() == '{broken'
+    assert api.collections() == [{'name': 'New', 'games': []}]
+
+
+def test_the_window_opens_on_the_collection_it_was_left_on(lgd_home):
+    api = GuiApi(None, lambda: {})
+    api.set_view({'filter': 'collection:Co-op'})
+    assert GuiApi(None, lambda: {}).view()['filter'] == 'collection:Co-op'
+    api.set_view({'filter': 'nonsense'})
+    assert api.view()['filter'] == 'collection:Co-op', 'anything else is still left out'
 
 
 def test_open_folder_of_a_game_whose_files_are_gone(fake_game, tmp_path):

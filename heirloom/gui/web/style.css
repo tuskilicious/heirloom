@@ -166,6 +166,13 @@ button:disabled { opacity: .55; cursor: default; }
 .shelves .rail-item .icon { transition: color .2s, filter .3s, transform .4s var(--spring); }
 .shelves .rail-item:hover .icon { transform: translateX(2px); }
 
+/* your collections scroll in the room the sidebar has, and the marker scrolls with them */
+.shelves { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; }
+.collections { display: flex; flex-direction: column; gap: 2px; }
+.collections-head { z-index: 1; display: flex; flex: none; align-items: center; justify-content: space-between; margin-top: 14px; padding: 0 2px 2px 12px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.collections-head .icon-button { width: 26px; height: 26px; }
+.rail.collapsed .collections-head { justify-content: center; padding: 0; }
+
 /* glides to the chosen shelf; its citron edge is the lantern's light */
 .shelf-marker {
   position: absolute;
@@ -685,6 +692,39 @@ kbd {
 .free-text { min-width: 0; padding-top: 2px; }
 .free-game > button, .free-game > .owned { align-self: end; justify-self: start; height: 32px; }
 .free-game > .owned { display: flex; align-items: center; color: var(--muted); font-size: 13px; }
+
+/* a game's page: the whole window, with its art fading into the page */
+.game-page { width: 100vw; height: 100vh; max-width: none; max-height: none; margin: 0; padding: 0; overflow-y: auto; border: 0; background: var(--bg); color: var(--text); scrollbar-width: thin; }
+.game-page[open] { animation: game-page-in .22s var(--ease); }
+.game-page.no-art .game-body { margin-top: 0; padding-top: 72px; }
+#game-close { position: fixed; top: 16px; left: 16px; z-index: 1; width: 40px; height: 40px; border-radius: 50%; background: color-mix(in srgb, var(--surface-raised) 85%, transparent); color: var(--text); backdrop-filter: blur(8px); }
+.game-art { display: block; width: 100%; height: min(46vh, 520px); object-fit: cover; mask-image: linear-gradient(#000 50%, transparent); }
+.game-body { position: relative; max-width: 920px; margin: -96px auto 0; padding: 0 40px 56px; }
+.game-body h2 { margin: 0; font-size: clamp(28px, 4vw, 44px); line-height: 1.1; letter-spacing: -.02em; }
+.game-by { margin: 8px 0 0; color: var(--muted); font-size: 14px; }
+.game-by:empty { display: none; }
+.game-body .status { margin: 6px 0 0; font-size: 14px; }
+.game-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 20px; }
+.game-actions button { height: 40px; }
+.game-actions button:not(.icon-button) { padding: 0 16px; }
+.game-actions .primary { min-width: 128px; }
+.game-facts { display: flex; flex-wrap: wrap; gap: 12px 40px; margin: 28px 0 0; }
+.game-facts:empty { display: none; }
+.game-facts dt { color: var(--muted); font-size: 12px; }
+.game-facts dd { margin: 2px 0 0; font-size: 16px; font-weight: 600; }
+.game-about { max-width: 68ch; margin: 28px 0 0; color: var(--muted); font-size: 15px; line-height: 1.55; white-space: pre-line; }
+.game-section { margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border); }
+.game-section h3 { margin: 0 0 10px; color: var(--muted); font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.game-section .ghost, #detail-body > .ghost { height: 36px; padding: 0 12px; }
+@keyframes game-page-in { from { opacity: 0; transform: translateY(10px); } }
+
+/* ticking the collections a game is in */
+.checks { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.checks:empty { display: none; }
+.check { display: flex; align-items: center; gap: 8px; min-height: 36px; max-width: 100%; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius-control); font-size: 14px; cursor: pointer; }
+.check:has(:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.check input { flex: none; margin: 0; accent-color: var(--accent); }
+.check span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* the launch options dialog: one field */
 .launch-dialog { width: min(480px, calc(100vw - 40px)); }

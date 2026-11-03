@@ -30,6 +30,15 @@ let api;
 let state = {user: null, refreshing: false, notice: '', games: [], jobs: []};
 let libraryDrawn = '';
 let filter = 'all';
+// your collections, in order: {name, games: [app_name]}
+let collections = [];
+const COLLECTION_FILTER = 'collection:';
+const COLLECTION_NAME_LENGTH = 40;
+// the game whose page is open, and what its page was last drawn from
+let pageApp = null;
+let pageKey = '';
+// a click on a game that a double click would play waits to see if it's one
+let pageTimer = 0;
 let sort = 'title';
 // the notice closed with its X, until a different one comes
 let dismissedNotice = '';
@@ -179,6 +188,8 @@ function menuItem(label, iconName, onclick, className = '') {
 
 function showMenu(menu, anchor, children, at = null) {
   menu.replaceChildren(...children.filter(Boolean));
+  // an open dialog makes everything outside it unusable
+  (anchor.closest('dialog') || document.body).append(menu);
   // closing it with Escape or a choice puts the keyboard back on the button
   menu.onbeforetoggle = (event) => {
     if (event.newState === 'closed' && anchor.isConnected && menu.contains(document.activeElement)) anchor.focus();
@@ -198,12 +209,15 @@ const achievementsItem = (game) => (game.achievements
 const activate = (game) => (game.ubisoft
   ? menuItem('Activate on Ubisoft Connect', 'done', () => run(api.activate_ubisoft())) : null);
 
+const collectionsItem = (game) => menuItem('Collections…', 'folder', () => openCollections(game));
+
 function openManage(game, anchor, at = null) {
   if (!game.installed) {
     showMenu($('#manage'), anchor, [
       el('p', {className: 'menu-title', textContent: game.title}),
       menuItem('Install…', 'download', () => openInstall(game)),
       menuItem('Already on this PC…', 'folder', () => locateGame(game)),
+      collectionsItem(game),
       achievementsItem(game),
       activate(game),
     ], at);
@@ -215,6 +229,7 @@ function openManage(game, anchor, at = null) {
     menuItem('Open folder', 'folder', () => run(api.open_folder(game.app_name))),
     menuItem('Create desktop shortcut', 'desktop', () => run(api.create_shortcut(game.app_name))),
     menuItem('Launch options…', 'play', () => openLaunchOptions(game)),
+    collectionsItem(game),
     achievementsItem(game),
     menuItem('Verify and repair', 'repair', () => run(api.repair(game.app_name))),
     menuItem('Move…', 'folder', () => moveGame(game)),
@@ -236,6 +251,153 @@ function showDetail(title, ...children) {
 }
 
 const hint = (text, className = 'hint') => el('p', {className, textContent: text});
+
+const activeCollection = () => (filter.startsWith(COLLECTION_FILTER)
+  ? collections.find((collection) => collection.name === filter.slice(COLLECTION_FILTER.length)) : null);
+
+// saved one after another, as each save replaces the whole file
+let collectionsSaved = Promise.resolve();
+
+function saveCollections() {
+  collectionsSaved = collectionsSaved.then(() => api.save_collections(collections)).catch((failure) => {
+    console.error('Saving the collections failed', failure);
+    showDetail('Collections', hint('Could not save your collections. Your last change may be lost when Heirloom closes.'));
+  });
+  renderCollections();
+  renderShelves();
+  renderLibrary();
+  if ($('#game').open) renderGameCollections(state.games.find((game) => game.app_name === pageApp));
+}
+
+// asks for a collection's name in the small dialog, then hands it on
+function askCollectionName(title, current, done) {
+  const input = el('input', {type: 'text', className: 'text', value: current, maxLength: COLLECTION_NAME_LENGTH,
+    autocomplete: 'off', ariaLabel: 'Name'});
+  const error = el('p', {className: 'hint error', role: 'alert', hidden: true});
+  const form = el('form', {
+    className: 'field',
+    onsubmit: (event) => {
+      event.preventDefault();
+      const name = input.value.trim();
+      const taken = collections.some((collection) => collection.name !== current
+        && collection.name.toLowerCase() === name.toLowerCase());
+      error.textContent = taken ? 'You already have a collection with that name.' : 'It needs a name.';
+      error.hidden = Boolean(name) && !taken;
+      if (!error.hidden) return;
+      $('#detail').close();
+      done(name);
+    },
+  }, input, error, el('div', {className: 'panel-actions'},
+    button('Cancel', 'ghost', () => $('#detail').close()),
+    button('Save', 'primary', () => form.requestSubmit())));
+  showDetail(title, form);
+  input.focus();
+  input.select();
+}
+
+function newCollection(game = null, after = () => {}) {
+  askCollectionName('New collection', '', (name) => {
+    collections.push({name, games: game ? [game.app_name] : []});
+    saveCollections();
+    after();
+  });
+}
+
+function renameCollection(collection) {
+  askCollectionName(`Rename ${collection.name}`, collection.name, (name) => {
+    const wasShown = activeCollection() === collection;
+    collection.name = name;
+    if (wasShown) setFilter(COLLECTION_FILTER + name);
+    saveCollections();
+    saveView();
+  });
+}
+
+function deleteCollection(collection) {
+  if (!confirm(`Delete the collection ${collection.name}? The games stay in your library.`)) return;
+  const wasShown = activeCollection() === collection;
+  collections = collections.filter((other) => other !== collection);
+  if (wasShown) setFilter('all');
+  saveCollections();
+  saveView();
+}
+
+// a checkbox for each collection, for putting a game in it or taking it out, and a way to start a new one
+function collectionChecks(game, redraw) {
+  return [
+    el('div', {className: 'checks'}, ...collections.map((collection) => el('label', {className: 'check'},
+      el('input', {
+        type: 'checkbox',
+        checked: collection.games.includes(game.app_name),
+        onchange: (event) => {
+          collection.games = collection.games.filter((app) => app !== game.app_name);
+          if (event.target.checked) collection.games.push(game.app_name);
+          saveCollections();
+        },
+      }), el('span', {textContent: collection.name})))),
+    button('New collection', 'ghost', () => newCollection(game, redraw), 'plus'),
+  ];
+}
+
+function openCollections(game) {
+  showDetail(`Collections of ${game.title}`, ...collectionChecks(game, () => openCollections(game)));
+}
+
+function renderGameCollections(game) {
+  $('#game-collections').replaceChildren(...collectionChecks(game, () => renderGameCollections(game)));
+}
+
+function renderGamePage() {
+  if (!$('#game').open) return;
+  const game = state.games.find((candidate) => candidate.app_name === pageApp);
+  if (!game) {
+    $('#game').close();
+    return;
+  }
+  const job = activeJob(game.app_name);
+  const key = JSON.stringify([game, job]);
+  if (key === pageKey) return;
+  pageKey = key;
+  const art = $('#game-art');
+  const src = game.art || game.cover;
+  if (art.getAttribute('src') !== src) art.src = src;
+  art.hidden = !src;
+  $('#game').classList.toggle('no-art', !src);
+  $('#game-title').textContent = game.title;
+  const added = game.added ? `On Epic since ${new Date(game.added).getFullYear()}` : '';
+  $('#game-by').textContent = [game.developer, added].filter(Boolean).join(' · ');
+  $('#game-status').textContent = job ? progressText(job) : statusText(game, null);
+  const hadFocus = $('#game-actions').contains(document.activeElement);
+  const trophies = game.achievements && game.achievements.unlocked !== null ? ` ${game.achievements.unlocked}/${game.achievements.total}` : '';
+  $('#game-actions').replaceChildren(...[
+    ...actions(game, job),
+    !job && !game.store && !game.installed ? manageButton(game) : null,
+    game.achievements ? button(`Achievements${trophies}`, 'ghost', () => openAchievements(game), 'done') : null,
+    game.installed && game.cloud_saves ? button('Cloud saves', 'ghost', () => openSaves(game), 'cloud') : null,
+    game.installed && game.dlcs ? button('DLC', 'ghost', () => openDlcs(game), 'download') : null,
+  ].filter(Boolean));
+  if (hadFocus && !$('#game-actions').contains(document.activeElement)) focusGameAction();
+  const facts = [['Size', game.size && formatSize(game.size)],
+    ['Played', game.played && formatPlayed(game.played).replace(/ played$/, '')],
+    ['Last played', game.last_played && formatDay(game.last_played).replace(/^on /, '')],
+    ['Version', game.version]].filter(([, value]) => value);
+  $('#game-facts').replaceChildren(...facts.flatMap(([name, value]) => [
+    el('div', {}, el('dt', {textContent: name}), el('dd', {textContent: value}))]));
+  $('#game-about').textContent = game.about || '';
+  $('#game-about').hidden = !game.about;
+}
+
+const focusGameAction = () => ($('#game-actions').querySelector('button') || $('#game-close')).focus();
+
+function openGame(game) {
+  pageApp = game.app_name;
+  pageKey = '';
+  $('#game').showModal();
+  renderGamePage();
+  renderGameCollections(game);
+  $('#game').scrollTop = 0;
+  focusGameAction();
+}
 // an action of the dialog: it closes, then the job starts
 const detailAction = (call) => () => {
   $('#detail').close();
@@ -523,8 +685,14 @@ function skeleton() {
 // searching ignores case, spaces and punctuation: "hitman3" finds "HITMAN 3"
 const searchable = (text) => text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
 
+function onShelf(game) {
+  const collection = activeCollection();
+  return filter === 'all' || (filter === 'installed' && game.installed) || (filter === 'updates' && game.update)
+    || Boolean(collection && collection.games.includes(game.app_name));
+}
+
 function shown(game, query) {
-  return (filter === 'all' || (filter === 'installed' && game.installed) || (filter === 'updates' && game.update))
+  return onShelf(game)
     && (!query || searchable(game.title).includes(query) || searchable(game.app_name).includes(query));
 }
 
@@ -540,6 +708,7 @@ function emptyText(query) {
   if (query) return `No games match "${$('#search').value.trim()}".`;
   if (filter === 'installed') return 'Nothing installed yet.';
   if (filter === 'updates') return 'Everything is up to date.';
+  if (activeCollection()) return 'Nothing in this collection yet. Open a game and tick it.';
   return 'No games yet.';
 }
 
@@ -576,14 +745,32 @@ function renderLibrary() {
   $('#empty-login').hidden = Boolean(state.user || state.games.length || loggingIn());
 }
 
+// the collections in the sidebar; a game Epic no longer lists stays in its collection, in case it comes back, but
+// isn't counted
+function renderCollections() {
+  $('#collections').replaceChildren(...collections.map((collection) => {
+    const item = el('button', {type: 'button', className: 'rail-item', title: collection.name},
+      icon('folder'), el('span', {className: 'label', textContent: collection.name}), el('span', {className: 'count'}));
+    item.dataset.filter = COLLECTION_FILTER + collection.name;
+    item.setAttribute('aria-pressed', String(item.dataset.filter === filter));
+    return item;
+  }));
+  moveMarker();
+}
+
 function renderShelves() {
   const installed = state.games.filter((game) => game.installed);
   const updates = state.games.filter((game) => game.update);
   const counts = {all: state.games.length, installed: installed.length, updates: updates.length};
+  const listed = new Set(state.games.map((game) => game.app_name));
+  for (const collection of collections) {
+    counts[COLLECTION_FILTER + collection.name] = collection.games.filter((app) => listed.has(app)).length;
+  }
   for (const item of document.querySelectorAll('[data-filter]')) {
     item.querySelector('.count').textContent = counts[item.dataset.filter] || '';
   }
-  $('#heading').textContent = SHELVES[filter];
+  const collection = activeCollection();
+  $('#heading').textContent = collection ? collection.name : SHELVES[filter];
   let summary = '';
   if (filter === 'all' && state.games.length) {
     summary = `${plural(state.games.length, 'game')}, ${installed.length} installed`;
@@ -592,13 +779,16 @@ function renderShelves() {
     summary = `${plural(installed.length, 'game')}, ${formatSize(size)} on disk`;
   } else if (filter === 'updates' && updates.length) {
     summary = `${plural(updates.length, 'update')} ready to install`;
+  } else if (collection && counts[filter]) {
+    const inIt = state.games.filter((game) => collection.games.includes(game.app_name) && game.installed).length;
+    summary = `${plural(counts[filter], 'game')}, ${inIt} installed`;
   }
   $('#summary').textContent = summary;
 }
 
 function moveMarker() {
-  const active = document.querySelector(`[data-filter="${filter}"]`);
-  $('#shelf-marker').style.setProperty('--y', `${active.offsetTop}px`);
+  const active = [...document.querySelectorAll('[data-filter]')].find((item) => item.dataset.filter === filter);
+  if (active) $('#shelf-marker').style.setProperty('--y', `${active.offsetTop}px`);
 }
 
 // a theme whose hero shows the focused game sets --hero: focus (Big Picture)
@@ -723,6 +913,7 @@ function render() {
   renderHero();
   renderFree();
   renderLibrary();
+  renderGamePage();
 }
 
 async function poll() {
@@ -938,7 +1129,8 @@ function primaryAction(game) {
   else run(game.update ? api.install(game.app_name) : api.play(game.app_name));
 }
 
-// a gamepad, polled while one is connected: the D-pad or left stick moves, A chooses, B goes back, Y opens Manage.
+// a gamepad, polled while one is connected: the D-pad or left stick moves, A chooses, B goes back, X opens the game's
+// page, Y opens Manage.
 // A direction held repeats, after a pause
 let padFrame = 0;
 const padHeld = new Map();
@@ -956,12 +1148,12 @@ function pollGamepad() {
   const button = (index) => Boolean(pad.buttons[index] && pad.buttons[index].pressed);
   const [x = 0, y = 0] = pad.axes;
   const pressed = {up: button(12) || y < -0.6, down: button(13) || y > 0.6, left: button(14) || x < -0.6,
-    right: button(15) || x > 0.6, a: button(0), b: button(1), y: button(3)};
+    right: button(15) || x > 0.6, a: button(0), b: button(1), x: button(2), y: button(3)};
   const now = performance.now();
   for (const [name, down] of Object.entries(pressed)) {
     const next = padHeld.get(name);
     if (!down) padHeld.delete(name);
-    else if (next === undefined || (now >= next && !'aby'.includes(name))) {
+    else if (next === undefined || (now >= next && !'abxy'.includes(name))) {
       padHeld.set(name, now + (next === undefined ? 380 : 110));
       padPress(name);
     }
@@ -980,7 +1172,8 @@ function manageCard(game, node) {
 function padPress(name) {
   document.documentElement.dataset.input = 'pad';
   const menu = document.querySelector('.menu:popover-open');
-  const dialog = document.querySelector('dialog[open]');
+  // the newest: a dialog opened from a game's page comes after #game in the page
+  const dialog = [...document.querySelectorAll('dialog[open]')].pop();
   if (name === 'b') {
     if (menu) menu.hidePopover();
     else if (dialog) dialog.close();
@@ -1008,8 +1201,9 @@ function padPress(name) {
   }
   const game = state.games.find((candidate) => candidate.app_name === current.dataset.app);
   if (name === 'a') primaryAction(game);
+  else if (name === 'x' && game) openGame(game);
   else if (name === 'y' && game && !game.store) manageCard(game, current);
-  else if (name !== 'y') moveFocus(current, name);
+  else if (name !== 'x' && name !== 'y') moveFocus(current, name);
 }
 
 // names the cards on screen for a view transition, by their place in the library, so each glides from where it
@@ -1086,12 +1280,26 @@ async function start() {
     renderFree();
     renderLibrary();
   });
-  for (const item of document.querySelectorAll('[data-filter]')) {
-    item.onclick = () => {
-      setFilter(item.dataset.filter);
-      saveView();
-    };
-  }
+  $('#collection-new').onclick = () => newCollection();
+  document.querySelector('.shelves').onclick = (event) => {
+    const item = event.target.closest('[data-filter]');
+    if (!item) return;
+    setFilter(item.dataset.filter);
+    saveView();
+  };
+  // a right click on a collection renames or deletes it
+  $('#collections').oncontextmenu = (event) => {
+    const item = event.target.closest('[data-filter]');
+    if (!item) return;
+    event.preventDefault();
+    const collection = collections.find((other) => COLLECTION_FILTER + other.name === item.dataset.filter);
+    showMenu($('#manage'), item, [
+      el('p', {className: 'menu-title', textContent: collection.name}),
+      menuItem('Rename…', 'settings', () => renameCollection(collection)),
+      el('hr'),
+      menuItem('Delete', 'trash', () => deleteCollection(collection), 'danger'),
+    ], {x: event.clientX, y: event.clientY});
+  };
   $('#rail-toggle').onclick = () => {
     setRailCollapsed(!$('#rail').classList.contains('collapsed'));
     saveView();
@@ -1126,8 +1334,17 @@ async function start() {
     const node = event.target.closest('.card[data-app]');
     return node && {node, game: state.games.find((game) => game.app_name === node.dataset.app)};
   };
+  // a click on a game opens its page
+  $('#library').onclick = (event) => {
+    const found = gameOf(event);
+    if (!found || !found.game || event.target.closest('button') || event.detail > 1) return;
+    clearTimeout(pageTimer);
+    if (found.game.installed && !activeJob(found.game.app_name)) pageTimer = setTimeout(() => openGame(found.game), 250);
+    else openGame(found.game);
+  };
   // a double click on an installed game plays it
   $('#library').ondblclick = (event) => {
+    clearTimeout(pageTimer);
     const found = gameOf(event);
     if (!found || !found.game || !found.game.installed || event.target.closest('button')
       || activeJob(found.game.app_name)) return;
@@ -1209,9 +1426,13 @@ async function start() {
     if (step) {
       event.preventDefault();
       moveFocus(node, step);
-    } else if (event.key === 'Enter' || event.key === ' ') {
+    } else if (event.key === 'Enter') {
       event.preventDefault();
       primaryAction(gameOf(event).game);
+    } else if (event.key === ' ') {
+      event.preventDefault();
+      const {game} = gameOf(event);
+      if (game) openGame(game);
     } else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
       event.preventDefault();
       const {game} = gameOf(event);
@@ -1250,6 +1471,10 @@ async function start() {
     locateGame(game, folder);
   };
   $('#detail-close').onclick = () => $('#detail').close();
+  $('#game-close').onclick = () => $('#game').close();
+  $('#game').onclose = () => {
+    pageApp = null;
+  };
   $('#install-dir-change').onclick = async () => showSettings(await api.choose_install_dir());
   for (const name of ['max_download_speed', 'max_download_speed_while_playing', 'max_workers', 'max_memory',
     'preferred_cdn']) {
@@ -1288,7 +1513,12 @@ async function start() {
   const view = await api.view();
   setRailCollapsed(view.rail_collapsed);
   setSort(view.sort);
-  setFilter(view.filter);
+  collections = await api.collections();
+  renderCollections();
+  // a collection deleted since is gone from the shelves
+  const shelfGone = view.filter.startsWith(COLLECTION_FILTER)
+    && !collections.some((collection) => COLLECTION_FILTER + collection.name === view.filter);
+  setFilter(shelfGone ? 'all' : view.filter);
   await showThemes();
   await poll();
   api.refresh();

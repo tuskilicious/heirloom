@@ -31,8 +31,9 @@ body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; font
   flex-direction: row;
   align-items: center;
   gap: 4px;
-  width: auto;
+  width: 100%;
   height: 68px;
+  transition: none;
   padding: 0 28px;
   border-right: 0;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
@@ -43,7 +44,14 @@ body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; font
 .rail.collapsed .logo { display: block; }
 .rail.collapsed .mark { display: none; }
 .rail.collapsed :is(.label, .count) { opacity: 1; }
-.shelves { flex-direction: row; gap: 4px; }
+.shelves { flex-direction: row; gap: 4px; align-items: center; overflow: auto hidden; }
+.collections { display: contents; }
+.collections-head { margin: 0; padding: 0; }
+.collections-head .label { display: none; }
+.collections-head .icon-button { width: 46px; height: 46px; }
+.rail-item { flex: none; }
+.game-body h2 { font-size: clamp(36px, 5vw, 64px); }
+.game-actions button { height: 52px; font-size: 16px; }
 .shelf-marker, #rail-toggle { display: none; }
 .rail-item { width: auto; height: 46px; padding: 0 16px; border-radius: 999px; font-size: 15px; }
 .rail-item .label { flex: none; }
