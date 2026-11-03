@@ -468,6 +468,10 @@ kbd {
 /* size, time played and last played: columns in Compact list, hidden otherwise */
 .meta { display: none; margin: 0; }
 .library-head { display: none; }
+/* with a gamepad, what it's on always shows: the browser hides the ring when focus was moved by the page */
+[data-input="pad"] :focus:not(.card) { outline: 3px solid var(--accent); outline-offset: 3px; }
+/* inside the menu's edge, which would clip it */
+[data-input="pad"] .menu :focus { outline-offset: -3px; }
 /* a card reached with the keyboard or a gamepad lifts and glows like one under the pointer */
 .card { outline: none; }
 .card:focus-visible .cover, [data-input="pad"] .card:focus .cover {

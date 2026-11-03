@@ -60,11 +60,16 @@
 .card:hover .cover { translate: 0 -10px; }
 
 @supports (animation-timeline: view()) {
-  .card:not(.rising) { animation: float-in linear both; animation-timeline: view(); animation-range: entry 0% cover 30%; }
+  /* only the cards near the screen: on all of a large library this costs two thirds of the frame rate */
+  .card.near:not(.rising) { animation: float-in linear both; animation-timeline: view(); animation-range: entry 0% cover 30%; }
   /* the middle of each row trails a little behind, so the rows move like layers */
-  .card:nth-child(3n + 2):not(.rising) { animation-range: entry 8% cover 38%; }
+  .card.near:nth-child(3n + 2):not(.rising) { animation-range: entry 8% cover 38%; }
   .hero-body { animation: hero-lift linear both; animation-timeline: scroll(root); animation-range: 0 70vh; }
 }
+
+/* pill-shaped buttons, but not pill-shaped boxes */
+.menu, .output, .choice:has(.theme-preview) { border-radius: 16px; }
+.menu button { border-radius: 10px; }
 
 @keyframes ken-burns { from { transform: scale(1.04); } to { transform: scale(1.2) translate(-3%, 2%); } }
 @keyframes float-in { from { opacity: 0; transform: translateY(70px) scale(.94); } }

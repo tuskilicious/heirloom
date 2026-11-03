@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.35.1 "Gallery" (2026-11-03)
+
+A controller you can see, and a Showcase that scrolls smoothly.
+
+### Fixed
+- **A controller now shows what it's on.** In dialogs and menus it moved between controls with nothing to show where
+  it was, so A could press a button you couldn't see was selected. What it's on now has a clear ring, until you use
+  the mouse.
+- **The first press on a controller brings the chosen game into view**, rather than leaving it under a tall banner.
+- **A controller is picked up even if its "connected" event was missed**, such as one already in use before the
+  window had focus.
+- **The Manage menu opens on the game** when opened with a controller or the keyboard, rather than far from it, and
+  the ring around what's selected is no longer cut off by the menu's edge.
+- **Showcase scrolls about three times as smoothly.** Its scroll animation ran on every cover in the library; it now
+  runs only on the ones near the screen, which took a 564-game library from about 20–26 to 67 frames a second.
+
 ## 0.35.0 "Gallery" (2026-11-01)
 
 Themes that rearrange the window, and a library you can drive with a controller.

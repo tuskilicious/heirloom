@@ -39,6 +39,11 @@ let heroKey = '';
 // the states of the Epic overlay's jobs, to redraw Customize when one finishes
 let overlayJobs = '';
 const cards = new Map();
+// marks the cards near the screen (.near), so a theme can animate those alone: a scroll animation on every card of
+// a large library takes the window from about 60 frames a second to about 20
+const nearScreen = new IntersectionObserver((entries) => {
+  for (const entry of entries) entry.target.classList.toggle('near', entry.isIntersecting);
+}, {rootMargin: '400px'});
 const rows = new Map();
 // finished jobs taken off the list with "Clear finished"
 const cleared = new Set();
@@ -463,6 +468,7 @@ function card(game) {
     // focusable for moving through the library with the arrow keys or a gamepad (see moveFocus)
     entry.node = el('article', {className: 'card', tabIndex: -1}, entry.cover);
     entry.node.dataset.app = game.app_name;
+    nearScreen.observe(entry.node);
     cards.set(game.app_name, entry);
   }
   const job = activeJob(game.app_name);
@@ -731,6 +737,8 @@ async function poll() {
   }
   render();
   showPluginOutput();
+  // a gamepad the browser announced before the page listened, or while the window was hidden in the tray
+  if (navigator.getGamepads && [...navigator.getGamepads()].some(Boolean)) startGamepad();
   const overlay = state.jobs.filter((job) => job.kind.startsWith('overlay')).map((job) => job.status).join();
   if (overlay !== overlayJobs) {
     overlayJobs = overlay;
@@ -935,6 +943,10 @@ function primaryAction(game) {
 let padFrame = 0;
 const padHeld = new Map();
 
+function startGamepad() {
+  if (!padFrame) padFrame = requestAnimationFrame(pollGamepad);
+}
+
 function pollGamepad() {
   const pad = [...navigator.getGamepads()].find(Boolean);
   if (!pad) {
@@ -955,6 +967,14 @@ function pollGamepad() {
     }
   }
   padFrame = requestAnimationFrame(pollGamepad);
+}
+
+// the Manage menu of a card reached without the pointer, on the part of it that's on screen: covers can be taller
+// than the room above or below them
+function manageCard(game, node) {
+  const box = node.getBoundingClientRect();
+  const y = (Math.max(box.top, 0) + Math.min(box.bottom, innerHeight)) / 2;
+  openManage(game, node, {x: box.left + box.width / 2 + 105, y});
 }
 
 function padPress(name) {
@@ -978,13 +998,17 @@ function padPress(name) {
   }
   const current = document.activeElement && document.activeElement.closest('.card[data-app]');
   if (!current) {
+    // the first press picks the first game, brought into view (it can be below a tall banner)
     const first = visibleCards()[0];
-    if (first) first.focus();
+    if (first) {
+      first.focus({preventScroll: true});
+      first.scrollIntoView({block: 'center'});
+    }
     return;
   }
   const game = state.games.find((candidate) => candidate.app_name === current.dataset.app);
   if (name === 'a') primaryAction(game);
-  else if (name === 'y' && game && !game.store) openManage(game, current);
+  else if (name === 'y' && game && !game.store) manageCard(game, current);
   else if (name !== 'y') moveFocus(current, name);
 }
 
@@ -1191,12 +1215,12 @@ async function start() {
     } else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
       event.preventDefault();
       const {game} = gameOf(event);
-      if (game && !game.store) openManage(game, node);
+      if (game && !game.store) manageCard(game, node);
     }
   });
-  window.addEventListener('gamepadconnected', () => {
-    if (!padFrame) padFrame = requestAnimationFrame(pollGamepad);
-  });
+  window.addEventListener('gamepadconnected', startGamepad);
+  // the mouse takes over from the gamepad, and its focus ring goes
+  document.addEventListener('pointerdown', () => delete document.documentElement.dataset.input);
   const closeInstall = () => {
     installing = null;
     $('#install').close();
