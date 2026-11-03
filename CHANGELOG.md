@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### New
+- **Heirloom installs its own updates.** When a new version is out it downloads the installer and checks it against
+  GitHub's checksum. Once the window is closed and no game or download is running, it installs and comes back in the
+  tray. This is for copies from the installer on Windows, and Settings can turn it off. Should an install fail, it
+  isn't tried again and the sidebar's download link stays.
+
 ## 0.36.0 "Cabinet" (2026-11-03)
 
 A page for each game, collections of your own, and updates that always show.

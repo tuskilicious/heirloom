@@ -37,6 +37,12 @@ from heirloom.gui.background import (
     starts_with_windows,
     startup_command,
 )
+from heirloom.gui.self_update import (
+    fetch_setup,
+    installed_by_setup,
+    other_heirlooms_running,
+    start_install,
+)
 from heirloom.lfs.eos import (
     add_registry_entries,
     query_registry_entries,
@@ -59,7 +65,7 @@ WINDOW_THEME = 'heirloom'
 WINDOW_COLORS = {'bg': '#01211a', 'surface': '#0b3028', 'accent': '#f3fb88', 'text': '#f7faf2'}
 # switches in Settings, and the config options they turn the other way: each is on unless disabled
 SWITCHES = {'cloud_saves': 'disable_cloud_save_sync', 'auto_updates': 'disable_auto_updates',
-            'update_notice': 'disable_update_notice'}
+            'update_notice': 'disable_update_notice', 'self_update': 'disable_self_update'}
 SPEEDS = ('max_download_speed', 'max_download_speed_while_playing')
 # download options for the few who need them, as whole numbers, 0 for heirloom's own choice: download threads, and
 # the memory in MiB that downloads use
@@ -473,6 +479,9 @@ class GuiApi:
         self._notice = ''
         # a newer Heirloom release: version, name and url
         self._update: dict[str, str] | None = None
+        # a newer release's installer that is downloaded and checked, waiting for the window to be closed
+        self._setup: Path | None = None
+        self._fetching_setup = False
         self._free_games: list[dict[str, Any]] = []
         # counts the changes to the games and free games, so the page is sent them only when they changed
         self._revision = 0
@@ -490,7 +499,7 @@ class GuiApi:
         self._read.wait()
         with self._lock:
             state = {'user': self._user, 'refreshing': self._refreshing, 'notice': self._notice,
-                     'update': self._update, 'revision': self._revision, 'jobs': self._jobs.snapshot()}
+                     'update': self._update, 'update_ready': self._setup is not None, 'revision': self._revision, 'jobs': self._jobs.snapshot()}
             if revision != self._revision:
                 state |= {'games': self._games, 'free_games': self._free_games}
             return state
@@ -849,7 +858,7 @@ class GuiApi:
     def background(self) -> dict[str, Any]:
         """Whether Heirloom keeps going in the tray, and whether it starts with Windows (only from the installer)"""
         return {'tray': Tray.available(), 'startup_possible': startup_command() is not None,
-                'starts_with_windows': starts_with_windows()}
+                'starts_with_windows': starts_with_windows(), 'self_update_possible': installed_by_setup()}
 
     def overlay(self) -> dict[str, Any] | None:
         """
@@ -972,6 +981,64 @@ class GuiApi:
             self._index = (index, time.monotonic())
         return index, ''
 
+    def _self_update_on(self) -> bool:
+        return installed_by_setup() and not self._lgd().config.getboolean('Heirloom', 'disable_self_update',
+                                                                          fallback=False)
+
+    def _setup_path(self, version: str) -> Path:
+        return self._lgd().path / 'self_update' / f'heirloom_{version}_setup.exe'
+
+    def _fetch_setup(self, release: dict[str, Any]) -> None:
+        path = self._setup_path(release['version'])
+        try:
+            fetch_setup(release['setup'], path)
+            with self._lock:
+                self._setup = path
+        except Exception as e:
+            log.warning(f'Could not download Heirloom {release["version"]}: {e!r}')
+        finally:
+            with self._lock:
+                self._fetching_setup = False
+
+    def _self_update(self, release: dict[str, Any] | None) -> str:
+        """Gets a newer release's installer ready, or clears up after an update; says if installing it failed"""
+        if not release:
+            with self._lock:
+                self._setup = None
+            shutil.rmtree(self._lgd().path / 'self_update', ignore_errors=True)
+            return ''
+        if not self._self_update_on() or not release.get('setup'):
+            return ''
+        # one try for each release, as an installer that fails would otherwise quit and reopen Heirloom over and over
+        if self._setup_path(release['version']).with_suffix('.tried').exists():
+            with self._lock:
+                self._setup = None
+            return f'Heirloom {release["version"]} could not install itself. You can download it from the sidebar.'
+        with self._lock:
+            if self._fetching_setup or self._setup:
+                return ''
+            self._fetching_setup = True
+        threading.Thread(target=self._fetch_setup, args=(release,), daemon=True).start()
+        return ''
+
+    def _install_update(self) -> bool:
+        """Starts installing the waiting release if nothing is in the way, and then Heirloom should quit"""
+        with self._lock:
+            setup = self._setup
+        if not setup or not self._self_update_on():
+            return False
+        if any(job['status'] in ('queued', 'running') for job in self._jobs.snapshot()):
+            return False
+        try:
+            if other_heirlooms_running():
+                return False
+            setup.with_suffix('.tried').touch()
+            start_install(setup)
+        except (OSError, subprocess.SubprocessError) as e:
+            log.warning(f'Could not start installing {setup.name}: {e!r}')
+            return False
+        return True
+
     def _close(self) -> None:
         self._jobs.stop_downloads()
 
@@ -1057,7 +1124,7 @@ class GuiApi:
         return f'Updating by itself: {", ".join(game["title"] for game in games)}.' if games else ''
 
     def _refresh(self) -> None:
-        notice, update, refreshed, fetched = '', None, False, 0.0
+        notice, update, refreshed, fetched, newer = '', None, False, 0.0, None
         try:
             from heirloom.core import HeirloomCore
             core = HeirloomCore(override_config=self._config_file)
@@ -1086,8 +1153,9 @@ class GuiApi:
                     notice = f'Added from the Epic Games Launcher: {titles}.'
                 refreshed = True
             # logging in checks for a newer Heirloom
-            if core.update_available and core.update_notice_enabled() and (release := core.get_update_info()):
-                update = {'version': release['version'], 'name': release['name'], 'url': release['gh_url']}
+            newer = core.get_update_info() if core.update_available else None
+            if newer and core.update_notice_enabled():
+                update = {'version': newer['version'], 'name': newer['name'], 'url': newer['gh_url']}
         except Exception as e:
             log.warning(f'Refreshing the library failed: {e!r}')
             notice = f'Refreshing the library failed: {e}'
@@ -1096,7 +1164,7 @@ class GuiApi:
         if refreshed:
             with self._lock:
                 self._fetched = fetched
-            notice = ' '.join(filter(None, (notice, self._update_games())))
+            notice = ' '.join(filter(None, (notice, self._update_games(), self._self_update(newer))))
         with self._lock:
             self._notice, self._update, self._refreshing = notice, update, False
 
@@ -1113,8 +1181,13 @@ def run(config_file: str | None, load_themes: Callable[[], dict[str, Theme]], ba
     tray = Tray.available()
     # the window, once there is one: a second "heirloom gui" may ask for it before
     opened: list[webview.Window] = []
+    # nobody is using the window, so a new release can install without taking it away from them
+    hidden = threading.Event()
+    if background and tray:
+        hidden.set()
 
     def show() -> None:
+        hidden.clear()
         for window in opened:
             window.show()
             window.restore()
@@ -1133,6 +1206,7 @@ def run(config_file: str | None, load_themes: Callable[[], dict[str, Theme]], ba
         if not tray or quitting.is_set():
             return True
         window.hide()
+        hidden.set()
         return False
 
     def quit_heirloom() -> None:
@@ -1140,15 +1214,26 @@ def run(config_file: str | None, load_themes: Callable[[], dict[str, Theme]], ba
         window.destroy()
 
     window.events.closing += closing
-    if tray:
-        Tray(show, quit_heirloom).start()
+    icon = Tray(show, quit_heirloom) if tray else None
+    if icon:
+        icon.start()
 
     def refresh_hourly() -> None:
         # new versions turn up while Heirloom keeps going, and their updates start by themselves
         while not quitting.wait(60 * 60):
             api.refresh()
 
+    def install_when_hidden() -> None:
+        while not quitting.wait(30):
+            if hidden.is_set() and api._install_update():
+                try:
+                    if icon:
+                        icon.stop()
+                finally:
+                    quit_heirloom()
+
     threading.Thread(target=refresh_hourly, daemon=True).start()
+    threading.Thread(target=install_when_hidden, daemon=True).start()
     try:
         # a profile of its own that is kept, so covers come from the disk cache rather than Epic each time
         webview.start(private_mode=False, storage_path=str(config_dir / 'webview'), http_port=page_port())

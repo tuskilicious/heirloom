@@ -836,8 +836,11 @@ function renderRail() {
   update.hidden = !release;
   if (release) {
     update.href = release.url;
-    update.title = `Heirloom ${release.version} "${release.name}" is out: open its download page`;
-    update.querySelector('.label').textContent = `Get Heirloom ${release.version}`;
+    update.title = state.update_ready
+      ? `Heirloom ${release.version} "${release.name}" installs itself when you close this window`
+      : `Heirloom ${release.version} "${release.name}" is out: open its download page`;
+    update.querySelector('.label').textContent = state.update_ready ? `Heirloom ${release.version} is ready`
+      : `Get Heirloom ${release.version}`;
   }
 }
 
@@ -951,10 +954,11 @@ function showSettings(settings) {
     $('#window-start').value = start;
     $('#window-end').value = end;
   }
-  for (const name of ['auto_updates', 'cloud_saves', 'update_notice', 'starts_with_windows']) {
+  for (const name of ['auto_updates', 'cloud_saves', 'update_notice', 'self_update', 'starts_with_windows']) {
     $(`#${name}`).checked = settings[name];
   }
   $('#startup-row').hidden = !settings.tray;
+  $('#self-update-row').hidden = !settings.self_update_possible;
   $('#starts_with_windows').disabled = !settings.startup_possible;
   $('#startup-detail').textContent = settings.startup_possible
     ? 'In the tray, so games update before you play. Closing the window keeps Heirloom there; Quit is in its menu.'
@@ -1487,7 +1491,7 @@ async function start() {
       if (Boolean(start) === Boolean(until)) saveSetting('update_window', start ? `${start}-${until}` : '');
     };
   }
-  for (const name of ['auto_updates', 'cloud_saves', 'update_notice', 'starts_with_windows']) {
+  for (const name of ['auto_updates', 'cloud_saves', 'update_notice', 'self_update', 'starts_with_windows']) {
     $(`#${name}`).onchange = (event) => saveSetting(name, event.target.checked);
   }
   for (const folder of document.querySelectorAll('[data-folder]')) {
