@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.36.0 "Cabinet" (2026-11-03)
+
+A page for each game, collections of your own, and updates that always show.
+
+### New
+- **A page for each game.** Click a game, press Space, or press X on a controller to see its art, developer, sizes,
+  time played, achievements, cloud saves and DLC together. A double click, Enter and A still play straight away.
+- **Collections.** Group your games your own way, such as "Co-op" or "Backlog". The sidebar lists them as shelves that
+  sort and search like the others. Add a game from its page or the Manage menu; right-click a collection to rename or
+  delete it. They're kept in `collections.json` next to Heirloom's other settings.
+
+### Fixed
+- **An update now always shows in the window.** The window could keep using its cached copy of the old page after an
+  update, so new features and fixes didn't appear even though they were installed.
+
 ## 0.35.1 "Gallery" (2026-11-03)
 
 A controller you can see, and a Showcase that scrolls smoothly.

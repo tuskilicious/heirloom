@@ -58,6 +58,7 @@ button { border-radius: var(--radius-control); text-transform: uppercase; letter
 }
 .brand { filter: drop-shadow(0 0 6px var(--cyan)) drop-shadow(0 0 16px var(--cyan)); }
 .rail-item { color: #d9c9ff; font-size: 9px; letter-spacing: .06em; text-transform: uppercase; }
+.collections-head { font-size: 9px; letter-spacing: .06em; text-transform: uppercase; }
 .rail-item:hover:not(:disabled) { color: var(--cyan); text-shadow: 0 0 8px var(--cyan); }
 .shelves .rail-item[aria-pressed="true"] { color: var(--gold); text-shadow: 0 0 8px var(--gold); }
 .shelf-marker::before { background: var(--gold); box-shadow: 0 0 12px var(--gold); }

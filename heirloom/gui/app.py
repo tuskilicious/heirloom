@@ -11,10 +11,12 @@ import os
 import re
 import shlex
 import shutil
+import socket
 import subprocess
 import sys
 import threading
 import time
+import zlib
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
@@ -69,6 +71,11 @@ STORE_PAGE = 'https://store.epicgames.com/p/'
 FOLDER_DIALOG = 20
 # how the window shows the library, kept between runs in window.json: the first of each is the default
 VIEW_CHOICES = {'filter': ('all', 'installed', 'updates'), 'sort': ('title', 'recent', 'played', 'size')}
+# below the range Windows hands out to programs by itself
+PAGE_PORTS = range(42002, 49000)
+# the shelf of a collection, as window.json and the page name it: this and the collection's name
+COLLECTION_FILTER = 'collection:'
+COLLECTION_NAME_LENGTH = 40
 # portrait art first, as the library shows covers
 COVER_TYPES = ('DieselGameBoxTall', 'OfferImageTall', 'DieselStoreFrontTall', 'Thumbnail', 'DieselGameBox')
 # covers are drawn at most this big, at twice their size on screen: hundreds of originals are slow to decode
@@ -218,6 +225,60 @@ def _title(css_file: Path) -> str:
     return css_file.stem.replace('-', ' ').replace('_', ' ').capitalize()
 
 
+def page_port() -> int | None:
+    """
+    The local port to serve the window's page on, which changes with the page. The browser keeps what it fetches in
+    the window's profile and pywebview's "don't cache" headers don't survive its file server, so on one port an update
+    can keep showing the old page. The first port free from there, as Windows reserves whole ranges; None if none is.
+    """
+    digest = 0
+    for path in sorted(WEB.rglob('*')):
+        if path.is_file():
+            digest = zlib.crc32(path.read_bytes(), digest)
+    first = PAGE_PORTS.start + digest % len(PAGE_PORTS)
+    for port in range(first, first + 50):
+        with socket.socket() as probe:
+            try:
+                probe.bind(('127.0.0.1', port))
+            except OSError:
+                continue
+            return port
+    return None
+
+
+def game_details(game: Game | None) -> dict[str, Any]:
+    """What a game's page says about it, from its cached metadata"""
+    metadata = game.metadata if game else {}
+    releases = metadata.get('releaseInfo') or [{}]
+    # most descriptions are only the game's title again
+    about = metadata.get('longDescription') or metadata.get('description') or None
+    if game and about and about.strip().casefold() == game.app_title.strip().casefold():
+        about = None
+    return {'developer': metadata.get('developer') or None,
+            # when it came to Epic's store, which can be later than its release
+            'added': releases[0].get('dateAdded') or metadata.get('creationDate') or None,
+            'about': about}
+
+
+def clean_collections(collections: Any) -> list[dict[str, Any]]:
+    """Collections as they're kept: each with a name of its own and its games, in order; ValueError if they can't be"""
+    if not isinstance(collections, list):
+        raise ValueError('collections must be a list')
+    cleaned = []
+    names = set()
+    for collection in collections:
+        name = collection.get('name') if isinstance(collection, dict) else None
+        games = collection.get('games') if isinstance(collection, dict) else None
+        name = name.strip() if isinstance(name, str) else ''
+        if not name or len(name) > COLLECTION_NAME_LENGTH or name.casefold() in names:
+            raise ValueError(f'unusable collection name: {name!r}')
+        if not isinstance(games, list) or not all(isinstance(game, str) for game in games):
+            raise ValueError(f'unusable games in collection {name!r}')
+        names.add(name.casefold())
+        cleaned.append({'name': name, 'games': list(dict.fromkeys(games))})
+    return cleaned
+
+
 def read_library(lgd: LGDLFS) -> list[dict[str, Any]]:
     """The games heirloom knows about from its cached files, without going online"""
     installed = {game.app_name: game for game in lgd.get_installed_list()}
@@ -259,7 +320,7 @@ def read_library(lgd: LGDLFS) -> list[dict[str, Any]]:
                 'total': game.achievements.total_achievements,
                 'unlocked': (unlocked[game.namespace] or {}).get('totalUnlocked', 0) if game.namespace in unlocked else None,
             } if game and game.achievements and game.achievements.total_achievements else None,
-        })
+        } | game_details(game))
     return sorted(games, key=lambda game: game['title'].lower())
 
 
@@ -838,6 +899,8 @@ class GuiApi:
             saved = {}
         view: dict[str, Any] = {key: saved.get(key) if saved.get(key) in choices else choices[0]
                                 for key, choices in VIEW_CHOICES.items()}
+        if str(saved.get('filter')).startswith(COLLECTION_FILTER):
+            view['filter'] = saved['filter']
         view['rail_collapsed'] = saved.get('rail_collapsed') is True
         return view
 
@@ -845,11 +908,36 @@ class GuiApi:
         """Keeps how the window shows the library for the next time; anything unknown is left out"""
         kept = self.view()
         kept |= {key: view[key] for key, choices in VIEW_CHOICES.items() if view.get(key) in choices}
+        if isinstance(view.get('filter'), str) and view['filter'].startswith(COLLECTION_FILTER):
+            kept['filter'] = view['filter']
         if isinstance(view.get('rail_collapsed'), bool):
             kept['rail_collapsed'] = view['rail_collapsed']
         path = self._lgd().path
         path.mkdir(parents=True, exist_ok=True)
         (path / 'window.json').write_text(json.dumps(kept, indent=2), encoding='utf-8')
+
+    def collections(self) -> list[dict[str, Any]]:
+        """Your collections of games, kept in collections.json; none if that can't be read"""
+        try:
+            return clean_collections(json.loads((self._lgd().path / 'collections.json').read_text(encoding='utf-8')))
+        except (OSError, ValueError):
+            return []
+
+    def save_collections(self, collections: list[dict[str, Any]]) -> None:
+        """Replaces your collections. A file that can't be read is set aside first, as it may be all you have of them"""
+        cleaned = clean_collections(collections)
+        path = self._lgd().path / 'collections.json'
+        path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            clean_collections(json.loads(path.read_text(encoding='utf-8')))
+        except FileNotFoundError:
+            pass
+        except (OSError, ValueError):
+            shutil.copyfile(path, path.with_name('collections.json.bad'))
+        # replaced in one step, so a crash can't leave half a file
+        unfinished = path.with_name('collections.json.tmp')
+        unfinished.write_text(json.dumps(cleaned, indent=2), encoding='utf-8')
+        unfinished.replace(path)
 
     def themes(self) -> dict[str, Any]:
         lgd = self._lgd()
@@ -1063,7 +1151,7 @@ def run(config_file: str | None, load_themes: Callable[[], dict[str, Theme]], ba
     threading.Thread(target=refresh_hourly, daemon=True).start()
     try:
         # a profile of its own that is kept, so covers come from the disk cache rather than Epic each time
-        webview.start(private_mode=False, storage_path=str(config_dir / 'webview'))
+        webview.start(private_mode=False, storage_path=str(config_dir / 'webview'), http_port=page_port())
     finally:
         quitting.set()
         api._close()
