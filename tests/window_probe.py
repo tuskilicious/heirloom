@@ -142,13 +142,18 @@ def tour(page: Page, out: Path) -> list[str]:
 
 def main() -> None:
     page = Page(page_socket(int(sys.argv[1]), 120))
+    features = {}
     for _ in range(60):
-        features = page.evaluate(FEATURES)
-        if features['api'] and features['library']:
+        try:
+            features = page.evaluate(FEATURES)
+        except RuntimeError:
+            # still loading: there is no <body> yet
+            pass
+        if features.get('api') and features.get('library'):
             break
         time.sleep(1)
     print(json.dumps(features, indent=1))
-    assert features['api'] and features['library'], 'the page never loaded, or pywebview.api never appeared'
+    assert features.get('api') and features.get('library'), 'the page never loaded, or pywebview.api never appeared'
     state = page.evaluate('pywebview.api.state(-1)')
     assert 'jobs' in state, 'the API answered without jobs'
     if len(sys.argv) > 2:
