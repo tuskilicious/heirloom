@@ -78,7 +78,29 @@ jobs:
           7z a heirloom_macOS.zip heirloom_macOS_*
           test "$(7z l -slt heirloom_macOS.zip | grep -c -- '-rwx')" = 2
 
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macOS-zip
+          path: dist/heirloom_macOS.zip
+
       - name: Create draft release
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "${{ github.ref_name }}" --repo "${{ github.server_url }}/${{ github.repository }}" --draft --generate-notes --verify-tag ./dist/heirloom*
+
+  # what someone on a Mac gets: the zip itself, unzipped and run, on each kind of Mac
+  test-macos-zip:
+    needs: [release]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: ['macos-15', 'macos-15-intel']
+      fail-fast: false
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: macOS-zip
+
+      - run: |
+          unzip heirloom_macOS.zip
+          ./heirloom_macOS_$(uname -m | sed s/x86_64/x64/) --version
