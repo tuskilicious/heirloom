@@ -31,10 +31,15 @@ jobs:
 
     - name: Build
       run: |
-        uv pip install pillow
+        uv pip install --python .venv pillow
         uv run --module PyInstaller --distpath installer/build --workpath build/onedir installer/heirloom.spec
         du -sh installer/build/heirloom
         du -s installer/build/heirloom/_internal/* | sort -n | tail -15
+        du -d 3 installer/build/heirloom/_internal/PySide6 | sort -n | tail -14
+        du -s installer/build/heirloom/_internal/PySide6/Qt/lib/* | sort -n | tail -30
+        du -s installer/build/heirloom/_internal/PySide6/Qt/plugins/* | sort -n | tail -16
+        du -s installer/build/heirloom/_internal/PySide6/Qt/qml/* | sort -n | tail -10
+        ls -S installer/build/heirloom/_internal/PySide6 | head -30
         uv run sh installer/build_appimage.sh
         ls -l installer/Output
       env:
@@ -110,9 +115,10 @@ jobs:
 
     - name: Build
       run: |
-        uv pip install pillow
+        uv pip install --python .venv pillow
         uv run --module PyInstaller --distpath installer/build --workpath build/onedir installer/heirloom.spec
         du -sh installer/build/Heirloom.app
+        du -d 2 installer/build/Heirloom.app/Contents | sort -n | tail -8
         hdiutil create -volname Heirloom -srcfolder installer/build/Heirloom.app -ov -format UDZO heirloom_macos_arm64.dmg
         ls -l heirloom_macos_arm64.dmg
       env:
