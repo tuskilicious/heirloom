@@ -9,7 +9,6 @@ root = os.path.dirname(SPECPATH)
 icon = os.path.join(root, 'assets', 'windows_icon.ico')
 datas = [(os.path.join(root, 'heirloom', 'gui', 'web'), 'heirloom/gui/web')]
 excludes = []
-trim = not os.environ.get('HL_DEBUG_NO_TRIM')
 
 if sys.platform != 'win32':
     # the tray's icon, which on Linux the app menu uses too
@@ -18,7 +17,7 @@ if sys.platform != 'win32':
     import PySide6
     qt_modules = {'QtCore', 'QtGui', 'QtNetwork', 'QtPrintSupport', 'QtWebChannel', 'QtWebEngineCore',
                   'QtWebEngineWidgets', 'QtWidgets'}
-    excludes = [] if not trim else [f'PySide6.{name}' for name in {file.split('.')[0] for file in os.listdir(os.path.dirname(PySide6.__file__))
+    excludes = [f'PySide6.{name}' for name in {file.split('.')[0] for file in os.listdir(os.path.dirname(PySide6.__file__))
                                                if file.startswith('Qt')} - qt_modules]
 
 
@@ -49,7 +48,7 @@ def needed(entry):
 
 
 cli = Analysis([os.path.join(root, 'heirloom', 'cli.py')], datas=datas, excludes=excludes)
-if sys.platform != 'win32' and trim:
+if sys.platform != 'win32':
     cli.datas = [entry for entry in cli.datas if needed(entry)]
     cli.binaries = [entry for entry in cli.binaries if needed(entry)]
 cli_exe = EXE(PYZ(cli.pure), cli.scripts, [], exclude_binaries=True, name='heirloom', icon=icon, console=True)

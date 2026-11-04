@@ -12,11 +12,13 @@ from pathlib import Path
 
 assert sys.platform == 'win32'
 
-__all__ = ['STARTUP_NAME', 'UPDATE_FILE', 'WINDOW_ICON', 'Tray', 'add_to_menu', 'can_update_itself', 'choose_window_engine',
+__all__ = ['SERVE_PAGE', 'STARTUP_NAME', 'UPDATE_FILE', 'WINDOW_ICON', 'Tray', 'add_to_menu', 'can_update_itself', 'choose_window_engine',
            'game_runners', 'host_env', 'open_folder', 'opens_window_by_default', 'other_heirlooms_running', 'start_at_login',
            'start_install', 'starts_at_login', 'startup_command', 'update_blocker']
 
 UPDATE_FILE = 'heirloom_windows_x64_setup.exe'
+# WebView2 is given the page by a local server, as it doesn't take page_port's way round its cache otherwise
+SERVE_PAGE = True
 STARTUP_NAME = 'Start with Windows'
 # the program's own, which Windows uses
 WINDOW_ICON = None

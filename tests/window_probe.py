@@ -30,6 +30,14 @@ FEATURES = """({
   size: [innerWidth, innerHeight],
 })"""
 
+INTERNET = """new Promise((done) => {
+  const art = new Image();
+  art.onload = () => done(`reached Epic, ${art.naturalWidth} px wide`);
+  art.onerror = () => done('could not reach Epic');
+  setTimeout(() => done('nothing from Epic after 25 s'), 25000);
+  art.src = 'https://store.epicgames.com/favicon.ico';
+})"""
+
 # light, dark and busy art, long names, and games in every state, as bugs have come from each
 LIBRARY = r"""(() => {
   window.__errors = [];
@@ -152,6 +160,7 @@ def main() -> None:
             break
         time.sleep(1)
     print(json.dumps(features, indent=1))
+    print('The internet from the page:', page.evaluate(INTERNET))
     if not features.get('library'):
         print('What the window shows:', page.evaluate('document.body?.innerText'))
         print('It went to:', [entry['url'] for entry in page.call('Page.getNavigationHistory')['entries']])

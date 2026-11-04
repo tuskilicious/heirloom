@@ -1213,7 +1213,9 @@ def run(config_file: str | None, load_themes: Callable[[], dict[str, Theme]], ba
     if not claim_window(port_file, show):
         return
     desktop.add_to_menu()
-    window = webview.create_window('Heirloom', url=str(WEB / 'index.html'), js_api=api, width=1280, height=820,
+    page = WEB / 'index.html'
+    window = webview.create_window('Heirloom', url=str(page) if desktop.SERVE_PAGE else page.as_uri(), js_api=api,
+                                   width=1280, height=820,
                                    min_size=(760, 560), background_color='#01211a', hidden=background and tray)
     assert window is not None
     opened.append(window)
@@ -1253,8 +1255,8 @@ def run(config_file: str | None, load_themes: Callable[[], dict[str, Theme]], ba
     threading.Thread(target=install_when_hidden, daemon=True).start()
     try:
         # a profile of its own that is kept, so covers come from the disk cache rather than Epic each time
-        webview.start(private_mode=False, storage_path=str(config_dir / 'webview'), http_port=page_port(),
-                      icon=desktop.WINDOW_ICON)
+        webview.start(private_mode=False, storage_path=str(config_dir / 'webview'),
+                      http_port=page_port() if desktop.SERVE_PAGE else None, icon=desktop.WINDOW_ICON)
     finally:
         quitting.set()
         if not tray:
