@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.37.3 "Caretaker" (2026-11-04)
+
+The themes and layouts, tidied up.
 
 ### Fixed
 - **A game's page keeps its text off the art,** so it's easy to read, and shows more of the top of the art, where the
