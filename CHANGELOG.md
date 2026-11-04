@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.39.0 "Daybreak" (2026-11-04)
+
+A light and dark toggle, your own currency, and more character in every theme.
 
 ### New
 - **A light and dark toggle in the sidebar,** for every theme that comes with Heirloom. Your choice is remembered.
