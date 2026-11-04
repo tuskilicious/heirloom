@@ -73,14 +73,18 @@ jobs:
         HEIRLOOM_CONFIG_PATH="$RUNNER_TEMP/config" QTWEBENGINE_REMOTE_DEBUGGING=9222 "$app" gui > window.log 2>&1 &
         uv run --no-project --with websocket-client python tests/window_probe.py 9222 shots-mac-${{ matrix.arch }} \
           || {
-            lsof -iTCP -sTCP:LISTEN -P | grep -i heirloom
-            port=$(lsof -iTCP -sTCP:LISTEN -P -a -c heirloom | grep -oE ':[0-9]+ ' | head -1 | tr -d ': ')
-            echo "port $port"
-            curl -sS -m 15 -o /dev/null -w 'curl says %{http_code} in %{time_total}s\n' "http://127.0.0.1:$port/index.html" || echo "curl failed"
-            netstat -an | grep -E "\.$port " | head -12
+            lsof -iTCP -sTCP:LISTEN -P -a -c heirloom
+            for port in $(lsof -iTCP -sTCP:LISTEN -P -a -c heirloom | grep -oE ':[0-9]+ ' | tr -d ': '); do
+              curl -sS -m 20 -o /dev/null -w "curl $port says %{http_code}, connected in %{time_connect}s, all in %{time_total}s\n" "http://127.0.0.1:$port/index.html" || echo "curl $port failed"
+            done
+            netstat -an | grep -E 'tcp4.*\.488' | head -12
             pid=$(pgrep -f 'MacOS/heirloom gui' | head -1)
             sample "$pid" 3 -file sample.txt > /dev/null 2>&1
-            grep -nE 'Thread_|PyEval|socket|accept|recv|lock|semaphore|Keychain|Sec[A-Z]' sample.txt | cut -c1-140 | head -80
+            sed -n '/(<lambda>)/,/ThreadPoolServiceThread/p' sample.txt | grep -vE '_PyEval|PyObject_|cfunction|method_vectorcall|_PyFunction|slot_tp' | cut -c1-120 | head -40
+            echo "--- the same build from its own folder, with its own config"
+            HEIRLOOM_CONFIG_PATH="$RUNNER_TEMP/config2" QTWEBENGINE_REMOTE_DEBUGGING=9223 installer/build/Heirloom.app/Contents/MacOS/heirloom gui > window2.log 2>&1 &
+            uv run --no-project --with websocket-client python tests/window_probe.py 9223 || echo "ALSO FAILS FROM THE BUILD FOLDER"
+            tail -8 window2.log
             exit 1
           }
 
