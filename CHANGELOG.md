@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.39.2 "Daybreak" (2026-11-04)
+
+A macOS zip that runs, and a tidier codebase.
 
 ### Changed
 - **Commands start a little faster,** as they no longer load the downloader and encryption until they need them.
