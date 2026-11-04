@@ -142,6 +142,9 @@ jobs:
         uv pip install --python .venv pillow
         uv run --module PyInstaller --distpath installer/build --workpath build/onedir installer/heirloom.spec
         du -sh installer/build/heirloom
+        # logins go in the system's keyring only if these made it into the program
+        uv run pyi-archive_viewer --list --recursive installer/build/heirloom/heirloom > modules.txt
+        grep -q 'keyring.backends.SecretService' modules.txt && grep -q 'secretstorage' modules.txt && grep -q 'jeepney' modules.txt
         uv run sh installer/build_appimage.sh
         ls -l installer/Output
       env:
@@ -190,6 +193,33 @@ jobs:
         (sleep 3; sudo chmod -R a+rw /dev/input || true) &
         uv run --no-project --with websocket-client --with evdev python tests/virtual_pad.py 9222 || echo "No controller here: see above"
 
+    - name: Closing the window keeps it in the tray
+      run: |
+        sudo apt-get install -y openbox stalonetray wmctrl
+        pkill -f heirloom || true
+        sleep 2
+        Xvfb :77 -screen 0 1280x820x24 &
+        export DISPLAY=:77 QTWEBENGINE_REMOTE_DEBUGGING=9333
+        sleep 2
+        openbox &
+        stalonetray &
+        sleep 2
+        ./heirloom_linux_x64.AppImage gui > tray.log 2>&1 &
+        uv run --no-project --with websocket-client python tests/window_probe.py 9333
+        wmctrl -l
+        wmctrl -l | grep -q Heirloom
+        wmctrl -c Heirloom
+        sleep 4
+        wmctrl -l
+        if wmctrl -l | grep -q Heirloom; then echo "still open"; exit 1; fi
+        pgrep -f heirloom > /dev/null
+        ./heirloom_linux_x64.AppImage gui
+        sleep 3
+        wmctrl -l
+        wmctrl -l | grep -q Heirloom
+        pkill -f heirloom || true
+        tail -15 tray.log
+
     - name: What the window said
       if: always()
       run: |
@@ -206,6 +236,8 @@ jobs:
         printf '[default]\nwine_executable=%s\n' "$RUNNER_TEMP/fake-wine" > "$config/config.ini"
         echo '{"app_name":"Fish","app_title":"Fish Game","metadata":{},"asset_infos":{}}' > "$config/metadata/Fish.json"
         printf '{"Fish":{"app_name":"Fish","title":"Fish Game","version":"1","install_path":"%s","executable":"game.exe","platform":"Windows","can_run_offline":true,"install_size":1}}' "$RUNNER_TEMP/game" > "$config/installed.json"
+        # Chromium's sandbox, which Ubuntu limits: is the page's process in one?
+        for pid in $(pgrep -f QtWebEngineProcess || true); do tr '\0' ' ' < /proc/$pid/cmdline | cut -c1-90; grep -E 'Seccomp:|NoNewPrivs' /proc/$pid/status; done
         HEIRLOOM_CONFIG_PATH=$config ./heirloom_linux_x64.AppImage launch Fish --offline
         for attempt in 1 2 3 4 5 6 7 8 9 10; do [ -s "$RUNNER_TEMP/wine.env" ] && break; sleep 1; done
         grep -c . "$RUNNER_TEMP/wine.env"
@@ -256,6 +288,7 @@ jobs:
         chmod +x heirloom_linux_x64.AppImage
         docker run -d --name app --network host -v "$PWD:/work" -w /work \
           -e APPIMAGE_EXTRACT_AND_RUN=1 -e QTWEBENGINE_REMOTE_DEBUGGING=9222 -e HEIRLOOM_CONFIG_PATH=/tmp/config \
+          -e QTWEBENGINE_DISABLE_SANDBOX=1 \
           "${{ matrix.image }}" sh -c '${{ matrix.needs }} > /dev/null && ./heirloom_linux_x64.AppImage -V && xvfb-run -a -s "-screen 0 1280x820x24" ./heirloom_linux_x64.AppImage gui'
         uv run --no-project --with websocket-client python tests/window_probe.py 9222
 

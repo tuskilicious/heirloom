@@ -58,3 +58,9 @@ def test_commands_dont_wait_for_what_only_downloads_need():
             'print([m for m in ("Cryptodome", "heirloom.downloader.mp.manager") if m in sys.modules])')
     result = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True, timeout=60)
     assert result.stdout.strip() == '[]', result.stderr
+
+
+def test_a_game_can_be_played_offline_without_a_login(fake_game):
+    (fake_game / 'user.json').unlink()
+    result = run('launch', 'Fish', '--offline', '--dry-run')
+    assert result.returncode == 0, result.stderr

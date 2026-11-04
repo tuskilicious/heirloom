@@ -144,11 +144,11 @@ def main() -> None:
     page = Page(page_socket(int(sys.argv[1]), 120))
     for _ in range(60):
         features = page.evaluate(FEATURES)
-        if features['api']:
+        if features['api'] and features['library']:
             break
         time.sleep(1)
     print(json.dumps(features, indent=1))
-    assert features['api'], 'pywebview.api never appeared'
+    assert features['api'] and features['library'], 'the page never loaded, or pywebview.api never appeared'
     state = page.evaluate('pywebview.api.state(-1)')
     assert 'jobs' in state, 'the API answered without jobs'
     if len(sys.argv) > 2:

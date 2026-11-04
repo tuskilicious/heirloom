@@ -72,8 +72,12 @@ jobs:
         "$app" -V
         HEIRLOOM_CONFIG_PATH="$RUNNER_TEMP/config" QTWEBENGINE_REMOTE_DEBUGGING=9222 "$app" gui > window.log 2>&1 &
         uv run --no-project --with websocket-client python tests/window_probe.py 9222 shots-mac-${{ matrix.arch }}
+
+    - name: What the window said
+      if: always()
+      run: |
         pkill -f Heirloom.app || true
-        tail -20 window.log
+        tail -30 window.log
 
     - name: Try updating itself
       run: |

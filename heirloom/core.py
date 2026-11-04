@@ -923,8 +923,10 @@ class HeirloomCore:
         elif not install.can_run_offline:
             self.log.warning('Game is not approved for offline use and may not work correctly.')
 
-        account_id = self.lgd.userdata['account_id']
-        user_name = user or self.lgd.userdata['displayName']
+        # playing offline works without a login, which the window tries when there is none
+        login = self.lgd.userdata or {}
+        account_id = login.get('account_id', '')
+        user_name = user or login.get('displayName', '')
 
         params.egl_parameters.extend([
             '-AUTH_LOGIN=unused',
