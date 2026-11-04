@@ -1,6 +1,6 @@
 """
 Where the Epic login tokens are kept: encrypted with DPAPI on Windows (as the Epic Games Launcher does),
-or in the system keyring on macOS and Linux. user.json keeps the rest of the login, which isn't secret.
+or in the system keyring on Linux. user.json keeps the rest of the login, which isn't secret.
 """
 from __future__ import annotations
 
@@ -69,7 +69,7 @@ class DpapiStore:
 
 
 class KeyringStore:
-    """The tokens in the system keyring (macOS Keychain, Secret Service on Linux), one entry per config folder"""
+    """The tokens in the system keyring (Secret Service), one entry per config folder"""
     name = 'the system keyring'
     service = 'Heirloom'
 

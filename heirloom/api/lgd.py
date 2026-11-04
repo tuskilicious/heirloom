@@ -12,7 +12,6 @@ SETUP = 'heirloom_windows_x64_setup.exe'
 # the release file to download on each platform, first one found
 DOWNLOADS = {
     'windows': (SETUP, 'heirloom_windows_x64.exe'),
-    'macos': ('heirloom_macOS.zip',),
     'linux': ('heirloom_linux_x64',),
 }
 
@@ -46,7 +45,7 @@ def is_newer(version: str, than: str) -> bool:
 
 class LGDAPI:
     # platform.system() can take tens of milliseconds on Windows, at every start
-    _user_agent = f'Heirloom/{__version__} ({ {"win32": "Windows", "darwin": "Darwin"}.get(sys.platform, "Linux")})'
+    _user_agent = f'Heirloom/{__version__} ({"Windows" if sys.platform == "win32" else "Linux"})'
     _api_host = 'api.legendary.gl'
 
     def __init__(self):

@@ -6,7 +6,7 @@
 </h1>
 ## A free and open-source Epic Games Launcher alternative
 
-Heirloom is an open-source game launcher that can download and install games from the Epic Games platform on Linux, macOS, and Windows.
+Heirloom is an open-source game launcher that can download and install games from the Epic Games platform on Linux and Windows.
 Like Legendary, its name is a tongue-in-cheek play on tiers of [item rarity in many MMORPGs](https://wow.gamepedia.com/Quality).
 
 Heirloom is a fork of [Legendary](https://github.com/derrod/legendary) by derrod and its contributors, under the same GPL-3.0 license.
@@ -25,8 +25,8 @@ Report problems with Heirloom [on its GitHub](https://github.com/tuskilicious/he
  - Delta patching/updating of installed games
  - Launching games with online authentication (for multiplayer/DRM)
  - Syncing cloud saves (compatible with EGL)
- - Running games with WINE on Linux/macOS
- - Importing/Exporting installed games from/to the Epic Games Launcher (unsupported for macOS version of EGL)
+ - Running games with WINE on Linux
+ - Importing/Exporting installed games from/to the Epic Games Launcher
 
 **Planned:**
  - More of the CLI in the window (download queue, settings)
@@ -34,7 +34,7 @@ Report problems with Heirloom [on its GitHub](https://github.com/tuskilicious/he
 
 ## Requirements
 
-- Linux, Windows (8.1+), or macOS (12.0+)
+- Linux or Windows (8.1+)
   + 32-bit operating systems are not supported
 - python 3.10+ (64-bit)
   + (Windows) `pythonnet` is not yet compatible with 3.14+
@@ -43,11 +43,11 @@ Report problems with Heirloom [on its GitHub](https://github.com/tuskilicious/he
   + (optional) `pywebview` for webview-based login
   + (optional) `uv` for setup/building
 
-**Note:** Running Windows applications on Linux or macOS requires [Wine](https://www.winehq.org/).
+**Note:** Running Windows applications on Linux requires [Wine](https://www.winehq.org/).
 
 ## How to run/install
 
-Prebuilt executables for Windows, macOS, and Linux are on the [releases page](https://github.com/tuskilicious/heirloom/releases/latest).
+Prebuilt executables for Windows and Linux are on the [releases page](https://github.com/tuskilicious/heirloom/releases/latest).
 Heirloom is not on PyPI or in Linux package managers yet; to run it with your own Python, install it from this repository.
 
 ### Windows installer
@@ -58,18 +58,6 @@ It can also add a desktop shortcut and add Heirloom to `PATH`, so the `heirloom`
 Running a newer installer updates Heirloom; uninstalling it (Settings > Apps) keeps your config folder, with your login and game list.
 When a newer Heirloom is out, the window's sidebar links to it and commands that log in mention it when they finish (checked once a day).
 Windows may warn about an unrecognized app the first time, because the installer isn't code-signed: choose "More info" and "Run anyway".
-
-### macOS
-
-Download `heirloom_macOS_arm64` for Apple silicon (M1 or later) or `heirloom_macOS_x64` for Intel from the [releases page](https://github.com/tuskilicious/heirloom/releases/latest); `heirloom_macOS.zip` has both.
-On macOS, Heirloom is a command line program with no window, so run it in Terminal. It isn't signed by Apple, so macOS blocks it at first:
-```bash
-cd ~/Downloads
-chmod +x heirloom_macOS_arm64
-xattr -d com.apple.quarantine heirloom_macOS_arm64
-./heirloom_macOS_arm64 --help
-```
-A file from the zip doesn't need `chmod` in Heirloom 0.39.2 or later. Instead of `xattr`, you can run it once, then choose "Open Anyway" in System Settings > Privacy & Security.
 
 ### With pip
 
@@ -82,7 +70,7 @@ Optionally, for logging in through an embedded web view:
 pip install "heirloom-gl[webview] @ git+https://github.com/tuskilicious/heirloom"
 ```
 On Linux this may also require a supported web engine and its Python bindings (on Ubuntu: `sudo apt install python3-gi-cairo`).
-Using pywebview's Qt engine may not work correctly, and pywebview is currently unsupported on macOS.
+Using pywebview's Qt engine may not work correctly.
 
 ### With uv, from a clone
 
@@ -140,7 +128,7 @@ The login page should open in your browser and after logging in you should be pr
 Alternatively you can use the `--import` flag to import the authentication from the Epic Games Launcher (manually specifying the used WINE prefix may be required on Linux).
 Note that this will log you out of the Epic Launcher.
 
-Your login tokens are not saved in plain text: on Windows they are encrypted for your user account with DPAPI (in `user.dpapi`, like the Epic Games Launcher does), on macOS and Linux they go into the system keyring (Keychain, or GNOME Keyring/KWallet through Secret Service).
+Your login tokens are not saved in plain text: on Windows they are encrypted for your user account with DPAPI (in `user.dpapi`, like the Epic Games Launcher does), on Linux they go into the system keyring (Keychain, or GNOME Keyring/KWallet through Secret Service).
 A login saved by an older version is moved there the next time Heirloom runs.
 Without a usable keyring, for example on a headless machine, they stay in `user.json` as before; `PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring` does that on purpose.
 
@@ -148,7 +136,7 @@ Open the window: your library with cover art, and Play, Install and Update butto
 ````
 heirloom gui
 ````
-It needs pywebview, which the prebuilt Windows executable includes (install the `webview` extra otherwise; on Linux this also needs GTK WebKit, and macOS is untested).
+It needs pywebview, which the prebuilt Windows executable includes (install the `webview` extra otherwise; on Linux this also needs GTK WebKit).
 The sidebar switches between all your games, the installed ones and the ones with an update, and the sort button orders them A to Z, by when you last played, by playtime or by size; the window opens on the shelf, order and sidebar you left it with.
 `/` jumps to the search, which ignores case, spaces and punctuation ("hitman3" finds HITMAN 3), and Escape empties it. Double-click an installed game to play it, and right-click it for its Manage menu.
 Installed games are in colour and the others are not; a download assembles its game's cover tile by tile, sharpening from a blur as it goes.
@@ -190,7 +178,7 @@ heirloom queue add Anemone
 heirloom queue add --updates
 heirloom queue run --window 01:00-07:00
 ````
-`queue add` takes the same options as `install` (e.g. `--platform Mac` or `--max-speed 5M`); `--updates` queues every installed game that has an update.
+`queue add` takes the same options as `install` (e.g. `--max-speed 5M`); `--updates` queues every installed game that has an update.
 `queue run` downloads the queued games one after another, each as its own `heirloom install`, and only inside the time window, which may cross midnight (e.g. `23:00-07:00`).
 When the window closes, the current download stops as it would with CTRL-C and continues where it stopped once the window opens again; downloads that fail stay queued.
 Leave `queue run` running, or start it from Task Scheduler or cron. Set `download_window` in the config to use a window without `--window`.
@@ -271,7 +259,6 @@ Commands:
     auth                Authenticate with the Epic Games Store
     clean-saves         Clean cloud saves
     cleanup             Remove old temporary, metadata, and manifest files
-    crossover           Setup CrossOver for launching games (macOS only)
     download-saves      Download all cloud saves
     egl-sync            Setup or run Epic Games Launcher sync
     eos-overlay         Manage EOS Overlay install
@@ -363,29 +350,6 @@ optional arguments:
   --keep-manifests  Do not delete old manifests
 
 
-Command: crossover
-usage: heirloom crossover [-h] [--reset] [--download] [--ignore-version]
-                           [--crossover-app <path to .app>]
-                           [--crossover-bottle <bottle name>]
-                           [<App Name>]
-
-positional arguments:
-  <App Name>            App name to configure, will configure defaults if
-                        ommited
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --reset               Reset default/app-specific crossover configuration
-  --download            Automatically download and set up a preconfigured
-                        bottle (experimental)
-  --ignore-version      Disable version check for available bottles when using
-                        --download
-  --crossover-app <path to .app>
-                        Specify app to skip interactive selection
-  --crossover-bottle <bottle name>
-                        Specify bottle to skip interactive selection
-
-
 Command: download-saves
 usage: heirloom download-saves [-h] [<App Name>]
 
@@ -429,7 +393,6 @@ optional arguments:
 
 Command: eos-overlay
 usage: heirloom eos-overlay [-h] [--path PATH] [--prefix PREFIX] [--app APP]
-                             [--bottle BOTTLE]
                              <install|update|remove|enable|disable|info>
 
 positional arguments:
@@ -443,7 +406,6 @@ optional arguments:
                         to.
   --prefix PREFIX       WINE prefix to install the overlay in
   --app APP             Use this app's wine prefix (if configured in config)
-  --bottle BOTTLE       WINE prefix to install the overlay in
 
 
 Command: import
@@ -465,8 +427,7 @@ optional arguments:
                         game
   --skip-dlcs           Do not ask about importing DLCs.
   --platform <Platform>
-                        Platform for import (default: Mac on macOS, otherwise
-                        Windows)
+                        Platform for import (default: Windows)
 
 
 Command: info
@@ -482,8 +443,8 @@ optional arguments:
   --offline             Only print info available offline
   --json                Output information in JSON format
   --platform <Platform>
-                        Platform to fetch info for (default: installed or Mac
-                        on macOS, Windows otherwise)
+                        Platform to fetch info for (default: installed or
+                        Windows)
 
 
 Command: install
@@ -604,13 +565,6 @@ optional arguments:
   --wine-prefix <wine pfx path>
                         Set WINE prefix to use
   --no-wine             Do not run game with WINE (e.g. if a wrapper is used)
-  --crossover           Interactively configure CrossOver for this
-                        application.
-  --crossover-app <path to .app>
-                        Specify which App to use for CrossOver (e.g.
-                        "/Applications/CrossOver.app")
-  --crossover-bottle <bottle name>
-                        Specify which bottle to use for CrossOver
 
 
 Command: list
@@ -620,8 +574,7 @@ usage: heirloom list [-h] [--platform <Platform>] [--include-ue] [-T] [--csv]
 optional arguments:
   -h, --help            show this help message and exit
   --platform <Platform>
-                        Platform to fetch game list for (default: Mac on
-                        macOS, otherwise Windows)
+                        Platform to fetch game list for (default: Windows)
   --include-ue          Also include Unreal Engine content
                         (Engine/Marketplace) in list
   -T, --third-party, --include-non-installable
@@ -646,7 +599,7 @@ optional arguments:
   -h, --help            show this help message and exit
   --force-download      Always download instead of using on-disk manifest
   --platform <Platform>
-                        Platform (default: Mac on macOS, otherwise Windows)
+                        Platform (default: Windows)
   --manifest <uri>      Manifest URL or path to use instead of the CDN one
   --csv                 Output in CSV format
   --tsv                 Output in TSV format
@@ -723,7 +676,7 @@ Command: queue
 usage: heirloom queue [list|add|remove|clear|run] [<App Name> ...] [options]
 
 "add" also takes "heirloom install" options for the queued downloads, e.g.
-"heirloom queue add Anemone --platform Mac"
+"heirloom queue add Anemone --max-speed 5M"
 
 positional arguments:
   {list,add,remove,clear,run}
@@ -1019,15 +972,10 @@ theme = default
 ; Window theme of "heirloom gui" (see "Window themes")
 window_theme = heirloom
 
-; macOS specific settings
-; Default application platform to use (default: Mac on macOS, Windows elsewhere)
+; Default application platform to use (default: Windows)
 default_platform = Windows
 ; Fallback to "Windows" platform if native version unavailable
 install_platform_fallback = true
-; (macOS) Disable automatic CrossOver use
-disable_auto_crossover = false
-; Default directory for native Mac applications (.app packages)
-mac_install_dir = /User/heirloom/Applications
 
 [Heirloom.aliases]
 ; List of aliases for simpler CLI use, in the format `<alias> = <app name>`
@@ -1039,12 +987,9 @@ gtav = 9d2d0eb64d5c44529cece33fe2a46482
 [default]
 ; (all) wrapper to run the game with (e.g. "gamemode")
 wrapper = gamemode
-; (linux/macOS) Wine executable and prefix
+; (linux) Wine executable and prefix
 wine_executable = wine
 wine_prefix = /home/user/.wine
-; (macOS) CrossOver options
-crossover_app = /Applications/CrossOver.app
-crossover_bottle = Heirloom
 
 ; default environment variables to set (overridden by game specific ones)
 [default.env]
@@ -1084,7 +1029,4 @@ disable_sdl = true
 pre_launch_command = /path/to/script.sh
 ; Whether or not to wait for command to finish running
 pre_launch_wait = false
-; (macOS) override crossover settings
-crossover_app = /Applications/CrossOver Nightly.app
-crossover_bottle = SomethingElse
 ````

@@ -16,7 +16,7 @@ from filelock import FileLock
 from heirloom.models.config import LGDConf
 from heirloom.models.game import Game, GameAsset, InstalledGame, PlaytimeSession
 from heirloom.utils.aliasing import generate_aliases
-from heirloom.utils.env import is_windows_mac_or_pyi
+from heirloom.utils.env import is_windows_or_pyi
 
 from .credentials import CredentialStore, UserDataLock, default_credential_store
 from .utils import LockedJSONData, clean_filename
@@ -159,7 +159,7 @@ class LGDLFS:
             self.config.set('Heirloom', 'disable_update_check', 'false')
         if not self.config.has_option('Heirloom', 'disable_update_notice'):
             self.config.set('Heirloom', '; Disables the notice about an available update on exit')
-            self.config.set('Heirloom', 'disable_update_notice', 'false' if is_windows_mac_or_pyi() else 'true')
+            self.config.set('Heirloom', 'disable_update_notice', 'false' if is_windows_or_pyi() else 'true')
 
         self._installed_lock = FileLock(self.path / 'installed.json.lock')
 

@@ -8,10 +8,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [
-          'windows-2025', 'windows-11-arm',
-          'macos-15-intel', 'macos-15'
-        ]
+        os: [ 'windows-2025', 'windows-11-arm' ]
       fail-fast: false
     env:
       UV_SYSTEM_PYTHON: 1
@@ -34,12 +31,6 @@ jobs:
 
     - name: Optional dependencies (WebView)
       run: uv sync --extra webview --no-install-local --inexact
-      if: runner.os != 'macOS'
-
-    - name: Set strip option on non-Windows
-      id: strip
-      run: echo "option=--strip" >> $GITHUB_OUTPUT
-      if: runner.os != 'Windows'
 
     - name: Build
       working-directory: heirloom
@@ -47,15 +38,10 @@ jobs:
         --onefile
         --name heirloom
         --add-data gui/web:heirloom/gui/web
-        ${{ steps.strip.outputs.option }}
         -i ../assets/windows_icon.ico
         cli.py
       env:
         PYTHONOPTIMIZE: 1
-
-    - name: Test the build
-      if: runner.os == 'macOS'
-      run: heirloom/dist/heirloom --version
 
     - uses: actions/upload-artifact@v7
       with:

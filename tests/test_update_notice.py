@@ -18,7 +18,7 @@ GITHUB_RELEASE = {
     'html_url': 'https://github.com/tuskilicious/heirloom/releases/tag/9.1.0',
     'body': 'Heirloom learns to grow tomatoes.\n\n### New\n- **Tomatoes.** Red ones.',
     'assets': [{'name': name, 'browser_download_url': f'https://github.com/dl/{name}'} for name in (
-        'heirloom_windows_x64.exe', 'heirloom_windows_x64_setup.exe', 'heirloom_macOS.zip', 'heirloom_linux_arm64')],
+        'heirloom_windows_x64.exe', 'heirloom_windows_x64_setup.exe', 'heirloom_linux_arm64')],
 }
 
 
@@ -30,8 +30,7 @@ def test_release_reads_like_the_feeds_release_info():
         'gh_url': 'https://github.com/tuskilicious/heirloom/releases/tag/9.1.0',
         'critical': False,
         'setup': {'url': 'https://github.com/dl/heirloom_windows_x64_setup.exe', 'sha256': ''},
-        'downloads': {'windows': 'https://github.com/dl/heirloom_windows_x64_setup.exe',
-                      'macos': 'https://github.com/dl/heirloom_macOS.zip'},
+        'downloads': {'windows': 'https://github.com/dl/heirloom_windows_x64_setup.exe'},
     }, 'the installer is preferred, and a platform without its file has no download'
 
 

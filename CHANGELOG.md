@@ -2,18 +2,12 @@
 
 ## 0.39.2 "Daybreak" (2026-11-04)
 
-A macOS zip that runs, and a tidier codebase.
+Heirloom is now for Windows and Linux, with steadier download speeds, clearer errors, and crashed downloads caught.
 
 ### Changed
+- **macOS is no longer supported.** There are no more macOS builds, and the CrossOver support and `crossover` command
+  are gone. Earlier releases stay available for anyone who needs them.
 - **Commands start a little faster,** as they no longer load the downloader and encryption until they need them.
-
-### Fixed
-- **The macOS zip's programs can run.** They had lost their permission to run while being packaged, so they failed
-  after unzipping. The README now has steps for macOS, which also needs to be told to trust a program Apple hasn't signed.
-
-## 0.39.1 "Daybreak" (2026-11-04)
-
-Steadier download speeds, clearer errors, and crashed downloads caught.
 
 ### Fixed
 - **Download speeds are steady.** They're averaged over a few seconds, as a slow connection could show 0.00 MiB/s while

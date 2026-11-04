@@ -1,7 +1,6 @@
 """The command line of "heirloom": every command and its options, without what they do (see cli.py)."""
 import argparse
 import os
-from sys import platform as sys_platform
 
 from heirloom import __codename__, __version__
 from heirloom.downloader.throttle import parse_speed
@@ -42,7 +41,6 @@ def build_parser():
     auth_parser = subparsers.add_parser('auth', help='Authenticate with the Epic Games Store')
     clean_saves_parser = subparsers.add_parser('clean-saves', help='Clean cloud saves')
     clean_parser = subparsers.add_parser('cleanup', help='Remove old temporary, metadata, and manifest files')
-    cx_parser = subparsers.add_parser('crossover', help='Setup CrossOver for launching games (macOS only)')
     download_saves_parser = subparsers.add_parser('download-saves', help='Download all cloud saves')
     egl_sync_parser = subparsers.add_parser('egl-sync', help='Setup or run Epic Games Launcher sync')
     gui_parser = subparsers.add_parser('gui', help='Open the Heirloom window: your library, installs, updates and playing')
@@ -70,7 +68,7 @@ def build_parser():
     queue_parser = subparsers.add_parser('queue', help='Queue installs and updates to run later, e.g. overnight',
                                          usage='%(prog)s [list|add|remove|clear|run] [<App Name> ...] [options]',
                                          description='"add" also takes "heirloom install" options for the queued '
-                                                     'downloads, e.g. "heirloom queue add Anemone --platform Mac"')
+                                                     'downloads, e.g. "heirloom queue add Anemone --max-speed 5M"')
     status_parser = subparsers.add_parser('status', help='Show heirloom status information')
     sync_saves_parser = subparsers.add_parser('sync-saves', help='Sync cloud saves')
     uninstall_parser = subparsers.add_parser('uninstall', help='Uninstall (delete) a game')
@@ -110,9 +108,6 @@ def build_parser():
                               metavar='<App name/Old alias>', nargs='?')
     alias_parser.add_argument('alias', help='New alias when using "add" action',
                               metavar='<New alias>', nargs='?')
-
-    cx_parser.add_argument('app_name', metavar='<App Name>', nargs='?',
-                           help='App name to configure, will configure defaults if ommited')
 
     move_parser.add_argument('app_name', metavar='<App Name>', help='Name of the app')
     move_parser.add_argument('new_path', metavar='<New Base Path>', help='Directory to move game folder to')
@@ -259,23 +254,8 @@ def build_parser():
         launch_parser.add_argument('--no-wine', dest='no_wine', help=argparse.SUPPRESS,
                                    action='store_true', default=True)
 
-    if sys_platform == 'darwin':
-        launch_parser.add_argument('--crossover', dest='crossover', action='store_true',
-                                   help='Interactively configure CrossOver for this application.')
-        launch_parser.add_argument('--crossover-app', dest='crossover_app', action='store', metavar='<path to .app>',
-                                   help='Specify which App to use for CrossOver (e.g. "/Applications/CrossOver.app")')
-        launch_parser.add_argument('--crossover-bottle', dest='crossover_bottle', action='store',
-                                   help='Specify which bottle to use for CrossOver', metavar='<bottle name>')
-    else:
-        launch_parser.add_argument('--crossover', dest='crossover', action='store_true',
-                                   help=argparse.SUPPRESS)
-        launch_parser.add_argument('--crossover-app', dest='crossover_app', action='store',
-                                   help=argparse.SUPPRESS)
-        launch_parser.add_argument('--crossover-bottle', dest='crossover_bottle', action='store',
-                                   help=argparse.SUPPRESS)
-
     list_parser.add_argument('--platform', dest='platform', action='store', metavar='<Platform>', type=str,
-                             help='Platform to fetch game list for (default: Mac on macOS, otherwise Windows)')
+                             help='Platform to fetch game list for (default: Windows)')
     list_parser.add_argument('--include-ue', dest='include_ue', action='store_true',
                              help='Also include Unreal Engine content (Engine/Marketplace) in list')
     list_parser.add_argument('-T', '--third-party', '--include-non-installable',
@@ -301,7 +281,7 @@ def build_parser():
     list_files_parser.add_argument('--force-download', dest='force_download', action='store_true',
                                    help='Always download instead of using on-disk manifest')
     list_files_parser.add_argument('--platform', dest='platform', action='store', metavar='<Platform>',
-                                   type=str, help='Platform (default: Mac on macOS, otherwise Windows)')
+                                   type=str, help='Platform (default: Windows)')
     list_files_parser.add_argument('--manifest', dest='override_manifest', action='store', metavar='<uri>',
                                    help='Manifest URL or path to use instead of the CDN one')
     list_files_parser.add_argument('--csv', dest='csv', action='store_true', help='Output in CSV format')
@@ -338,7 +318,7 @@ def build_parser():
     import_parser.add_argument('--skip-dlcs', dest='skip_dlcs', action='store_true',
                                help='Do not ask about importing DLCs.')
     import_parser.add_argument('--platform', dest='platform', action='store', metavar='<Platform>', type=str,
-                               help='Platform for import (default: Mac on macOS, otherwise Windows)')
+                               help='Platform for import (default: Windows)')
 
     egl_sync_parser.add_argument('--egl-manifest-path', dest='egl_manifest_path', action='store',
                                  help='Path to the Epic Games Launcher\'s Manifests folder, should '
@@ -377,7 +357,7 @@ def build_parser():
     info_parser.add_argument('--json', dest='json', action='store_true',
                              help='Output information in JSON format')
     info_parser.add_argument('--platform', dest='platform', action='store', metavar='<Platform>', type=str,
-                             help='Platform to fetch info for (default: installed or Mac on macOS, Windows otherwise)')
+                             help='Platform to fetch info for (default: installed or Windows)')
 
     store_group = activate_parser.add_mutually_exclusive_group(required=True)
     store_group.add_argument('-U', '--uplay', dest='uplay', action='store_true',
@@ -404,27 +384,9 @@ def build_parser():
                                         help='WINE prefix to install the overlay in')
         eos_overlay_parser.add_argument('--app', dest='app', action='store',
                                         help='Use this app\'s wine prefix (if configured in config)')
-
-        if sys_platform == 'darwin':
-            eos_overlay_parser.add_argument('--bottle', dest='bottle', action='store',
-                                            help='WINE prefix to install the overlay in')
-        else:
-            eos_overlay_parser.add_argument('--bottle', dest='bottle', action='store', help=argparse.SUPPRESS)
     else:
         eos_overlay_parser.add_argument('--prefix', dest='prefix', action='store', help=argparse.SUPPRESS)
-        eos_overlay_parser.add_argument('--bottle', dest='bottle', action='store', help=argparse.SUPPRESS)
         eos_overlay_parser.add_argument('--app', dest='app', action='store', help=argparse.SUPPRESS)
-
-    cx_parser.add_argument('--reset', dest='reset', action='store_true',
-                           help='Reset default/app-specific crossover configuration')
-    cx_parser.add_argument('--download', dest='download', action='store_true',
-                           help='Automatically download and set up a preconfigured bottle (experimental)')
-    cx_parser.add_argument('--ignore-version', dest='disable_version_check', action='store_true',
-                           help='Disable version check for available bottles when using --download')
-    cx_parser.add_argument('--crossover-app', dest='crossover_app', action='store', metavar='<path to .app>',
-                           help='Specify app to skip interactive selection')
-    cx_parser.add_argument('--crossover-bottle', dest='crossover_bottle', action='store', metavar='<bottle name>',
-                           help='Specify bottle to skip interactive selection')
 
     move_parser.add_argument('--skip-move', dest='skip_move', action='store_true',
                              help='Only change heirloom database, do not move files (e.g. if already moved)')
