@@ -198,8 +198,10 @@ function showMenu(menu, anchor, children, at = null) {
   // below the button (or the pointer), or above it when there's no room, and kept inside the window
   const button = at ? {left: at.x, right: at.x, top: at.y, bottom: at.y} : anchor.getBoundingClientRect();
   const {width, height} = menu.getBoundingClientRect();
-  const below = button.bottom + 6 + height <= innerHeight;
-  menu.style.left = `${Math.max(8, Math.min(button.right - width, innerWidth - width - 8))}px`;
+  const below = button.bottom + 6 + height + 8 <= innerHeight;
+  // from a cover, along its left edge, as lining up with its right could put it over the sidebar
+  const left = button.width > 100 && button.width < 2 * width ? button.left : button.right - width;
+  menu.style.left = `${Math.max(8, Math.min(left, innerWidth - width - 8))}px`;
   menu.style.top = `${below ? button.bottom + 6 : Math.max(8, button.top - 6 - height)}px`;
   (menu.querySelector('[aria-checked="true"]') || menu.querySelector('[role^="menuitem"]')).focus();
 }
@@ -360,7 +362,12 @@ function renderGamePage() {
   pageKey = key;
   const art = $('#game-art');
   const src = game.art || game.cover;
-  if (art.getAttribute('src') !== src) art.src = src;
+  if (art.getAttribute('src') !== src) {
+    // the last game's art would otherwise stay until this one's has loaded
+    art.classList.add('loading');
+    art.onload = () => art.classList.remove('loading');
+    art.src = src;
+  }
   art.hidden = !src;
   $('#game').classList.toggle('no-art', !src);
   $('#game-title').textContent = game.title;
