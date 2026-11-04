@@ -21,9 +21,25 @@ if sys.platform != 'win32':
                                                if file.startswith('Qt')} - qt_modules]
 
 
+# On Linux, libraries that have to come from the system the program runs on, to match its graphics drivers, fonts and
+# sound (AppImage's own list of them), and what only Qt's plugins for GTK themes and for printing brought along
+SYSTEM_LIBRARIES = {
+    'libasound', 'libcom_err', 'libdrm', 'libEGL', 'libexpat', 'libfontconfig', 'libfreetype', 'libgbm', 'libgcc_s',
+    'libgio-2.0', 'libGL', 'libGLdispatch', 'libGLX', 'libglapi', 'libglib-2.0', 'libgmodule-2.0', 'libgobject-2.0',
+    'libgpg-error', 'libgthread-2.0', 'libharfbuzz', 'libICE', 'libOpenGL', 'libp11-kit', 'libSM', 'libstdc++',
+    'libusb-1.0', 'libuuid', 'libX11', 'libxcb', 'libz',
+    'libatk-1.0', 'libatk-bridge-2.0', 'libatspi', 'libavahi-client', 'libavahi-common', 'libcairo', 'libcairo-gobject',
+    'libcups', 'libdatrie', 'libepoxy', 'libfribidi', 'libgdk-3', 'libgdk_pixbuf-2.0', 'libgmp', 'libgnutls',
+    'libgraphite2', 'libgtk-3', 'libhogweed', 'libidn2', 'libnettle', 'libpango-1.0', 'libpangocairo-1.0',
+    'libpangoft2-1.0', 'libpixman-1', 'libtasn1', 'libthai', 'libunistring',
+}
+
+
 def needed(entry):
-    """Without the parts of Qt the window doesn't use. GTK's theme plugin would also bring this machine's GTK along"""
+    """Without the parts of Qt the window doesn't use, and on Linux what comes from the system"""
     path = entry[0].replace(os.sep, '/')
+    if sys.platform == 'linux' and os.path.basename(path).split('.so')[0] in SYSTEM_LIBRARIES:
+        return False
     if '/qtwebengine_locales/' in path:
         return path.endswith('en-US.pak')
     return not any(part in path for part in ('PySide6/Qt/qml/', 'PySide6/Qt/translations/', 'plugins/qmltooling/',

@@ -86,7 +86,7 @@ jobs:
         $update = Join-Path $env:RUNNER_TEMP 'self_update'
         New-Item -ItemType Directory $update | Out-Null
         Copy-Item installer\Output\heirloom_windows_x64_setup.exe "$update\setup.exe"
-        uv run python -c "import sys; from pathlib import Path; from heirloom.gui.self_update import start_install; sys.executable = sys.argv[1]; start_install(Path(sys.argv[2]))" "$dir\heirloom.exe" "$update\setup.exe"
+        uv run python -c "import sys; from pathlib import Path; from heirloom.desktop import start_install; sys.executable = sys.argv[1]; start_install(Path(sys.argv[2]))" "$dir\heirloom.exe" "$update\setup.exe"
         for ($i = 0; $i -lt 120 -and -not (Get-Process heirloom -ErrorAction SilentlyContinue | Where-Object Path -eq "$dir\heirloom.exe"); $i++) { Start-Sleep 1 }
         Get-Content "$update\setup.log" -Tail 5
         if (-not (Get-Process heirloom -ErrorAction SilentlyContinue | Where-Object Path -eq "$dir\heirloom.exe")) { throw 'Heirloom did not reopen after updating itself' }
@@ -140,10 +140,9 @@ jobs:
       run: |
         uv sync --extra pyinstaller_build --extra webview_qt --no-install-local
         uv pip install --python .venv pillow
-        uv run --no-sync --module PyInstaller --distpath installer/build --workpath build/onedir installer/heirloom.spec
+        uv run --module PyInstaller --distpath installer/build --workpath build/onedir installer/heirloom.spec
         du -sh installer/build/heirloom
-        du -s installer/build/heirloom/_internal/* | sort -n
-        uv run --no-sync sh installer/build_appimage.sh
+        uv run sh installer/build_appimage.sh
         ls -l installer/Output
       env:
         PYTHONOPTIMIZE: 1
@@ -233,13 +232,13 @@ jobs:
       matrix:
         include:
           - image: fedora:latest
-            needs: dnf install -y xorg-x11-server-Xvfb xorg-x11-xauth mesa-libEGL mesa-libGL dejavu-sans-fonts
+            needs: dnf install -y xorg-x11-server-Xvfb xorg-x11-xauth mesa-libEGL mesa-libGL dejavu-sans-fonts alsa-lib glib2 fontconfig
           - image: archlinux:latest
-            needs: pacman -Sy --noconfirm xorg-server-xvfb xorg-xauth mesa ttf-dejavu
+            needs: pacman -Sy --noconfirm xorg-server-xvfb xorg-xauth mesa ttf-dejavu alsa-lib glib2 fontconfig
           - image: debian:12
-            needs: apt-get update && apt-get install -y xvfb xauth libegl1 libgl1 fonts-dejavu-core
+            needs: apt-get update && apt-get install -y xvfb xauth libegl1 libgl1 fonts-dejavu-core libasound2 libglib2.0-0 libfontconfig1
           - image: ubuntu:22.04
-            needs: apt-get update && apt-get install -y xvfb xauth libegl1 libgl1 fonts-dejavu-core
+            needs: apt-get update && apt-get install -y xvfb xauth libegl1 libgl1 fonts-dejavu-core libasound2 libglib2.0-0 libfontconfig1
       fail-fast: false
 
     steps:

@@ -46,7 +46,7 @@ jobs:
       run: |
         uv sync --extra pyinstaller_build --extra webview_qt --no-install-local
         uv pip install --python .venv pillow
-        uv run --no-sync --module PyInstaller --distpath installer/build --workpath build/onedir installer/heirloom.spec
+        uv run --module PyInstaller --distpath installer/build --workpath build/onedir installer/heirloom.spec
         du -sh installer/build/Heirloom.app
       env:
         PYTHONOPTIMIZE: 1
@@ -79,7 +79,7 @@ jobs:
       run: |
         app="$RUNNER_TEMP/Applications/Heirloom.app"
         touch "$app/Contents/stale"
-        uv run --no-sync python -c "import sys; from pathlib import Path; from heirloom.desktop import macos; sys.frozen = True; sys.executable = sys.argv[1]; macos.start_install(Path(sys.argv[2]))" "$app/Contents/MacOS/heirloom" "$PWD/$DMG"
+        uv run python -c "import sys; from pathlib import Path; from heirloom.desktop import macos; sys.frozen = True; sys.executable = sys.argv[1]; macos.start_install(Path(sys.argv[2]))" "$app/Contents/MacOS/heirloom" "$PWD/$DMG"
         for attempt in $(seq 1 120); do
           [ ! -e "$app/Contents/stale" ] && [ -x "$app/Contents/MacOS/heirloom" ] && [ ! -e "$app.old" ] && break
           sleep 1
