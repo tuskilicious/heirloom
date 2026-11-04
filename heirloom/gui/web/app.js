@@ -971,15 +971,16 @@ function showSettings(settings) {
     $('#window-start').value = start;
     $('#window-end').value = end;
   }
-  for (const name of ['auto_updates', 'cloud_saves', 'update_notice', 'self_update', 'starts_with_windows']) {
+  for (const name of ['auto_updates', 'cloud_saves', 'update_notice', 'self_update', 'start_at_login']) {
     $(`#${name}`).checked = settings[name];
   }
   $('#startup-row').hidden = !settings.tray;
   $('#self-update-row').hidden = !settings.self_update_possible;
-  $('#starts_with_windows').disabled = !settings.startup_possible;
+  $('#startup-name').textContent = settings.startup_name;
+  $('#start_at_login').disabled = !settings.startup_possible;
   $('#startup-detail').textContent = settings.startup_possible
     ? 'In the tray, so games update before you play. Closing the window keeps Heirloom there; Quit is in its menu.'
-    : 'Install Heirloom with its installer to start it with Windows. Closing the window keeps it in the tray.';
+    : 'Only the installed Heirloom can do this. Closing the window keeps it in the tray.';
 }
 
 async function saveSetting(name, value) {
@@ -1587,7 +1588,7 @@ async function start() {
       if (Boolean(start) === Boolean(until)) saveSetting('update_window', start ? `${start}-${until}` : '');
     };
   }
-  for (const name of ['auto_updates', 'cloud_saves', 'update_notice', 'self_update', 'starts_with_windows']) {
+  for (const name of ['auto_updates', 'cloud_saves', 'update_notice', 'self_update', 'start_at_login']) {
     $(`#${name}`).onchange = (event) => saveSetting(name, event.target.checked);
   }
   for (const folder of document.querySelectorAll('[data-folder]')) {

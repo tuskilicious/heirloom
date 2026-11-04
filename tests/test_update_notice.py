@@ -5,7 +5,7 @@ import time
 import pytest
 import requests
 
-from heirloom import __version__
+from heirloom import __version__, desktop
 from heirloom.api.lgd import LGDAPI, is_newer, release_info
 from heirloom.core import HeirloomCore
 from heirloom.gui.app import GuiApi, Job
@@ -22,7 +22,8 @@ GITHUB_RELEASE = {
 }
 
 
-def test_release_reads_like_the_feeds_release_info():
+def test_release_reads_like_the_feeds_release_info(monkeypatch):
+    monkeypatch.setattr('heirloom.api.lgd.UPDATE_FILE', 'heirloom_windows_x64_setup.exe')
     assert release_info(GITHUB_RELEASE) == {
         'version': '9.1.0',
         'name': 'Heirloom Tomato',
@@ -131,8 +132,8 @@ def test_window_offers_the_update(lgd_home, monkeypatch):
 @pytest.fixture
 def setup_files(lgd_home, monkeypatch):
     """A window that came from the installer, and a release whose installer holds these bytes"""
-    monkeypatch.setattr('heirloom.gui.app.installed_by_setup', lambda: True)
-    monkeypatch.setattr('heirloom.gui.app.other_heirlooms_running', lambda: False)
+    monkeypatch.setattr(desktop, 'can_update_itself', lambda: True)
+    monkeypatch.setattr(desktop, 'other_heirlooms_running', lambda: False)
 
     class Response:
         def __enter__(self):
@@ -164,16 +165,16 @@ def fetched_api(release):
 
 def test_a_new_release_waits_ready_and_installs_once(setup_files, monkeypatch):
     started = []
-    monkeypatch.setattr('heirloom.gui.app.start_install', started.append)
+    monkeypatch.setattr(desktop, 'start_install', started.append)
     api = fetched_api(setup_files)
     assert api.state()['update_ready'] and api._setup.read_bytes() == b'installer'
 
     api._jobs._jobs[:] = [Job(1, 'play', 'Fish', 'Fish Game', 'running')]
     assert not api._install_update() and not started, 'not while a game is running'
     api._jobs._jobs[:] = [Job(1, 'play', 'Fish', 'Fish Game', 'done')]
-    monkeypatch.setattr('heirloom.gui.app.other_heirlooms_running', lambda: True)
+    monkeypatch.setattr(desktop, 'other_heirlooms_running', lambda: True)
     assert not api._install_update() and not started, 'nor while a shortcut or a terminal is using its files'
-    monkeypatch.setattr('heirloom.gui.app.other_heirlooms_running', lambda: False)
+    monkeypatch.setattr(desktop, 'other_heirlooms_running', lambda: False)
 
     setup = api._setup
     assert api._install_update() and started == [setup]
@@ -206,5 +207,5 @@ def test_turned_off_or_outside_the_installer_nothing_is_downloaded(setup_files, 
     assert api._self_update(setup_files) == '' and not api._fetching_setup
     lgd.config.set('Heirloom', 'disable_self_update', 'false')
     lgd.save_config()
-    monkeypatch.setattr('heirloom.gui.app.installed_by_setup', lambda: False)
+    monkeypatch.setattr(desktop, 'can_update_itself', lambda: False)
     assert api._self_update(setup_files) == '' and not api._fetching_setup

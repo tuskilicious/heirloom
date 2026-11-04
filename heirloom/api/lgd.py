@@ -6,13 +6,13 @@ import sys
 import requests
 
 from heirloom import __version__
+from heirloom.desktop import UPDATE_FILE
 
 RELEASES = 'https://api.github.com/repos/tuskilicious/heirloom/releases/latest'
-SETUP = 'heirloom_windows_x64_setup.exe'
 # the release file to download on each platform, first one found
 DOWNLOADS = {
-    'windows': (SETUP, 'heirloom_windows_x64.exe'),
-    'linux': ('heirloom_linux_x64',),
+    'windows': ('heirloom_windows_x64_setup.exe', 'heirloom_windows_x64.exe'),
+    'linux': ('heirloom_linux_x64.AppImage', 'heirloom_linux_x64'),
 }
 
 
@@ -21,7 +21,7 @@ def release_info(release: dict) -> dict:
     # releases are titled like 0.25.0 "Strongbox", and their notes start with a one-paragraph summary
     name = release.get('name') or release['tag_name']
     assets = {asset['name']: asset['browser_download_url'] for asset in release.get('assets', [])}
-    setup = next((asset for asset in release.get('assets', []) if asset['name'] == SETUP), None)
+    setup = next((asset for asset in release.get('assets', []) if asset['name'] == UPDATE_FILE), None)
     return {
         'version': release['tag_name'],
         'name': name.split('"')[1] if name.count('"') == 2 else name,

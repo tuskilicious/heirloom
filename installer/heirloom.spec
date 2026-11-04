@@ -8,8 +8,11 @@ import sys
 root = os.path.dirname(SPECPATH)
 icon = os.path.join(root, 'assets', 'windows_icon.ico')
 
-cli = Analysis([os.path.join(root, 'heirloom', 'cli.py')],
-               datas=[(os.path.join(root, 'heirloom', 'gui', 'web'), 'heirloom/gui/web')])
+datas = [(os.path.join(root, 'heirloom', 'gui', 'web'), 'heirloom/gui/web')]
+if sys.platform != 'win32':
+    # for the tray, and on Linux the app menu
+    datas.append((icon, 'heirloom/desktop'))
+cli = Analysis([os.path.join(root, 'heirloom', 'cli.py')], datas=datas)
 cli_exe = EXE(PYZ(cli.pure), cli.scripts, [], exclude_binaries=True, name='heirloom', icon=icon, console=True)
 
 if sys.platform == 'win32':

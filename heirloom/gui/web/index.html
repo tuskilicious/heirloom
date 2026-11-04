@@ -303,11 +303,11 @@
     <section aria-labelledby="app-title">
       <h3 id="app-title">Heirloom</h3>
       <ul class="rows">
-        <!-- Windows only: the tray is Windows' -->
+        <!-- only with a tray to start in -->
         <li class="row" id="startup-row" hidden>
-          <label class="row-text" for="starts_with_windows"><span class="what">Start with Windows</span>
+          <label class="row-text" for="start_at_login"><span id="startup-name" class="what"></span>
             <span id="startup-detail" class="detail"></span></label>
-          <input type="checkbox" role="switch" id="starts_with_windows" class="switch">
+          <input type="checkbox" role="switch" id="start_at_login" class="switch">
         </li>
         <li class="row">
           <label class="row-text" for="update_notice"><span class="what">Tell me about new Heirloom versions</span>

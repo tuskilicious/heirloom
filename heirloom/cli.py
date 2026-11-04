@@ -27,7 +27,7 @@ import requests
 from filelock import FileLock, Timeout
 from requests.exceptions import HTTPError
 
-from heirloom import __codename__, __version__, plugin_store
+from heirloom import __codename__, __version__, desktop, plugin_store
 from heirloom.cli_args import build_parser
 from heirloom.core import HeirloomCore
 from heirloom.downloader.queue import (
@@ -732,7 +732,7 @@ class HeirloomCLI:
             return self._print_json(vars(params), args.pretty_json)
 
         # Copying existing env vars is required on Windows, probably a good idea on Linux
-        full_env = os.environ.copy()
+        full_env = desktop.host_env()
         full_env.update(params.environment)
 
         full_params = list()
@@ -1017,7 +1017,7 @@ class HeirloomCLI:
         try:
             import webview  # noqa: F401
         except ImportError:
-            logger.error('The window needs pywebview: use the Windows executable, or install Heirloom with its '
+            logger.error('The window needs pywebview: use a prebuilt Heirloom, or install Heirloom with its '
                          '"webview" extra (pip install "heirloom-gl[webview]").')
             exit(1)
         if sys.platform == 'win32':
@@ -1162,7 +1162,7 @@ class HeirloomCLI:
                 if cmd:
                     try:
                         logger.debug(f'Running pre-launch command: {cmd}')
-                        p = subprocess.Popen(shlex.split(cmd))
+                        p = subprocess.Popen(shlex.split(cmd), env=desktop.host_env())
                         if wait_for_exit:
                             logger.debug('Waiting for pre-launch command to finish...')
                             p.wait()
@@ -1180,7 +1180,7 @@ class HeirloomCLI:
         env = self.core.get_app_environment(args.app_name, wine_pfx=args.wine_pfx)
         cmd, wait_for_exit = self.core.get_pre_launch_command(args.app_name)
 
-        full_env = os.environ.copy()
+        full_env = desktop.host_env()
         full_env.update(env)
 
         if not command:
@@ -2933,6 +2933,9 @@ def main():
     # Set output encoding to UTF-8 if not outputting to a terminal
     if not stdout.isatty():
         stdout.reconfigure(encoding='utf-8')
+    # opened from the app menu or the Finder
+    if not sys.argv[1:] and desktop.opens_window_by_default():
+        sys.argv.append('gui')
 
     parser, subparsers, install_parser, queue_parser = build_parser()
 
