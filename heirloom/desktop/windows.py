@@ -12,12 +12,14 @@ from pathlib import Path
 
 assert sys.platform == 'win32'
 
-__all__ = ['STARTUP_NAME', 'UPDATE_FILE', 'Tray', 'add_to_menu', 'can_update_itself', 'choose_window_engine',
+__all__ = ['STARTUP_NAME', 'UPDATE_FILE', 'WINDOW_ICON', 'Tray', 'add_to_menu', 'can_update_itself', 'choose_window_engine',
            'game_runners', 'host_env', 'open_folder', 'opens_window_by_default', 'other_heirlooms_running', 'start_at_login',
            'start_install', 'starts_at_login', 'startup_command', 'update_blocker']
 
 UPDATE_FILE = 'heirloom_windows_x64_setup.exe'
 STARTUP_NAME = 'Start with Windows'
+# the program's own, which Windows uses
+WINDOW_ICON = None
 # the Run key value that starts Heirloom with Windows
 RUN_KEY = r'Software\Microsoft\Windows\CurrentVersion\Run'
 RUN_VALUE = 'Heirloom'

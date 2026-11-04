@@ -14,12 +14,14 @@ from pathlib import Path
 
 from heirloom.desktop.shared import Tray, choose_qt_window, host_env, run_after_quitting
 
-__all__ = ['STARTUP_NAME', 'UPDATE_FILE', 'Tray', 'add_to_menu', 'can_update_itself', 'choose_window_engine',
+__all__ = ['STARTUP_NAME', 'UPDATE_FILE', 'WINDOW_ICON', 'Tray', 'add_to_menu', 'can_update_itself', 'choose_window_engine',
            'game_runners', 'host_env', 'open_folder', 'opens_window_by_default', 'other_heirlooms_running', 'start_at_login',
            'start_install', 'starts_at_login', 'startup_command', 'update_blocker']
 
 UPDATE_FILE = f'heirloom_macos_{"arm64" if platform.machine() == "arm64" else "x64"}.dmg'
 STARTUP_NAME = 'Start when you log in'
+# the app's own, which the Mac uses
+WINDOW_ICON = None
 LAUNCH_AGENT = 'io.github.tuskilicious.heirloom'
 # the old app is moved aside only once the new one is complete, and put back if that fails
 INSTALL = '''

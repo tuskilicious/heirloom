@@ -56,10 +56,12 @@ def qt_app():
 
 @functools.cache
 def _tray_available() -> bool:
-    if not has_qt():
+    try:
+        qt_app()
+        from PySide6.QtWidgets import QSystemTrayIcon
+    except ImportError:
+        # no Qt, or a system without the graphics libraries Qt uses from it; opening the window says what's wrong
         return False
-    qt_app()
-    from PySide6.QtWidgets import QSystemTrayIcon
     return QSystemTrayIcon.isSystemTrayAvailable()
 
 

@@ -1,0 +1,113 @@
+name: Mac
+
+# Apart from the other builds and never on pull requests: a Mac runner can sit in the queue for hours, which should only
+# ever delay the Mac files. Everything happens in one job, as passing an app between jobs loses its permissions.
+on:
+  push:
+    tags: [ '*.*.*' ]
+    branches: [ 'claude/linux-mac' ]
+  workflow_dispatch:
+
+jobs:
+  app:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        include:
+          - os: macos-15
+            arch: arm64
+          - os: macos-15-intel
+            arch: x64
+      fail-fast: false
+    env:
+      UV_SYSTEM_PYTHON: 1
+      DMG: heirloom_macos_${{ matrix.arch }}.dmg
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - uses: actions/setup-python@v6
+      with:
+        # the same as the other builds
+        python-version: "3.14"
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        enable-cache: true
+
+    - name: Tests
+      run: uv run --locked pytest
+
+    - name: Build the app
+      run: |
+        uv sync --extra pyinstaller_build --extra webview_qt --no-install-local
+        uv pip install --python .venv pillow
+        uv run --no-sync --module PyInstaller --distpath installer/build --workpath build/onedir installer/heirloom.spec
+        du -sh installer/build/Heirloom.app
+      env:
+        PYTHONOPTIMIZE: 1
+
+    - name: Make the disk image
+      run: |
+        mkdir disk
+        ditto installer/build/Heirloom.app disk/Heirloom.app
+        ln -s /Applications disk/Applications
+        # hdiutil is known to find a disk busy now and then
+        for attempt in 1 2 3 4 5; do
+          hdiutil create -volname Heirloom -srcfolder disk -ov -format UDZO "$DMG" && break
+          sleep 15
+        done
+        ls -l "$DMG"
+
+    - name: Try what someone gets
+      run: |
+        hdiutil attach "$DMG" -nobrowse -readonly -mountpoint "$RUNNER_TEMP/disk"
+        ditto "$RUNNER_TEMP/disk/Heirloom.app" "$RUNNER_TEMP/Applications/Heirloom.app"
+        hdiutil detach "$RUNNER_TEMP/disk"
+        app="$RUNNER_TEMP/Applications/Heirloom.app/Contents/MacOS/heirloom"
+        "$app" -V
+        HEIRLOOM_CONFIG_PATH="$RUNNER_TEMP/config" QTWEBENGINE_REMOTE_DEBUGGING=9222 "$app" gui > window.log 2>&1 &
+        uv run --no-project --with websocket-client python tests/window_probe.py 9222 shots-mac-${{ matrix.arch }}
+        pkill -f Heirloom.app || true
+        tail -20 window.log
+
+    - name: Try updating itself
+      run: |
+        app="$RUNNER_TEMP/Applications/Heirloom.app"
+        touch "$app/Contents/stale"
+        uv run --no-sync python -c "import sys; from pathlib import Path; from heirloom.desktop import macos; sys.frozen = True; sys.executable = sys.argv[1]; macos.start_install(Path(sys.argv[2]))" "$app/Contents/MacOS/heirloom" "$PWD/$DMG"
+        for attempt in $(seq 1 120); do
+          [ ! -e "$app/Contents/stale" ] && [ -x "$app/Contents/MacOS/heirloom" ] && [ ! -e "$app.old" ] && break
+          sleep 1
+        done
+        test ! -e "$app/Contents/stale"
+        "$app/Contents/MacOS/heirloom" -V
+
+    - uses: actions/upload-artifact@v7
+      if: always()
+      with:
+        name: mac-${{ matrix.arch }}-shots
+        path: shots-*
+
+    - uses: actions/upload-artifact@v7
+      if: github.ref_type != 'tag'
+      with:
+        name: ${{ env.DMG }}
+        path: ${{ env.DMG }}
+        compression-level: 0
+
+    - name: Add it to the release
+      if: github.ref_type == 'tag'
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        # the other builds make the release, and may not have got there yet
+        for attempt in $(seq 1 60); do
+          gh release upload "${{ github.ref_name }}" "$DMG" --clobber --repo "${{ github.repository }}" && exit 0
+          sleep 60
+        done
+        exit 1

@@ -982,6 +982,7 @@ function showSettings(settings) {
     $(`#${name}`).checked = settings[name];
   }
   $('#startup-row').hidden = !settings.tray;
+  $('#no-tray-row').hidden = settings.tray;
   $('#self-update-row').hidden = !settings.self_update_possible;
   $('#startup-name').textContent = settings.startup_name;
   $('#start_at_login').disabled = !settings.startup_possible;

@@ -310,6 +310,11 @@
           <input type="text" id="game_runner" class="speed host" list="runners" autocomplete="off" spellcheck="false">
           <datalist id="runners"></datalist>
         </li>
+        <!-- GNOME has no tray without an extension, so nothing can keep going once the window closes -->
+        <li class="row" id="no-tray-row" hidden>
+          <span class="row-text"><span class="what">Closing the window stops downloads</span>
+            <span class="detail">This desktop has no system tray for Heirloom to keep going in</span></span>
+        </li>
         <!-- only with a tray to start in -->
         <li class="row" id="startup-row" hidden>
           <label class="row-text" for="start_at_login"><span id="startup-name" class="what"></span>
