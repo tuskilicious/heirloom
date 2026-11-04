@@ -12,7 +12,7 @@ from pathlib import Path
 from heirloom.desktop.shared import Tray, choose_qt_window, host_env, run_after_quitting
 
 __all__ = ['STARTUP_NAME', 'UPDATE_FILE', 'Tray', 'add_to_menu', 'can_update_itself', 'choose_window_engine',
-           'host_env', 'open_folder', 'opens_window_by_default', 'other_heirlooms_running', 'start_at_login',
+           'game_runners', 'host_env', 'open_folder', 'opens_window_by_default', 'other_heirlooms_running', 'start_at_login',
            'start_install', 'starts_at_login', 'startup_command', 'update_blocker']
 
 UPDATE_FILE = 'heirloom_linux_x64.AppImage'
@@ -78,6 +78,11 @@ def add_to_menu() -> None:
 
 def opens_window_by_default() -> bool:
     return _appimage() is not None
+
+
+def game_runners() -> list[str] | None:
+    """The programs here that can run Windows games: umu-run for Proton, or Wine"""
+    return [found for program in ('umu-run', 'wine') if (found := shutil.which(program))]
 
 
 def open_folder(path: str | Path) -> None:

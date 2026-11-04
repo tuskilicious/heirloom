@@ -13,7 +13,7 @@ from pathlib import Path
 assert sys.platform == 'win32'
 
 __all__ = ['STARTUP_NAME', 'UPDATE_FILE', 'Tray', 'add_to_menu', 'can_update_itself', 'choose_window_engine',
-           'host_env', 'open_folder', 'opens_window_by_default', 'other_heirlooms_running', 'start_at_login',
+           'game_runners', 'host_env', 'open_folder', 'opens_window_by_default', 'other_heirlooms_running', 'start_at_login',
            'start_install', 'starts_at_login', 'startup_command', 'update_blocker']
 
 UPDATE_FILE = 'heirloom_windows_x64_setup.exe'
@@ -40,6 +40,11 @@ def add_to_menu() -> None:
 
 def opens_window_by_default() -> bool:
     return False
+
+
+def game_runners() -> list[str] | None:
+    """Windows runs Windows games by itself"""
+    return None
 
 
 def host_env() -> dict[str, str]:

@@ -81,6 +81,11 @@ def test_without_an_appimage_nothing_is_added(tmp_path, monkeypatch):
         linux.start_at_login(True)
 
 
+def test_linux_lists_what_can_run_windows_games(monkeypatch):
+    monkeypatch.setattr(linux.shutil, 'which', lambda name: f'/usr/bin/{name}' if name == 'wine' else None)
+    assert linux.game_runners() == ['/usr/bin/wine']
+
+
 def install_script(script: str, **env: str) -> None:
     subprocess.run(['sh', '-c', script], env=env, check=True, timeout=30)
 

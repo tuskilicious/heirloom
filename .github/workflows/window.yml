@@ -68,7 +68,7 @@ jobs:
         ls /dev/fuse; which fusermount fusermount3 || true
         ./heirloom_linux_x64.AppImage -V
         sysctl kernel.apparmor_restrict_unprivileged_userns || true
-        unshare -Ur true; echo "unshare says $?"
+        unshare -Ur true && echo "unshare works" || echo "unshare is blocked"
 
     - name: The window, sandbox on
       run: |
@@ -86,6 +86,11 @@ jobs:
         export HEIRLOOM_CONFIG_PATH=$RUNNER_TEMP/config2 QTWEBENGINE_REMOTE_DEBUGGING=9223 PYWEBVIEW_GUI=qt QTWEBENGINE_DISABLE_SANDBOX=1
         xvfb-run -a -s "-screen 0 1280x820x24" ./heirloom_linux_x64.AppImage gui > window2.log 2>&1 &
         uv run --no-project --with websocket-client python tests/window_probe.py 9223 shots-nosandbox || echo "PROBE FAILED"
+        sudo modprobe uinput || echo "no uinput"
+        sudo modprobe joydev || echo "no joydev"
+        sudo chmod 666 /dev/uinput || true
+        (sleep 3; sudo chmod -R a+rw /dev/input || true; ls -l /dev/input) &
+        uv run --no-project --with websocket-client --with evdev python tests/virtual_pad.py 9223 || echo "CONTROLLER FAILED"
         tail -40 window2.log
         pkill -f heirloom || true
 

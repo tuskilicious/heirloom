@@ -303,6 +303,13 @@
     <section aria-labelledby="app-title">
       <h3 id="app-title">Heirloom</h3>
       <ul class="rows">
+        <!-- Linux only: elsewhere Windows games run by themselves, or through CrossOver -->
+        <li class="row" id="runner-row" hidden>
+          <label class="row-text" for="game_runner"><span class="what">Run Windows games with</span>
+            <span id="runner-detail" class="detail"></span></label>
+          <input type="text" id="game_runner" class="speed host" list="runners" autocomplete="off" spellcheck="false">
+          <datalist id="runners"></datalist>
+        </li>
         <!-- only with a tray to start in -->
         <li class="row" id="startup-row" hidden>
           <label class="row-text" for="start_at_login"><span id="startup-name" class="what"></span>

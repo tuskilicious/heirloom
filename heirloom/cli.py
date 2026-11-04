@@ -813,8 +813,14 @@ class HeirloomCLI:
                 logger.debug('Environment overrides: {}'.format(', '.join(
                     f'{k}={v}' for k, v in params.environment.items())))
             started = datetime.now(timezone.utc)
-            game_process = subprocess.Popen(full_params, cwd=launching.working_directory, env=full_env,
-                                            shell=os.name == 'nt')
+            try:
+                game_process = subprocess.Popen(full_params, cwd=launching.working_directory, env=full_env,
+                                                shell=os.name == 'nt')
+            except FileNotFoundError as e:
+                hint = '' if os.name == 'nt' else ' Windows games need Wine: install it, or choose what runs them ' \
+                                                  'with --wine or the window\'s Settings.'
+                logger.fatal(f'Could not start {igame.title}, as {e.filename} was not found.{hint}')
+                exit(1)
             record_playtime = not self.core.lgd.config.getboolean('Heirloom', 'disable_playtime_tracking',
                                                                   fallback=False)
             if args.no_wait or not (record_playtime or sync_saves):

@@ -785,6 +785,8 @@ class GuiApi:
                for name in COUNTS},
             # a download server to use when Epic offers it, as part of its hostname
             'preferred_cdn': config.get('Heirloom', 'preferred_cdn', fallback=''),
+            'game_runners': desktop.game_runners(),
+            'game_runner': self._game_runner(config),
             **{name: not config.getboolean('Heirloom', option, fallback=defaults.get(name, False))
                for name, option in SWITCHES.items()},
             **self.background(),
@@ -820,12 +822,37 @@ class GuiApi:
             if not re.fullmatch(r'[a-z0-9.-]*', host):
                 raise ValueError('Use a server name, such as fastly-download.epicgames.com')
             self._set_option(lgd, 'preferred_cdn', host)
+        elif name == 'game_runner':
+            self._set_game_runner(lgd, str(value).strip())
         elif name in SWITCHES and isinstance(value, bool):
             lgd.config.set('Heirloom', SWITCHES[name], str(not value).lower())
         else:
             raise ValueError(f'No setting named "{name}"')
         lgd.save_config()
         return self.settings()
+
+    @staticmethod
+    def _game_runner(config: Any) -> str:
+        """What runs Windows games, unless a game has its own: umu-run for Proton, or a Wine program; empty for wine"""
+        wrapper = config.get('default', 'wrapper', fallback='')
+        return wrapper if Path(wrapper).name == 'umu-run' else config.get('default', 'wine_executable', fallback='')
+
+    @staticmethod
+    def _set_game_runner(lgd: LGDLFS, runner: str) -> None:
+        if runner and not shutil.which(runner):
+            raise ValueError(f'Can\'t find {runner}')
+        if not lgd.config.has_section('default'):
+            lgd.config.add_section('default')
+        # a wrapper of their own, like gamemoderun, stays unless it has to make way for umu-run
+        if Path(lgd.config.get('default', 'wrapper', fallback='')).name == 'umu-run':
+            lgd.config.remove_option('default', 'wrapper')
+            lgd.config.remove_option('default', 'no_wine')
+        lgd.config.remove_option('default', 'wine_executable')
+        if Path(runner).name == 'umu-run':
+            lgd.config.set('default', 'wrapper', runner)
+            lgd.config.set('default', 'no_wine', 'true')
+        elif runner:
+            lgd.config.set('default', 'wine_executable', runner)
 
     @staticmethod
     def _set_option(lgd: LGDLFS, option: str, value: str) -> None:
