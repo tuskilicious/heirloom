@@ -19,6 +19,7 @@
   --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   --glass: var(--surface);
   --glass-strong: var(--surface);
+  --card-width: none;
   --columns: 30px minmax(0, 1fr) minmax(110px, 170px) 76px 96px 104px 116px;
 }
 
@@ -133,3 +134,27 @@
   :root { --columns: 30px minmax(0, 1fr) minmax(110px, 150px) 76px 116px; }
   .library-head > :nth-child(4), .library-head > :nth-child(5), .meta-played, .meta-last { display: none; }
 }
+
+:root[data-mode="light"] {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-raised: #eceef2;
+  --border: #d9dde3;
+  --text: #1c1f23;
+  --muted: #5a6068;
+  --accent: #1a66d9;
+  --accent-text: #ffffff;
+  --logo: #1c1f23;
+  --danger: #c5221f;
+  --unlit: grayscale(1) contrast(.92) brightness(1.03);
+  --glass: var(--surface);
+  --glass-strong: var(--surface);
+}
+
+/* an accent bar slides in on the row under the pointer */
+.card .cover { position: relative; }
+.card .cover::after { content: ""; position: absolute; inset: 8px auto 8px 0; width: 3px; border-radius: 3px; background: var(--accent); opacity: 0; transform: scaleY(.3); transition: opacity .15s ease, transform .25s var(--spring); }
+.card:hover .cover::after, .card:focus-visible .cover::after { opacity: 1; transform: none; }
+
+/* with the top bar on two lines in a small window, the headings scroll away rather than hide under it */
+@media (max-width: 1000px) { .library-head { position: static; } }

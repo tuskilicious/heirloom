@@ -18,6 +18,7 @@
   --radius: 14px;
   --radius-control: 10px;
   --card-width: 216px;
+  --theme-card-width: 216px;
   --font: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
   /* the banner shows the game the keyboard or gamepad is on (see heroFollowsFocus in app.js) */
   --hero: focus;
@@ -110,3 +111,23 @@ body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; font
 @media (prefers-reduced-motion: reduce) {
   .cover { transition: none; }
 }
+
+:root[data-mode="light"] {
+  --bg: #eef2f8;
+  --surface: #ffffff;
+  --surface-raised: #e2e8f2;
+  --border: #c9d3e2;
+  --text: #0c1424;
+  --muted: #4c5a70;
+  --accent: #0b7196;
+  --accent-text: #ffffff;
+  --logo: #0c1424;
+  --danger: #b3261e;
+  --unlit: grayscale(1) contrast(.9) brightness(1.04);
+  --shadow: 0 14px 34px rgb(40 60 90 / 20%);
+}
+[data-mode="light"] .ambient { opacity: .22; }
+[data-mode="light"] .hero { box-shadow: 0 40px 80px -46px rgb(40 60 90 / 50%); }
+
+/* the row's edge fades, as on a TV shelf; the cover you're on gets a rim of its own light */
+.grid { mask-image: linear-gradient(90deg, transparent, #000 var(--gutter), #000 calc(100% - var(--gutter)), transparent); }

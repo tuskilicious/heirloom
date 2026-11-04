@@ -20,6 +20,7 @@
   --radius-control: 8px;
   --font: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --card-width: 172px;
+  --theme-card-width: 172px;
   --shadow: 0 14px 34px rgb(0 10 7 / 45%);
   /* frosted glass: a tint of the surface, the blur behind it, a light edge and a shine along the top */
   --glass: color-mix(in srgb, var(--surface) 52%, transparent);
@@ -36,6 +37,32 @@
 }
 
 /* Windows' contrast themes and "Increase contrast" ask for this */
+/* the light mode of the toggle in the sidebar; each theme that comes with Heirloom has its own too */
+:root[data-mode="light"] {
+  --bg: #eef3ea;
+  --surface: #ffffff;
+  --surface-raised: #dfe8db;
+  --border: #c5d3c6;
+  --text: #0f2a20;
+  --muted: #3f5549;
+  --accent: #1f7a55;
+  --accent-text: #ffffff;
+  --logo: #1f7a55;
+  --danger: #b3261e;
+  --progress: var(--accent);
+  --unlit: grayscale(1) contrast(.88) brightness(1.04);
+  --shadow: 0 14px 34px rgb(40 70 55 / 20%);
+  --glass: color-mix(in srgb, var(--surface) 74%, transparent);
+  --glass-strong: color-mix(in srgb, var(--surface) 90%, transparent);
+  --glass-edge: color-mix(in srgb, var(--text) 13%, transparent);
+  --glass-shine: inset 0 1px 0 rgb(255 255 255 / 70%);
+  color-scheme: light;
+}
+
+/* cover sizes, from the sort menu; each theme's own size is medium */
+:root[data-covers="small"] .main { --card-width: calc(var(--theme-card-width, 172px) * .78); }
+:root[data-covers="large"] .main { --card-width: calc(var(--theme-card-width, 172px) * 1.3); }
+
 @media (prefers-contrast: more) {
   :root {
     --bg: #000000;
@@ -256,6 +283,17 @@ button:disabled { opacity: .55; cursor: default; }
 .sort { flex: none; height: 38px; padding: 0 12px; border-color: var(--glass-edge); background: color-mix(in srgb, var(--bg) 45%, transparent); color: var(--muted); font-size: 13px; }
 .sort:hover:not(:disabled) { color: var(--text); }
 .sort .icon { width: 16px; height: 16px; }
+.sort.icon-only { width: 38px; padding: 0; }
+/* a small window gives the tools a line of their own, so the search box stays usable */
+@media (max-width: 1000px) { .top { flex-wrap: wrap; } .tools { width: 100%; } }
+/* the die rolls under the pointer */
+#surprise:hover:not(:disabled) .icon { transform: rotate(90deg); }
+#surprise .icon { transition: transform .35s var(--spring); }
+#to-top { position: fixed; right: 24px; bottom: 24px; z-index: 3; width: 44px; height: 44px; padding: 0; border-radius: 50%; border-color: var(--glass-edge); background: var(--glass-strong); backdrop-filter: var(--glass-blur); box-shadow: var(--shadow), var(--glass-shine); }
+#to-top:not([hidden]) { display: grid; place-items: center; animation: to-top-in .25s var(--ease); }
+@keyframes to-top-in { from { opacity: 0; transform: translateY(8px); } }
+.hero-art { transition: opacity .45s ease; }
+.hero-art.loading { opacity: 0; }
 .search .icon { position: absolute; left: 12px; width: 16px; height: 16px; color: var(--muted); pointer-events: none; }
 
 #search {
@@ -311,11 +349,13 @@ kbd {
   background: var(--surface);
 }
 
+/* the art on the right, fading in from the left, so a logo in the art doesn't run into the title beside it */
 .hero-art {
   position: absolute;
-  inset: 0;
+  inset: 0 0 0 auto;
   z-index: -2;
-  width: 100%;
+  width: 74%;
+  mask-image: linear-gradient(90deg, transparent, #000 34%);
   height: 100%;
   object-fit: cover;
   animation: drift 32s ease-in-out infinite alternate;
@@ -358,6 +398,10 @@ kbd {
   animation: rise .5s var(--ease) backwards;
   animation-delay: calc(var(--i, 0) * 22ms);
 }
+
+/* what's inside a card stays inside it, or its plates and buttons draw over the sticky top bar when scrolled */
+.card { isolation: isolate; }
+.card:hover, .card:focus-within { z-index: 1; }
 
 .cover {
   position: relative;

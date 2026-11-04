@@ -19,6 +19,7 @@ const SHELVES = {all: 'Library', installed: 'Installed', updates: 'Updates'};
 const SORTS = {
   title: ['A to Z', () => 0],
   recent: ['Recently played', (a, b) => (b.last_played || '').localeCompare(a.last_played || '')],
+  added: ['Newest on Epic', (a, b) => (b.added || '').localeCompare(a.added || '')],
   played: ['Most played', (a, b) => b.played - a.played],
   size: ['Largest', (a, b) => (b.size || 0) - (a.size || 0)],
 };
@@ -780,7 +781,9 @@ function renderShelves() {
   $('#heading').textContent = collection ? collection.name : SHELVES[filter];
   let summary = '';
   if (filter === 'all' && state.games.length) {
-    summary = `${plural(state.games.length, 'game')}, ${installed.length} installed`;
+    const played = state.games.reduce((total, game) => total + (game.played || 0), 0);
+    summary = `${plural(state.games.length, 'game')}, ${installed.length} installed`
+      + (played ? `, ${formatPlayed(played)}` : '');
   } else if (filter === 'installed' && installed.length) {
     const size = installed.reduce((total, game) => total + (game.size || 0), 0);
     summary = `${plural(installed.length, 'game')}, ${formatSize(size)} on disk`;
@@ -819,7 +822,12 @@ function renderHero() {
   heroKey = key;
   const art = $('#hero-art');
   const src = game.art || game.cover;
-  if (art.getAttribute('src') !== src) art.src = $('#ambient').src = src;
+  if (art.getAttribute('src') !== src) {
+    // the new art fades in, rather than the old one snapping away
+    art.classList.add('loading');
+    art.onload = () => art.classList.remove('loading');
+    art.src = $('#ambient').src = src;
+  }
   art.hidden = $('#ambient').hidden = !src;
   $('#hero-title').textContent = game.title;
   $('#hero-meta').textContent = job ? progressText(job) : game.last_played
@@ -1020,10 +1028,45 @@ function themePreview(colors) {
   return preview;
 }
 
+const COVERS = {small: 'Small covers', medium: 'Medium covers', large: 'Large covers'};
+let covers = 'medium';
+
+function setCovers(name) {
+  covers = name;
+  document.documentElement.dataset.covers = name;
+}
+
+// what you might feel like: an installed game you haven't played lately, or any game if none is installed
+function surprise() {
+  const installed = state.games.filter((game) => game.installed && !game.store);
+  const pool = installed.length ? installed : state.games.filter((game) => !game.store);
+  if (pool.length) openGame(pool[Math.floor(Math.random() * pool.length)]);
+}
+
+// the toggle's choice, 'dark' or 'light', or '' for the theme as it comes
+let colorMode = '';
+// themes of your own without a light and a dark have no toggle
+let themeHasModes = true;
+
+function applyMode() {
+  const root = document.documentElement;
+  if (colorMode && themeHasModes) root.dataset.mode = colorMode;
+  else delete root.dataset.mode;
+  const toggle = $('#mode-toggle');
+  toggle.hidden = !themeHasModes;
+  const light = getComputedStyle(root).colorScheme.includes('light');
+  const label = light ? 'Dark mode' : 'Light mode';
+  toggle.title = `Switch to ${label.toLowerCase()}`;
+  toggle.querySelector('.label').textContent = label;
+  toggle.querySelector('use').setAttribute('href', light ? '#i-moon' : '#i-sun');
+}
+
 async function showThemes(info) {
   const themes = info || await api.themes();
   document.documentElement.dataset.theme = themes.active;
   $('#theme-css').textContent = themes.css;
+  themeHasModes = !themes.css || themes.css.includes('data-mode');
+  applyMode();
   // a choice only once there is a theme besides the window's own look
   const choice = themes.themes.length > 1;
   $('#theme-list').hidden = !choice;
@@ -1249,7 +1292,7 @@ function smoothly(update) {
 
 // keeps the shelf, the sort order and the sidebar for the next time the window opens
 function saveView() {
-  api.set_view({filter, sort, rail_collapsed: $('#rail').classList.contains('collapsed')});
+  api.set_view({filter, sort, covers, mode: colorMode, rail_collapsed: $('#rail').classList.contains('collapsed')});
 }
 
 function setSort(name) {
@@ -1288,6 +1331,30 @@ async function start() {
   const login = () => run(api.login());
   $('#account').onclick = login;
   $('#empty-login').onclick = login;
+  $('#mode-toggle').onclick = (event) => {
+    colorMode = getComputedStyle(document.documentElement).colorScheme.includes('light') ? 'dark' : 'light';
+    saveView();
+    if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      applyMode();
+      return;
+    }
+    // the new colours spread out from the button
+    const {left, top, width, height} = event.currentTarget.getBoundingClientRect();
+    const [x, y] = [left + width / 2, top + height / 2];
+    const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+    const transition = document.startViewTransition(applyMode);
+    transition.ready.then(() => document.documentElement.animate(
+      {clipPath: [`circle(0 at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`]},
+      {duration: 520, easing: 'cubic-bezier(.23, 1, .32, 1)', pseudoElement: '::view-transition-new(root)'},
+    )).catch(() => {});
+  };
+  $('#surprise').onclick = surprise;
+  const toTop = $('#to-top');
+  toTop.onclick = () => {
+    scrollTo({top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+    $('#library').scrollLeft = 0;
+  };
+  addEventListener('scroll', () => { toTop.hidden = scrollY < innerHeight; }, {passive: true});
   $('#refresh').onclick = () => run(api.refresh());
   $('#search').oninput = () => smoothly(() => {
     renderHero();
@@ -1319,6 +1386,19 @@ async function start() {
     saveView();
   };
   $('#sort').onclick = (event) => showMenu($('#sort-menu'), event.currentTarget, [
+    ...(getComputedStyle(document.documentElement).getPropertyValue('--card-width').trim() === 'none' ? [] : [
+      el('p', {className: 'menu-title', textContent: 'Cover size'}),
+      ...Object.entries(COVERS).map(([name, label]) => {
+        const item = menuItem(label, name === covers ? 'done' : 'games', () => {
+          setCovers(name);
+          saveView();
+        });
+        item.setAttribute('role', 'menuitemradio');
+        item.setAttribute('aria-checked', String(name === covers));
+        return item;
+      }),
+      el('hr'),
+    ]),
     el('p', {className: 'menu-title', textContent: 'Sort by'}),
     ...Object.entries(SORTS).map(([name, [label]]) => {
       const item = menuItem(label, name === sort ? 'done' : 'sort', () => {
@@ -1336,6 +1416,12 @@ async function start() {
   };
   // Escape empties the search, then leaves it
   $('#search').onkeydown = (event) => {
+    if (event.key === 'Enter') {
+      const first = visibleCards()[0];
+      const game = first && state.games.find((candidate) => candidate.app_name === first.dataset.app);
+      if (game) openGame(game);
+      return;
+    }
     if (event.key !== 'Escape') return;
     if (!event.target.value) {
       event.target.blur();
@@ -1518,13 +1604,17 @@ async function start() {
   }
   document.addEventListener('keydown', (event) => {
     const typing = event.target.closest('input, select, textarea');
-    if (event.key === '/' && !typing && !event.ctrlKey && !event.metaKey && !event.altKey) {
+    const slash = event.key === '/' && !typing && !event.ctrlKey && !event.metaKey && !event.altKey;
+    if ((slash || (event.ctrlKey && event.key.toLowerCase() === 'f')) && !document.querySelector('dialog[open]')) {
       event.preventDefault();
       $('#search').focus();
+      $('#search').select();
     }
   });
   // the window opens as it was left
   const view = await api.view();
+  colorMode = view.mode;
+  setCovers(view.covers);
   setRailCollapsed(view.rail_collapsed);
   setSort(view.sort);
   collections = await api.collections();

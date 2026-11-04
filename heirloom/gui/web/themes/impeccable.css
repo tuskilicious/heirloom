@@ -12,7 +12,7 @@
 @font-face { font-family: "Chakra Petch"; font-weight: 700; font-display: swap; src: url("themes/fonts/chakra-petch-latin-700-normal.woff2") format("woff2"); }
 @font-face { font-family: "JetBrains Mono"; font-weight: 500; font-display: swap; src: url("themes/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2"); }
 
-:root {
+:root, :root[data-mode="light"] {
   --bg: #f4ecdd;
   --surface: #ffffff;
   --surface-raised: #eadfc9;
@@ -98,3 +98,41 @@
 
 /* the tiles still to assemble are cream; each flashes amber as it snaps away */
 .tiles > span { background: color-mix(in srgb, var(--bg) 90%, transparent); box-shadow: inset 0 0 0 1px rgb(17 24 39 / 8%); }
+
+/* the dark mode: warm near-black, a deeper sidebar, and amber still the accent; accent text is a lighter burnt orange */
+:root[data-mode="dark"] {
+  --bg: #15110b;
+  --surface: #211a12;
+  --surface-raised: #30271a;
+  --border: #463a28;
+  --text: #f4ecdd;
+  --muted: #bbaf9b;
+  --accent: #e5a21a;
+  --accent-text: #15110b;
+  --ink: #f4a26d;
+  --danger: #ff8a7a;
+  --unlit: grayscale(1) contrast(.9) brightness(.62);
+  --shadow: 0 12px 28px -10px rgb(0 0 0 / 60%);
+  --glass: color-mix(in srgb, var(--surface) 78%, transparent);
+  --glass-strong: color-mix(in srgb, var(--surface) 90%, transparent);
+  --glass-edge: rgb(244 236 221 / 12%);
+  --glass-shine: inset 0 1px 0 rgb(244 236 221 / 7%);
+  color-scheme: dark;
+}
+[data-mode="dark"] .rail { --muted: #f0d9c8; --surface-raised: #5c2510; --border: rgb(251 243 228 / 20%); --glass-edge: rgb(251 243 228 / 16%); background: #742f13; }
+[data-mode="dark"] .shelf-marker { background: #5c2510; }
+[data-mode="dark"] .shelves .rail-item[aria-pressed="true"] .count { color: #5c2510; }
+[data-mode="dark"] .primary:hover:not(:disabled) { box-shadow: 0 6px 16px -6px rgb(0 0 0 / 70%); }
+[data-mode="dark"] .ambient { opacity: .14; }
+[data-mode="dark"] .hero::after {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--bg) 94%, transparent) 0%,
+      color-mix(in srgb, var(--bg) 70%, transparent) 46%, transparent 80%),
+    linear-gradient(0deg, color-mix(in srgb, var(--bg) 70%, transparent), transparent 55%);
+}
+[data-mode="dark"] .info { box-shadow: var(--glass-shine), 0 4px 12px -6px rgb(0 0 0 / 60%); }
+[data-mode="dark"] .tiles > span { box-shadow: inset 0 0 0 1px rgb(244 236 221 / 8%); }
+[data-mode="dark"] .empty { --logo: #fbf3e4; }
+
+/* poster print: the cover under the pointer lifts off a hard offset shadow */
+.card:hover .cover { transform: none; translate: -3px -3px; box-shadow: 6px 6px 0 var(--accent); }

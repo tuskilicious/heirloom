@@ -17,6 +17,7 @@
   --radius: 24px;
   --radius-control: 999px;
   --card-width: 290px;
+  --theme-card-width: 290px;
   --font: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
   --shadow: 0 30px 70px -30px rgb(0 0 0 / 85%);
 }
@@ -27,6 +28,7 @@
 
 /* the banner: most of the window high, its headline in huge type */
 .hero { min-height: max(420px, 68vh); margin: 8px 0 64px; border-radius: 32px; box-shadow: var(--shadow); }
+/* the art on the right, fading in from the left, so a game's own logo doesn't run into the headline */
 .hero-art { animation: ken-burns 46s ease-in-out infinite alternate; transform-origin: 65% 35%; }
 .hero::after {
   background:
@@ -34,13 +36,15 @@
     linear-gradient(90deg, color-mix(in srgb, var(--bg) 82%, transparent), transparent 62%);
 }
 .hero .actions .icon-button { background: color-mix(in srgb, var(--surface-raised) 80%, transparent); color: var(--text); }
-.hero-body { max-width: 900px; padding: 64px 64px 56px; gap: 12px; }
+.hero-body { max-width: min(62%, 900px); padding: 64px 64px 56px; gap: 12px; }
 .hero-note { font-size: 12px; letter-spacing: .32em; text-transform: uppercase; }
 .hero-title {
-  font-size: clamp(48px, 7vw, 108px);
+  font-size: clamp(28px, 5.4vw, 88px);
   font-weight: 800;
   letter-spacing: -.045em;
-  line-height: .92;
+  /* background-clip only paints inside the box, so a tighter line would cut off the bottom of a "g" */
+  line-height: 1.08;
+  padding-bottom: .06em;
   background: linear-gradient(100deg, var(--text) 35%, var(--accent));
   -webkit-background-clip: text;
   background-clip: text;
@@ -79,3 +83,26 @@
 @media (prefers-reduced-motion: reduce) {
   .hero-art, .card:not(.rising), .hero-body { animation: none !important; }
 }
+
+:root[data-mode="light"] {
+  --bg: #f8f3f7;
+  --surface: #ffffff;
+  --surface-raised: #f0e6ee;
+  --border: #dccfda;
+  --text: #1b1020;
+  --muted: #5d5163;
+  --accent: #c2185b;
+  --accent-text: #ffffff;
+  --logo: #1b1020;
+  --danger: #b3261e;
+  --unlit: grayscale(1) contrast(.9) brightness(1.04);
+  --shadow: 0 30px 70px -34px rgb(90 40 80 / 45%);
+}
+[data-mode="light"] .ambient { opacity: .2; }
+
+/* light running along the headline when the banner changes */
+.hero-title { background-size: 220% 100%; animation: headline-sheen 1.6s var(--ease) both; }
+@keyframes headline-sheen { from { background-position: 100% 0; } to { background-position: 0 0; } }
+.card:hover .title { color: var(--accent); }
+.title { transition: color .2s ease; }
+@media (prefers-reduced-motion: reduce) { .hero-title { animation: none; } }
