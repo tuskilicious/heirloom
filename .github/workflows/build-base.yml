@@ -96,7 +96,7 @@ jobs:
         'updated itself'
 
         # the window, from the installed copy: each screen in each theme, closing to the tray, and coming back
-        $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=9222'
+        $env:HEIRLOOM_REMOTE_DEBUGGING = '9222'
         $env:HEIRLOOM_CONFIG_PATH = Join-Path $env:RUNNER_TEMP 'window-config'
         Start-Process "$dir\heirloom.exe" -ArgumentList 'gui' -RedirectStandardOutput window.out -RedirectStandardError window.err
         uv run --no-project --with websocket-client python tests/window_probe.py 9222 shots-windows
@@ -116,7 +116,7 @@ jobs:
         if ((Get-Process -Id $window.Id).MainWindowHandle -eq 0) { throw 'opening Heirloom again did not bring the window back' }
         Get-Process heirloom -ErrorAction SilentlyContinue | Where-Object Path -eq "$dir\heirloom.exe" | Stop-Process -Force
         Start-Sleep 2
-        Remove-Item Env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS, Env:HEIRLOOM_CONFIG_PATH
+        Remove-Item Env:HEIRLOOM_REMOTE_DEBUGGING, Env:HEIRLOOM_CONFIG_PATH
         'the window works'
 
         Start-Process "$dir\unins000.exe" -ArgumentList $silent -Wait

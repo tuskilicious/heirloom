@@ -39,7 +39,10 @@ def choose_window_engine() -> None:
 
 
 def prepare_window(window) -> None:
-    """WebView2 needs nothing more"""
+    """WebView2 needs nothing more, unless tests/window_probe.py is to look at it, as Qt lets anything through a variable"""
+    if port := os.environ.get('HEIRLOOM_REMOTE_DEBUGGING'):
+        import webview
+        webview.settings['REMOTE_DEBUGGING_PORT'] = int(port)
 
 
 def add_to_menu() -> None:

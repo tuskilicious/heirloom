@@ -1,6 +1,6 @@
 """
 Looks at the real packaged window, through Chromium's debugging port: run Heirloom with
-QTWEBENGINE_REMOTE_DEBUGGING=<port> first. Exits non-zero unless the page and its API work. With a folder, it also takes
+QTWEBENGINE_REMOTE_DEBUGGING=<port> first, or HEIRLOOM_REMOTE_DEBUGGING=<port> on Windows. Exits non-zero unless the page and its API work. With a folder, it also takes
 a screenshot of each screen in each theme and mode, over a made-up library, and lists what looks broken.
     python tests/window_probe.py <port> [folder for screenshots]
 """
