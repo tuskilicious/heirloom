@@ -67,7 +67,10 @@
 .grid { display: flex; flex-direction: column; gap: 1px; }
 .card { gap: 0; }
 .card.rising { animation: none; }
-.skeleton { display: none; }
+/* while the library loads: plain rows, and no column headings over nothing */
+.skeleton .cover { display: block; height: 44px; border-radius: var(--radius-control); }
+.skeleton .line { display: none; }
+.library-head:has(~ #empty:not([hidden])) { display: none; }
 
 /* a game's row */
 .card .cover {

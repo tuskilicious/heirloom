@@ -573,7 +573,8 @@ def test_theme_css_for_the_window(lgd_home, tmp_path):
     assert (found['active'], found['css']) == ('heirloom', '')
     assert [(theme['name'], theme['title']) for theme in found['themes']] == [
         ('heirloom', 'Heirloom'), ('big-picture', 'Big picture'), ('compact-list', 'Compact list'),
-        ('fluent', 'Fluent'), ('impeccable', 'Impeccable'), ('retro-arcade', 'Retro arcade'),
+        ('fluent', 'Fluent'), ('impeccable', 'Impeccable'), ('impeccable-dark', 'Impeccable dark'), ('liquid-glass', 'Liquid glass'),
+        ('retro-arcade', 'Retro arcade'),
         ('showcase', 'Showcase'), ('neon', 'neon'), ('paper_white', 'Paper white')], \
         "its own look and the ones that come with it, then themes with CSS and CSS files, " \
         "not terminal themes or the same CSS twice"

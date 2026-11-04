@@ -44,7 +44,8 @@ body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; font
 .rail.collapsed .logo { display: block; }
 .rail.collapsed .mark { display: none; }
 .rail.collapsed :is(.label, .count) { opacity: 1; }
-.shelves { flex-direction: row; gap: 4px; align-items: center; overflow: auto hidden; }
+/* fading out on the right, where more shelves are to scroll to */
+.shelves { flex-direction: row; gap: 4px; align-items: center; overflow: auto hidden; mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent); }
 .collections { display: contents; }
 .collections-head { margin: 0; padding: 0; }
 .collections-head .label { display: none; }

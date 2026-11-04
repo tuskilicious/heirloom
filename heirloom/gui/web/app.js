@@ -806,7 +806,9 @@ let spotlight = null;
 function renderHero() {
   const played = state.games.filter((game) => game.installed && game.last_played)
     .sort((a, b) => b.last_played.localeCompare(a.last_played));
-  const focused = spotlight && heroFollowsFocus() ? state.games.find((game) => game.app_name === spotlight) : null;
+  // only a game of the shelf on show, which could have changed since the keyboard or gamepad was on it
+  const focused = spotlight && heroFollowsFocus()
+    ? state.games.find((game) => game.app_name === spotlight && onShelf(game)) : null;
   const game = focused || (filter === 'all' && !$('#search').value.trim() ? played[0] : null);
   $('#hero').hidden = !game;
   $('#ambient').hidden = !game;
@@ -1222,7 +1224,8 @@ function padPress(name) {
 function nameCards() {
   [...$('#library').children].forEach((node, index) => {
     const box = node.getBoundingClientRect();
-    node.style.viewTransitionName = !node.hidden && box.bottom > 0 && box.top < innerHeight ? `card-${index}` : '';
+    const onScreen = box.bottom > 0 && box.top < innerHeight && box.right > 0 && box.left < innerWidth;
+    node.style.viewTransitionName = !node.hidden && onScreen ? `card-${index}` : '';
   });
 }
 

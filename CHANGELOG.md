@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.38.0 "Vitrine" (2026-11-04)
+
+Two new themes, and every screen looked over again.
+
+### New
+- **Impeccable dark.** A new theme with Impeccable's poster type on warm near-black, a deep burnt-orange sidebar and
+  amber accents. Choose it in Customize.
+- **Liquid glass.** A new theme of clear, bright-edged panes floating over a colourful wallpaper, with a sidebar that
+  hovers off the window's edge and soft pill-shaped controls.
+
+### Fixed
+- **Big picture no longer flashes white** when searching or changing shelf. Every cover in its row joined the
+  animation, not just those on screen, so this is lighter work too.
+- **Big picture's banner only shows a game from the shelf on show.** An empty shelf no longer shows an unrelated game
+  above it, and the shelves fade at the edge when there's more to scroll to.
+- **Impeccable:** the link to a new Heirloom version could not be seen, orange on the orange sidebar, and the lantern
+  on empty screens nearly vanished into the cream page.
+- **Compact list** shows rows while the library loads, and no column headings over an empty shelf.
+- **Retro arcade:** the memory setting shows all of its number.
+- The page no longer says to log in twice, and a shelf with no summary keeps its heading centred.
+
 ## 0.37.3 "Caretaker" (2026-11-04)
 
 The themes and layouts, tidied up.

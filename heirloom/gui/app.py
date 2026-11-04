@@ -206,7 +206,7 @@ def window_themes(themes: dict[str, Theme], themes_dir: Path) -> dict[str, tuple
     the themes with "gui_css", then any other CSS file in the themes folder, which is a theme for the window alone
     """
     found = {WINDOW_THEME: ('Heirloom', '')}
-    found |= {path.stem: (_title(path), path.read_text(encoding='utf-8')) for path in sorted((WEB / 'themes').glob('*.css'))}
+    found |= {path.stem: (_title(path), path.read_text(encoding='utf-8')) for path in sorted((WEB / 'themes').glob('*.css'), key=lambda path: path.stem)}
     found |= {theme.name: (theme.common_name, theme.css) for theme in themes.values()
               if theme.css and theme.name not in found}
     for path in sorted(themes_dir.glob('*.css')):
@@ -1129,11 +1129,11 @@ class GuiApi:
             from heirloom.core import HeirloomCore
             core = HeirloomCore(override_config=self._config_file)
             core.force_release_check = True
-            if not logged_in_user(core.lgd):
-                notice = 'Log in to see your games.'
-            elif not core.login():
+            # without a login the page says to log in by itself
+            user = logged_in_user(core.lgd)
+            if user and not core.login():
                 notice = 'Could not log in, try logging in again.'
-            else:
+            elif user:
                 core.get_game_and_dlc_list(update_assets=True)
                 fetched = time.monotonic()
                 try:
