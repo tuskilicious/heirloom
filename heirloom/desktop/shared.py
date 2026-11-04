@@ -25,6 +25,17 @@ def choose_qt_window() -> None:
         os.environ.setdefault('PYWEBVIEW_GUI', 'qt')
 
 
+def _allow_remote_art(window) -> None:
+    from PySide6.QtWebEngineCore import QWebEngineSettings
+    window.native.profile.settings().setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
+
+
+def prepare_window(window) -> None:
+    """Covers come from Epic's servers, and Qt keeps those from a page read from the disk unless told otherwise"""
+    if has_qt():
+        window.events.before_show += _allow_remote_art
+
+
 def host_env() -> dict[str, str]:
     """
     The environment for games and other programs to start with. PyInstaller and Qt point variables at the bundled

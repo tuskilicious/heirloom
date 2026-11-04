@@ -13,7 +13,7 @@ from pathlib import Path
 assert sys.platform == 'win32'
 
 __all__ = ['SERVE_PAGE', 'STARTUP_NAME', 'UPDATE_FILE', 'WINDOW_ICON', 'Tray', 'add_to_menu', 'can_update_itself', 'choose_window_engine',
-           'game_runners', 'host_env', 'open_folder', 'opens_window_by_default', 'other_heirlooms_running', 'start_at_login',
+           'game_runners', 'host_env', 'open_folder', 'opens_window_by_default', 'other_heirlooms_running', 'prepare_window', 'start_at_login',
            'start_install', 'starts_at_login', 'startup_command', 'update_blocker']
 
 UPDATE_FILE = 'heirloom_windows_x64_setup.exe'
@@ -36,6 +36,10 @@ Start-Process $env:HL_REOPEN -ArgumentList '--background'
 
 def choose_window_engine() -> None:
     """pywebview finds WebView2 by itself"""
+
+
+def prepare_window(window) -> None:
+    """WebView2 needs nothing more"""
 
 
 def add_to_menu() -> None:
