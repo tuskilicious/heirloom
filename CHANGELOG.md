@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.38.0 "Vitrine" (2026-11-04)
+
+Two new themes, and every screen looked over again.
 
 ### New
 - **Impeccable dark.** A new theme with Impeccable's poster type on warm near-black, a deep burnt-orange sidebar and
