@@ -12,6 +12,8 @@ RELEASES = 'https://api.github.com/repos/tuskilicious/heirloom/releases/latest'
 # the release file to download on each platform, first one found
 DOWNLOADS = {
     'windows': ('heirloom_windows_x64_setup.exe', 'heirloom_windows_x64.exe'),
+    # the one for this kind of Mac
+    'macos': (UPDATE_FILE if sys.platform == 'darwin' else 'heirloom_macos_arm64.dmg',),
     'linux': ('heirloom_linux_x64.AppImage', 'heirloom_linux_x64'),
 }
 
@@ -45,7 +47,7 @@ def is_newer(version: str, than: str) -> bool:
 
 class LGDAPI:
     # platform.system() can take tens of milliseconds on Windows, at every start
-    _user_agent = f'Heirloom/{__version__} ({"Windows" if sys.platform == "win32" else "Linux"})'
+    _user_agent = f'Heirloom/{__version__} ({ {"win32": "Windows", "darwin": "Darwin"}.get(sys.platform, "Linux")})'
     _api_host = 'api.legendary.gl'
 
     def __init__(self):

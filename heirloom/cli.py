@@ -38,6 +38,14 @@ from heirloom.downloader.queue import (
     handle_ctrl_break_as_ctrl_c,
     heirloom_command,
 )
+from heirloom.lfs.crossover import (
+    mac_find_crossover_apps,
+    mac_get_bottle_path,
+    mac_get_crossover_bottles,
+    mac_get_crossover_version,
+    mac_is_crossover_running,
+    mac_is_valid_bottle,
+)
 from heirloom.lfs.eos import (
     add_registry_entries,
     query_registry_entries,
@@ -70,9 +78,10 @@ from heirloom.utils.cli import (
     format_duration,
     format_size,
     get_boolean_choice,
+    get_int_choice,
     sdl_prompt,
 )
-from heirloom.utils.env import is_windows_or_pyi
+from heirloom.utils.env import is_windows_mac_or_pyi
 from heirloom.utils.selective_dl import get_sdl_appname
 
 # replaced by the configured theme's formatter once the config is loaded
@@ -640,6 +649,11 @@ class HeirloomCLI:
         app_name = self._resolve_aliases(args.app_name)
         addon_app_name = None
 
+        # Interactive CrossOver setup
+        if args.crossover and sys_platform == 'darwin':
+            args.reset = args.download = args.disable_version_check = False
+            self.crossover_setup(args)
+
         if args.origin or args.ubisoft:
             return self._launch_third_party(args)
 
@@ -703,6 +717,8 @@ class HeirloomCLI:
                                                    language=args.language, wrapper=args.wrapper,
                                                    disable_wine=args.no_wine,
                                                    executable_override=args.executable_override,
+                                                   crossover_app=args.crossover_app,
+                                                   crossover_bottle=args.crossover_bottle,
                                                    addon_app_name=addon_app_name)
 
         params = launch_parameters() if args.offline else self._logged_in(launch_parameters)
@@ -727,6 +743,11 @@ class HeirloomCLI:
                 self.core.lgd.config[app_name]['language'] = args.language
             if args.wrapper:
                 self.core.lgd.config[app_name]['wrapper'] = args.wrapper
+            if sys_platform == 'darwin':
+                if args.crossover_app:
+                    self.core.lgd.config[app_name]['crossover_app'] = args.crossover_app
+                if args.crossover_bottle:
+                    self.core.lgd.config[app_name]['crossover_bottle'] = args.crossover_bottle
 
         if args.json:
             return self._print_json(vars(params), args.pretty_json)
@@ -743,6 +764,21 @@ class HeirloomCLI:
         full_params.extend(params.game_parameters)
         full_params.extend(params.user_parameters)
         full_params.extend(params.egl_parameters)
+
+        if 'CX_BOTTLE' in full_env and any('SharedSupport/CrossOver' in p for p in params.launch_command):
+            # if using crossover, unset WINEPREFIX
+            full_env.pop('WINEPREFIX', None)
+            # check that bottle is valid, show error otherwise
+            bottle_name = full_env["CX_BOTTLE"].strip()
+            if not mac_is_valid_bottle(bottle_name):
+                if bottle_name == 'Legendary':
+                    logger.error('Attempted to use default CrossOver bottle ("Legendary"), but it does not exist, '
+                                 'see https://legendary.gl/crossover-setup for setup instructions.')
+                else:
+                    logger.error(f'Specified CrossOver bottle {bottle_name} does not exist, cannot launch.')
+                exit(1)
+            else:
+                logger.info(f'Using CrossOver Bottle "{bottle_name}"')
 
         if args.dry_run:
             logger.info(f'Not Launching {app_name} (dry run)')
@@ -1176,12 +1212,29 @@ class HeirloomCLI:
         # on linux, require users to specify at least the wine binary and prefix in config or command line
         command = self.core.get_app_launch_command(args.app_name, wrapper=args.wrapper,
                                                    wine_binary=args.wine_bin,
-                                                   disable_wine=args.no_wine)
-        env = self.core.get_app_environment(args.app_name, wine_pfx=args.wine_pfx)
+                                                   disable_wine=args.no_wine,
+                                                   crossover_app=args.crossover_app)
+        env = self.core.get_app_environment(args.app_name, wine_pfx=args.wine_pfx,
+                                            cx_bottle=args.crossover_bottle)
         cmd, wait_for_exit = self.core.get_pre_launch_command(args.app_name)
 
         full_env = desktop.host_env()
         full_env.update(env)
+
+        if 'CX_BOTTLE' in full_env and any('SharedSupport/CrossOver' in p for p in command):
+            # if using crossover, unset WINEPREFIX
+            full_env.pop('WINEPREFIX', None)
+            # check that bottle is valid, show error otherwise
+            bottle_name = full_env["CX_BOTTLE"].strip()
+            if not mac_is_valid_bottle(bottle_name):
+                if bottle_name == 'Legendary':
+                    logger.error('Attempted to use default CrossOver bottle ("Legendary"), but it does not exist, '
+                                 'see https://legendary.gl/crossover-setup for setup instructions.')
+                else:
+                    logger.error(f'Specified CrossOver bottle {bottle_name} does not exist, cannot launch.')
+                exit(1)
+            else:
+                logger.info(f'Using CrossOver Bottle "{bottle_name}"')
 
         if not command:
             logger.error('In order to launch correctly you must specify a prefix and wine binary or '
@@ -2666,17 +2719,25 @@ class HeirloomCLI:
         if os.name != 'nt':
             if args.app:
                 app_name = self._resolve_aliases(args.app)
-                # try getting the prefix from config
+                # try getting bottle/prefix from config
+                if sys_platform == 'darwin':
+                    args.bottle = self.core.lgd.config.get(app_name, 'crossover_bottle', fallback=None)
+
                 args.prefix = self.core.lgd.config.get(f'{app_name}.env', 'WINEPREFIX', fallback=None)
                 args.prefix = self.core.lgd.config.get(app_name, 'wine_prefix', fallback=args.prefix)
 
-            if args.prefix:
+            if sys_platform == 'darwin' and args.bottle:
+                if not mac_is_valid_bottle(args.bottle):
+                    logger.error('Invalid bottle specified.')
+                    return
+                prefix = mac_get_bottle_path(args.bottle)
+            elif args.prefix:
                 if not Path(args.prefix).exists():
                     logger.error(f'Prefix "{args.prefix}" does not exist.')
                     return
                 prefix = args.prefix
             elif args.action not in {'info', 'install', 'remove', 'update'}:
-                logger.error('Need either --prefix or --app for this command.')
+                logger.error('Need either --prefix, --bottle, or --app for this command.')
                 return
 
             if prefix:
@@ -2839,7 +2900,218 @@ class HeirloomCLI:
                     logger.info('Done.')
                 else:
                     logger.info('Overlay has been downloaded. Run "heirloom eos-overlay enable -h" to see '
-                                'available options for enabling the overlay by specifying a prefix or app.')
+                                'available options for enabling the overlay by specifying a prefix, app, or bottle.')
+
+    def crossover_setup(self, args):
+        if sys_platform != 'darwin':
+            logger.fatal('This command is only supported on macOS.')
+            return
+
+        if not args.app_name:
+            app_name = 'default'
+            game = None
+        else:
+            app_name = self._resolve_aliases(args.app_name)
+            game = self.core.get_game(app_name)
+
+        if args.reset:
+            if not game:
+                prompt = 'Reset default crossover configuration?'
+            else:
+                prompt = f'Reset "{game.app_title}" crossover configuration?'
+
+            y_n = args.yes or get_boolean_choice(prompt, default=False)
+            if y_n:
+                self.core.lgd.config.remove_option(app_name, 'crossover_app')
+                self.core.lgd.config.remove_option(app_name, 'crossover_bottle')
+            return
+
+        if args.crossover_app:
+            cx_version = mac_get_crossover_version(args.crossover_app)
+            if not cx_version:
+                logger.error('No valid CrossOver install specified!')
+                return
+            logger.info(f'Using CrossOver {cx_version} at {args.crossover_app}')
+        else:
+            logger.info('Looking for CrossOver installs...')
+            apps = mac_find_crossover_apps()
+            if len(apps) > 1:
+                print('\nFound multiple CrossOver installs, please select one:')
+                for i, (ver, path) in enumerate(apps, start=1):
+                    print(f'  {i:2d}. {ver} ({path})')
+                print('')
+                choice = get_int_choice('Select a CrossOver install', 1, 1, len(apps))
+                if choice is None:
+                    logger.error('No valid choice made, aborting.')
+                    exit(1)
+                # empty line just to make the output look a little less crammed
+                print('')
+                cx_version, args.crossover_app = apps[choice - 1]
+            elif len(apps) == 1:
+                cx_version, args.crossover_app = apps[0]
+                logger.info(f'Found CrossOver {cx_version} at {args.crossover_app}')
+            else:
+                logger.error('No CrossOver installs found, see https://legendary.gl/crossover-setup '
+                             'for setup instructions')
+                return
+
+        forced_selection = None
+        bottles = mac_get_crossover_bottles()
+
+        if args.crossover_bottle:
+            if args.crossover_bottle not in bottles:
+                logger.error('No valid CrossOver bottle specified!')
+                return
+            logger.info(f'Using Bottle "{args.crossover_bottle}"')
+            forced_selection = args.crossover_bottle
+        elif not any(b.startswith('Legendary') for b in bottles) and not args.download:
+            logger.info('It is recommended to set up a bottle specifically for Heirloom, see '
+                        'https://legendary.gl/crossover-setup for setup instructions.')
+        elif args.download:
+            logger.warning('This feature is experimental, and may not work properly. This is not supported by '
+                           'CodeWeavers/CrossOver, please report issues only on the Heirloom GitHub or Discord!')
+            if mac_is_crossover_running():
+                logger.error('CrossOver is still running, please quit it before proceeding.')
+                return
+
+            logger.info('Checking available bottles...')
+            available_bottles = self.core.get_available_bottles()
+            if args.disable_version_check:
+                logger.warning('All available bottles are shown, including possibly incompatible ones.')
+                usable_bottles = available_bottles
+            else:
+                usable_bottles = [b for b in available_bottles if cx_version in b['cx_versions']]
+            logger.info(f'Found {len(usable_bottles)} bottle(s) usable with the selected CrossOver version. '
+                        f'(Total: {len(available_bottles)})')
+
+            if not usable_bottles:
+                logger.info('No usable bottles found, see https://legendary.gl/crossover-setup for '
+                            'manual setup instructions.')
+                install_candidate = None
+            else:
+                print('\nFound available bottle(s), please select one:')
+
+                default_choice = None
+                for i, bottle in enumerate(usable_bottles, start=1):
+                    extra = []
+                    
+                    if cx_version in bottle['cx_versions']:
+                        if app_name in bottle['compatible_apps']:
+                            extra.append('recommended')
+                        if not default_choice and bottle['is_default']:
+                            default_choice = i
+                            extra.append('default')
+
+                    if bottle['name'] in bottles:
+                        extra.append('installed')
+
+                    if extra:
+                        print(f'  {i:2d}. {bottle["name"]} ({bottle["description"]}) [{", ".join(extra)}]')
+                    else:
+                        print(f'  {i:2d}. {bottle["name"]} ({bottle["description"]})')
+
+                print('')
+                choice = get_int_choice('Select a bottle (CTRL+C to abort)',
+                                        default_choice, 1, len(usable_bottles),
+                                        return_on_invalid=True)
+                if choice is None:
+                    logger.error('No valid choice made, aborting.')
+                    return
+                # empty line just to make the output look a little less crammed
+                print('')
+                install_candidate = usable_bottles[choice - 1]
+
+            if install_candidate:
+                bottle_name = install_candidate["name"]
+                logger.info(f'Preparing to download "{bottle_name}" ({install_candidate["description"]})...')
+
+                if bottle_name in bottles:
+                    logger.warning('Bottle with the same name already exists!')
+                    new_name = input('Please provide a new name for the bottle [CTRL-C or empty to abort]: ')
+                    if not new_name:
+                        logger.error('No new name provided, aborting.')
+                        return
+                    bottle_name = clean_filename(new_name).strip()
+
+                dlm, ares, path = self.core.prepare_bottle_download(bottle_name, install_candidate['manifest'],
+                                                                    base_url=install_candidate.get('base_url'))
+
+                logger.info(f'Bottle install directory: {path}')
+                logger.info(f'Bottle size: {ares.install_size / 1024 / 1024:.2f} MiB')
+                logger.info(f'Download size: {ares.dl_size / 1024 / 1024:.2f} MiB')
+
+                if not args.yes:
+                    if not get_boolean_choice('Do you want to download the selected bottle?'):
+                        print('Aborting...')
+                        return
+
+                try:
+                    # set up logging stuff (should be moved somewhere else later)
+                    dlm.logging_queue = self.logging_queue
+                    dlm.start()
+                    dlm.join()
+                except Exception as e:
+                    logger.error(f'The following exception occurred while waiting for the downloader: {e!r}. '
+                                 f'Try restarting the process, if it continues to fail please open an issue on GitHub.')
+                    # delete the unfinished bottle
+                    self.core.remove_bottle(bottle_name)
+                    return
+                else:
+                    if dlm.exitcode:
+                        logger.error(f'The download stopped with exit code {dlm.exitcode}.')
+                        self.core.remove_bottle(bottle_name)
+                        return
+                    logger.info('Finished downloading, finalising bottle setup...')
+                    self.core.finish_bottle_setup(bottle_name)
+                    forced_selection = bottle_name
+
+        if len(bottles) > 1 and not forced_selection:
+            print('\nFound multiple CrossOver bottles, please select one:')
+
+            if 'Legendary' in bottles:
+                default_choice = bottles.index('Legendary') + 1
+            elif 'Heroic' in bottles:
+                default_choice = bottles.index('Heroic') + 1
+            else:
+                default_choice = None
+
+            for i, bottle in enumerate(bottles, start=1):
+                if i == default_choice:
+                    print(f'  {i:2d}. {bottle} (default)')
+                else:
+                    print(f'  {i:2d}. {bottle}')
+            print('')
+
+            choice = get_int_choice('Select a bottle', default_choice, 1, len(bottles))
+            if choice is None:
+                logger.error('No valid choice made, aborting.')
+                exit(1)
+            # empty line just to make the output look a little less crammed
+            print('')
+            args.crossover_bottle = bottles[choice - 1]
+        elif len(bottles) == 1 and not forced_selection:
+            logger.info(f'Found only one bottle: {bottles[0]}')
+            args.crossover_bottle = bottles[0]
+        elif forced_selection:
+            args.crossover_bottle = forced_selection
+        else:
+            logger.error('No Bottles found, see https://legendary.gl/crossover-setup for setup instructions.')
+            return
+
+        logger.info(f'Current configuration: '
+                    f'--crossover-bottle "{args.crossover_bottle}" '
+                    f'--crossover-app "{args.crossover_app}" ')
+
+        if not game:
+            prompt = 'Would you like to save these choices as the default?'
+        else:
+            prompt = f'Would you like to save these choices for "{game.app_title}"?'
+
+        y_n = args.yes or get_boolean_choice(prompt)
+        if y_n:
+            self.core.lgd.config.set(app_name, 'crossover_app', args.crossover_app)
+            self.core.lgd.config.set(app_name, 'crossover_bottle', args.crossover_bottle)
+            logger.info('Saved choices to configuration.')
 
     def move(self, args):
         if not self.core.lgd.lock_installed():
@@ -2986,7 +3258,8 @@ def main():
 
     if hasattr(args, 'platform'):
         if not args.platform:
-            args.platform = cli.core.lgd.config.get('Heirloom', 'default_platform', fallback='Windows')
+            os_default = 'Mac' if sys_platform == 'darwin' else 'Windows'
+            args.platform = cli.core.lgd.config.get('Heirloom', 'default_platform', fallback=os_default)
         elif args.platform not in ('Win32', 'Windows', 'Mac'):
             logger.warning(f'Platform "{args.platform}" may be invalid. Valid ones are: Windows, Win32, Mac.')
 
@@ -3040,6 +3313,8 @@ def main():
             cli.get_token(args)
         elif args.subparser_name == 'eos-overlay':
             cli.manage_eos_overlay(args)
+        elif args.subparser_name == 'crossover':
+            cli.crossover_setup(args)
         elif args.subparser_name == 'move':
             cli.move(args)
         elif args.subparser_name == 'achievements':
@@ -3080,11 +3355,16 @@ def main():
             print(f'- Release summary:\n{update_info["summary"]}\n- Release URL: {update_info["gh_url"]}')
             if update_info['critical']:
                 print('! This update is recommended as it fixes major issues.')
-            if not is_windows_or_pyi():
+            if not is_windows_mac_or_pyi():
                 print('If you installed heirloom via a package manager it may '
                       'take some time for the update to become available.')
             elif 'downloads' in update_info:
-                dl_platform = 'linux' if sys_platform == 'linux' else 'windows'
+                dl_platform = 'windows'
+                if sys_platform == 'darwin':
+                    dl_platform = 'macos'
+                elif sys_platform == 'linux':
+                    dl_platform = 'linux'
+
                 if url := update_info['downloads'].get(dl_platform):
                     print(f'\n- Download URL: {url}')
 

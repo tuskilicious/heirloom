@@ -41,7 +41,7 @@ from heirloom.lfs.lgndry import LGDLFS
 from heirloom.models.game import Game
 from heirloom.plugins import PluginManager
 from heirloom.themes import Theme
-from heirloom.utils.env import is_windows_or_pyi
+from heirloom.utils.env import is_windows_mac_or_pyi
 
 if TYPE_CHECKING:
     from heirloom.core import HeirloomCore
@@ -775,7 +775,7 @@ class GuiApi:
             except ValueError:
                 speeds[option] = 0
         # the update notice is off by default where Heirloom comes from a package manager, which updates it
-        defaults = {'update_notice': not is_windows_or_pyi()}
+        defaults = {'update_notice': not is_windows_mac_or_pyi()}
         return {
             'install_dir': str(Path(config.get('Heirloom', 'install_dir', fallback='~/Games')).expanduser()),
             **speeds,
