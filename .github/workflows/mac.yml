@@ -10,21 +10,14 @@ on:
 
 jobs:
   app:
-    runs-on: ${{ matrix.os }}
+    # Apple silicon only: there is no build for Intel Macs
+    runs-on: macos-15
     timeout-minutes: 60
     permissions:
       contents: write
-    strategy:
-      matrix:
-        include:
-          - os: macos-15
-            arch: arm64
-          - os: macos-15-intel
-            arch: x64
-      fail-fast: false
     env:
       UV_SYSTEM_PYTHON: 1
-      DMG: heirloom_macos_${{ matrix.arch }}.dmg
+      DMG: heirloom_macos_arm64.dmg
 
     steps:
     - uses: actions/checkout@v6
@@ -71,7 +64,7 @@ jobs:
         app="$RUNNER_TEMP/Applications/Heirloom.app/Contents/MacOS/heirloom"
         "$app" -V
         HEIRLOOM_CONFIG_PATH="$RUNNER_TEMP/config" QTWEBENGINE_REMOTE_DEBUGGING=9222 "$app" gui > window.log 2>&1 &
-        uv run --no-project --with websocket-client python tests/window_probe.py 9222 shots-mac-${{ matrix.arch }}
+        uv run --no-project --with websocket-client python tests/window_probe.py 9222 shots-mac
 
     - name: What the window said
       if: always()
@@ -94,7 +87,7 @@ jobs:
     - uses: actions/upload-artifact@v7
       if: always()
       with:
-        name: mac-${{ matrix.arch }}-shots
+        name: mac-shots
         path: shots-*
 
     - uses: actions/upload-artifact@v7

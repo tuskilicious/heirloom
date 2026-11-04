@@ -12,8 +12,7 @@ RELEASES = 'https://api.github.com/repos/tuskilicious/heirloom/releases/latest'
 # the release file to download on each platform, first one found
 DOWNLOADS = {
     'windows': ('heirloom_windows_x64_setup.exe', 'heirloom_windows_x64.exe'),
-    # the one for this kind of Mac
-    'macos': (UPDATE_FILE if sys.platform == 'darwin' else 'heirloom_macos_arm64.dmg',),
+    'macos': ('heirloom_macos_arm64.dmg',),
     'linux': ('heirloom_linux_x64.AppImage', 'heirloom_linux_x64'),
 }
 

@@ -6,7 +6,6 @@ downloaded, so updating doesn't ask again.
 from __future__ import annotations
 
 import os
-import platform
 import plistlib
 import subprocess
 import sys
@@ -18,7 +17,8 @@ __all__ = ['SERVE_PAGE', 'STARTUP_NAME', 'UPDATE_FILE', 'WINDOW_ICON', 'Tray', '
            'game_runners', 'host_env', 'open_folder', 'opens_window_by_default', 'other_heirlooms_running', 'start_at_login',
            'start_install', 'starts_at_login', 'startup_command', 'update_blocker']
 
-UPDATE_FILE = f'heirloom_macos_{"arm64" if platform.machine() == "arm64" else "x64"}.dmg'
+# Apple silicon only: there is no build for Intel Macs
+UPDATE_FILE = 'heirloom_macos_arm64.dmg'
 # the window reads its page straight from the disk: Chromium in a Mac's Qt could time out reaching a server on localhost,
 # though the server answered anything else, and a page on the disk needs no connection at all
 SERVE_PAGE = False

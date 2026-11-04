@@ -6,7 +6,7 @@ import pytest
 import requests
 
 from heirloom import __version__, desktop
-from heirloom.api.lgd import DOWNLOADS, LGDAPI, is_newer, release_info
+from heirloom.api.lgd import LGDAPI, is_newer, release_info
 from heirloom.core import HeirloomCore
 from heirloom.gui.app import GuiApi, Job
 from heirloom.gui.self_update import DOWNLOAD_PREFIX, fetch_setup
@@ -19,7 +19,7 @@ GITHUB_RELEASE = {
     'body': 'Heirloom learns to grow tomatoes.\n\n### New\n- **Tomatoes.** Red ones.',
     'assets': [{'name': name, 'browser_download_url': f'https://github.com/dl/{name}'} for name in (
         'heirloom_windows_x64.exe', 'heirloom_windows_x64_setup.exe', 'heirloom_macos_arm64.dmg',
-        'heirloom_macos_x64.dmg', 'heirloom_linux_arm64')],
+        'heirloom_linux_arm64')],
 }
 
 
@@ -33,7 +33,7 @@ def test_release_reads_like_the_feeds_release_info(monkeypatch):
         'critical': False,
         'setup': {'url': 'https://github.com/dl/heirloom_windows_x64_setup.exe', 'sha256': ''},
         'downloads': {'windows': 'https://github.com/dl/heirloom_windows_x64_setup.exe',
-                      'macos': f'https://github.com/dl/{DOWNLOADS["macos"][0]}'},
+                      'macos': 'https://github.com/dl/heirloom_macos_arm64.dmg'},
     }, 'the installer is preferred, and a platform without its file has no download'
 
 

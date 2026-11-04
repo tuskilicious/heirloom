@@ -34,7 +34,7 @@ Report problems with Heirloom [on its GitHub](https://github.com/tuskilicious/he
 
 ## Requirements
 
-- Linux, Windows (8.1+), or macOS (14.0+)
+- Linux, Windows (8.1+), or macOS (14.0+ on Apple silicon)
   + 32-bit operating systems are not supported
 - python 3.10+ (64-bit)
   + (Windows) `pythonnet` is not yet compatible with 3.14+
@@ -76,7 +76,7 @@ For servers there are also `heirloom_linux_x64` and `heirloom_linux_arm64`: much
 
 ### macOS
 
-Download `heirloom_macos_arm64.dmg` for Apple silicon (M1 or later) or `heirloom_macos_x64.dmg` for Intel from the [releases page](https://github.com/tuskilicious/heirloom/releases/latest). It needs macOS 14 or later. Open it and drag Heirloom to Applications.
+Download `heirloom_macos_arm64.dmg` from the [releases page](https://github.com/tuskilicious/heirloom/releases/latest). It needs Apple silicon (M1 or later) and macOS 14 or later; there is no build for Intel Macs. Open it and drag Heirloom to Applications.
 
 Heirloom isn't signed by a paid Apple Developer account, so macOS blocks it the first time:
 1. Open Heirloom, and choose "Done" when macOS says it can't be opened.
