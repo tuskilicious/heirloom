@@ -58,7 +58,7 @@ class TimeWindow:
 @dataclass
 class QueuedDownload:
     app_name: str
-    # extra "heirloom install" options, e.g. ["--platform", "Mac"]
+    # extra "heirloom install" options, e.g. ["--max-speed", "5M"]
     options: list[str] = field(default_factory=list)
 
 

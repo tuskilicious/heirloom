@@ -11,10 +11,6 @@ def is_windows_or_pyi():
     return is_pyinstaller() or os.name == 'nt'
 
 
-def is_windows_mac_or_pyi():
-    return is_pyinstaller() or os.name == 'nt' or sys.platform == 'darwin'
-
-
 def windows_home_country() -> str:
     """The two letters of Windows' "Country or region" setting, or nothing if it has none or Windows is too old"""
     if sys.platform != 'win32':

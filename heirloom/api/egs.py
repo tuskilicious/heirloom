@@ -1,7 +1,6 @@
 # !/usr/bin/env python
 
 import logging
-import urllib.parse
 
 import requests
 import requests.adapters
@@ -62,10 +61,6 @@ class EPCAPI:
     def get_auth_code_url(self):
         """Gives a JSON object with an authorization code when opened by a browser signed in to Epic"""
         return f'https://www.epicgames.com/id/api/redirect?clientId={self._user_basic}&responseType=code'
-
-    def get_auth_url(self):
-        login_url = 'https://www.epicgames.com/id/login?redirectUrl='
-        return login_url + urllib.parse.quote(self.get_auth_code_url())
 
     def update_egs_params(self, egs_params):
         # update user-agent
@@ -152,10 +147,6 @@ class EPCAPI:
 
         return j
 
-    def invalidate_session(self):  # unused
-        _ = self.session.delete(f'https://{self._oauth_host}/account/api/oauth/sessions/kill/{self.access_token}',
-                                timeout=self.request_timeout)
-
     def get_game_token(self):
         r = self.session.get(f'https://{self._oauth_host}/account/api/oauth/exchange',
                              timeout=self.request_timeout)
@@ -192,13 +183,6 @@ class EPCAPI:
         r.raise_for_status()
         return r.json()
 
-    def get_launcher_manifests(self, platform='Windows', label=None):
-        r = self.session.get(f'https://{self._launcher_host}/launcher/api/public/assets/v2/platform/'
-                             f'{platform}/launcher', timeout=self.request_timeout,
-                             params=dict(label=label if label else self._label))
-        r.raise_for_status()
-        return r.json()
-
     def get_user_entitlements(self, start=0):
         user_id = self.user.get('account_id')
         r = self.session.get(f'https://{self._entitlements_host}/entitlement/api/account/{user_id}/entitlements',
@@ -224,26 +208,6 @@ class EPCAPI:
                              timeout=timeout or self.request_timeout)
         r.raise_for_status()
         return r.json().get(catalog_item_id, None)
-
-    def get_artifact_service_ticket(self, sandbox_id: str, artifact_id: str, label='Live', platform='Windows'):
-        # Based on EOS Helper Windows service implementation. Only works with anonymous EOSH session.
-        # sandbox_id is the same as the namespace, artifact_id is the same as the app name
-        r = self.session.post(f'https://{self._artifact_service_host}/artifact-service/api/public/v1/dependency/'
-                              f'sandbox/{sandbox_id}/artifact/{artifact_id}/ticket',
-                              json=dict(label=label, expiresInSeconds=300, platform=platform),
-                              params=dict(useSandboxAwareLabel='false'),
-                              timeout=self.request_timeout)
-        r.raise_for_status()
-        return r.json()
-
-    def get_game_manifest_by_ticket(self, artifact_id: str, signed_ticket: str, label='Live', platform='Windows'):
-        # Based on EOS Helper Windows service implementation.
-        r = self.session.post(f'https://{self._launcher_host}/launcher/api/public/assets/v2/'
-                              f'by-ticket/app/{artifact_id}',
-                              json=dict(platform=platform, label=label, signedTicket=signed_ticket),
-                              timeout=self.request_timeout)
-        r.raise_for_status()
-        return r.json()
 
     def get_library_items(self, include_metadata=True):
         records = []

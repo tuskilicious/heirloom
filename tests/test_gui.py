@@ -592,3 +592,12 @@ def test_theme_css_for_the_window(lgd_home, tmp_path):
     assert 'window_theme = paper_white' in config and '\ntheme =' not in config, 'the terminal keeps its theme'
     with pytest.raises(ValueError):
         api.use_theme('default')
+
+
+def test_a_crashed_job_shows_the_error_and_not_the_packaged_programs_last_words():
+    job = Job(1, 'overlay', '', 'Epic overlay')
+    for line in ('Traceback (most recent call last):', '  File "cli.py", line 1, in <module>',
+                 'PermissionError: [WinError 5] Access is denied',
+                 "[PYI-23504:ERROR] Failed to execute script 'cli' due to unhandled exception!"):
+        Jobs._read(job, line)
+    assert job.message == 'PermissionError: [WinError 5] Access is denied'

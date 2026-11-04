@@ -14,9 +14,8 @@ from datetime import datetime, timezone
 from hashlib import sha1
 from multiprocessing import Queue
 from pathlib import Path
-from platform import system
 from sys import platform as sys_platform
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qsl, urlencode, urlparse
 from uuid import uuid4
 
@@ -26,14 +25,7 @@ from requests.exceptions import ConnectionError, HTTPError
 from heirloom import __version__
 from heirloom.api.egs import EPCAPI
 from heirloom.api.lgd import LGDAPI, is_newer
-from heirloom.downloader.mp.manager import DLManager
 from heirloom.downloader.throttle import SpeedLimits, parse_speed
-from heirloom.lfs.crossover import (
-    mac_find_crossover_apps,
-    mac_get_bottle_path,
-    mac_get_crossover_version,
-    mac_is_valid_bottle,
-)
 from heirloom.lfs.egl import EPCLFS
 from heirloom.lfs.eos import EOSOverlayApp, query_registry_entries
 from heirloom.lfs.lgndry import LGDLFS
@@ -65,7 +57,7 @@ from heirloom.models.game import (
 from heirloom.models.json_manifest import JSONManifest
 from heirloom.models.manifest import Manifest
 from heirloom.utils.egl_crypt import decrypt_epic_data
-from heirloom.utils.env import get_system_locale, is_windows_mac_or_pyi
+from heirloom.utils.env import get_system_locale, is_windows_or_pyi
 from heirloom.utils.game_workarounds import (
     get_exe_override,
     is_opt_enabled,
@@ -73,6 +65,9 @@ from heirloom.utils.game_workarounds import (
 )
 from heirloom.utils.savegame_helper import SaveGameHelper
 from heirloom.utils.selective_dl import games as sdl_games
+
+if TYPE_CHECKING:
+    from heirloom.downloader.mp.manager import DLManager
 
 # ToDo: instead of true/false return values for success/failure actually raise an exception that the CLI/GUI
 #  can handle to give the user more details. (Not required yet since there's no GUI so log output is fine)
@@ -122,7 +117,7 @@ class HeirloomCore:
                 self.egs.language_code, self.egs.country_code = self.language_code, self.country_code
             except Exception as e:
                 self.log.warning(f'Getting locale failed: {e!r}, falling back to using en-US.')
-        elif system() != 'Darwin':  # macOS doesn't have a default locale we can query
+        else:
             self.log.warning('Could not determine locale, falling back to en-US')
 
         self.update_available = False
@@ -311,7 +306,7 @@ class HeirloomCore:
         if self.force_show_update:
             return True
         return not self.lgd.config.getboolean('Heirloom', 'disable_update_notice',
-                                              fallback=not is_windows_mac_or_pyi())
+                                              fallback=not is_windows_or_pyi())
 
     def check_for_updates(self, force=False):
         cached = self.lgd.get_cached_version()
@@ -761,7 +756,7 @@ class HeirloomCore:
     def _get_installed_game(self, app_name) -> InstalledGame:
         return self.lgd.get_installed_game(app_name)
 
-    def get_app_environment(self, app_name, wine_pfx=None, cx_bottle=None, disable_wine=False) -> dict:
+    def get_app_environment(self, app_name, wine_pfx=None, disable_wine=False) -> dict:
         # get environment overrides from config
         env: dict[str, str] = dict()
         if 'default.env' in self.lgd.config:
@@ -781,20 +776,6 @@ class HeirloomCore:
             return env
 
         # override wine prefix if necessary
-        if sys_platform == 'darwin':
-            if cx_bottle:
-                env['CX_BOTTLE'] = cx_bottle
-            elif 'CX_BOTTLE' not in os.environ:  # Only fall back to config is not already set in env
-                cx_bottle = self.lgd.config.get('default', 'crossover_bottle', fallback='Legendary')
-                cx_bottle = self.lgd.config.get(app_name, 'crossover_bottle', fallback=cx_bottle)
-                if cx_bottle:
-                    env['CX_BOTTLE'] = cx_bottle
-            else:
-                cx_bottle = os.environ['CX_BOTTLE']
-
-            if cx_bottle:
-                self.log.debug(f'Using CrossOver Bottle "{cx_bottle}"')
-
         if wine_pfx:
             env['WINEPREFIX'] = wine_pfx
         elif 'WINEPREFIX' not in os.environ:
@@ -804,8 +785,7 @@ class HeirloomCore:
 
         return env
 
-    def get_app_launch_command(self, app_name, wrapper=None, wine_binary=None,
-                               crossover_app=None, disable_wine=False):
+    def get_app_launch_command(self, app_name, wrapper=None, wine_binary=None, disable_wine=False):
         _cmd = []
         if wrapper or (wrapper := self.lgd.config.get(app_name, 'wrapper',
                                                       fallback=self.lgd.config.get('default', 'wrapper',
@@ -813,25 +793,6 @@ class HeirloomCore:
             _cmd.extend(shlex.split(wrapper))
 
         if os.name != 'nt' and not disable_wine:
-            if sys_platform == 'darwin' and not crossover_app and not wine_binary:
-                crossover_app = self.lgd.config.get('default', 'crossover_app', fallback=None)
-                crossover_app = self.lgd.config.get(app_name, 'crossover_app', fallback=crossover_app)
-                # on Mac we use CrossOver by default if we can
-                if not crossover_app and not self.lgd.config.getboolean('Heirloom', 'disable_auto_crossover',
-                                                                        fallback=False):
-                    cx_apps = mac_find_crossover_apps()
-                    cx_version, crossover_app = cx_apps[0]
-                    self.log.debug(f'Default CrossOver found: {crossover_app} ({cx_version})')
-
-            if sys_platform == 'darwin' and crossover_app:
-                wine_path = Path(crossover_app, 'Contents', 'SharedSupport', 'CrossOver', 'bin', 'wine')
-                if wine_path.exists():
-                    wine_binary = str(wine_path)
-                    cx_version = mac_get_crossover_version(crossover_app)
-                    self.log.info(f'Using CrossOver {cx_version} ({crossover_app})')
-                else:
-                    self.log.warning(f'Specified CrossOver app not valid (no wine binary): {crossover_app}')
-
             if not wine_binary:
                 # check if there's a default override
                 wine_binary = self.lgd.config.get('default', 'wine_executable', fallback='wine')
@@ -861,13 +822,11 @@ class HeirloomCore:
                               language: str | None = None, wrapper: str | None = None,
                               disable_wine: bool = False,
                               executable_override: str | None = None,
-                              crossover_app: str | None = None,
-                              crossover_bottle: str | None = None,
                               addon_app_name: str | None = None) -> LaunchParameters:
         install = self.lgd.get_installed_game(app_name)
         game = self.lgd.get_game_meta(addon_app_name if addon_app_name else app_name)
 
-        # Disable wine for non-Windows executables (e.g. native macOS)
+        # Disable wine for non-Windows executables
         if not install.platform.startswith('Win'):
             disable_wine = True
             wine_pfx = wine_bin = None
@@ -890,9 +849,8 @@ class HeirloomCore:
         params = LaunchParameters(
             game_executable=game_exe, game_directory=install.install_path, working_directory=working_dir,
             launch_command=self.get_app_launch_command(app_name=app_name, wrapper=wrapper, wine_binary=wine_bin,
-                                                       crossover_app=crossover_app, disable_wine=disable_wine),
-            environment=self.get_app_environment(app_name=app_name, wine_pfx=wine_pfx,
-                                                 cx_bottle=crossover_bottle, disable_wine=disable_wine)
+                                                       disable_wine=disable_wine),
+            environment=self.get_app_environment(app_name=app_name, wine_pfx=wine_pfx, disable_wine=disable_wine)
         )
 
         cmd, wait = self.get_pre_launch_command(app_name)
@@ -1046,23 +1004,8 @@ class HeirloomCore:
                 '{userprofile}': os.path.expandvars('%userprofile%'),
                 '{usersavedgames}': os.path.expandvars('%userprofile%/Saved Games'),
             }
-        elif sys_platform == 'darwin' and platform == 'Mac':
-            path_vars |= {
-                # Note: EGL actually resolves this to "~/Library/Application Support/Epic", but the only game
-                # I could find using this (Loop Hero) expects it to be "~/Library/Application Support".
-                '{appdata}': str(Path.home() / 'Library' / 'Application Support'),
-                '{userdir}': str(Path.home() / 'Documents'),
-                '{userlibrary}': str(Path.home() / 'Library'),
-            }
         else:
             wine_pfx = None
-            # on mac CrossOver takes precedence so check for a bottle first
-            if sys_platform == 'darwin':
-                cx_bottle = self.lgd.config.get(f'{app_name}.env', 'CX_BOTTLE', fallback=None)
-                cx_bottle = self.lgd.config.get(app_name, 'crossover_bottle', fallback=cx_bottle)
-                if cx_bottle and mac_is_valid_bottle(cx_bottle):
-                    wine_pfx = mac_get_bottle_path(cx_bottle)
-
             # attempt to get WINE prefix from config
             if not wine_pfx:
                 wine_pfx = self.lgd.config.get(f'{app_name}.env', 'WINEPREFIX', fallback=None)
@@ -1074,12 +1017,6 @@ class HeirloomCore:
                     wine_pfx = f'{proton_pfx}/pfx'
 
             # fall back to defaults if app-specifics not found
-            if not wine_pfx and sys_platform == 'darwin':
-                cx_bottle = self.lgd.config.get('default.env', 'CX_BOTTLE', fallback=None)
-                cx_bottle = self.lgd.config.get('default', 'crossover_bottle', fallback=cx_bottle)
-                if cx_bottle and mac_is_valid_bottle(cx_bottle):
-                    wine_pfx = mac_get_bottle_path(cx_bottle)
-
             if not wine_pfx:
                 wine_pfx = self.lgd.config.get('default.env', 'WINEPREFIX', fallback=None)
                 wine_pfx = self.lgd.config.get('default', 'wine_prefix', fallback=wine_pfx)
@@ -1090,11 +1027,6 @@ class HeirloomCore:
                     wine_pfx = f'{proton_pfx}/pfx'
 
             # If we still didn't find anything, try to read the prefix from the environment variables of this process
-            if not wine_pfx and sys_platform == 'darwin':
-                cx_bottle = os.getenv('CX_BOTTLE')
-                if cx_bottle and mac_is_valid_bottle(cx_bottle):
-                    wine_pfx = mac_get_bottle_path(cx_bottle)
-
             if not wine_pfx:
                 if proton_pfx := os.getenv('STEAM_COMPAT_DATA_PATH'):
                     wine_pfx = f'{proton_pfx}/pfx'
@@ -1383,15 +1315,6 @@ class HeirloomCore:
 
     def is_noupdate_game(self, app_name: str) -> bool:
         return self.lgd.config.getboolean(app_name, 'skip_update_check', fallback=False)
-
-    def is_latest(self, app_name: str) -> bool:
-        installed = self.lgd.get_installed_game(app_name)
-
-        for ass in self.get_assets(True):
-            if ass.app_name == app_name:
-                return ass.build_version == installed.version
-        # if we get here something is very wrong
-        raise ValueError(f'Could not find {app_name} in asset list!')
 
     def is_installed(self, app_name: str) -> bool:
         return self.get_installed_game(app_name) is not None
@@ -1682,6 +1605,9 @@ class HeirloomCore:
             max_speed_while_playing=self._speed_setting(max_speed_while_playing, 'max_download_speed_while_playing'),
             running_games_dir=str(self.lgd.running_games_dir),
         )
+        # only downloads need the downloader, which every command would otherwise wait for
+        from heirloom.downloader.mp.manager import DLManager
+
         dlm = DLManager(install_path, base_url, manifest_secrets, resume_file=resume_file, status_q=status_q,
                         max_shared_memory=max_shm * 1024 * 1024, max_workers=max_workers,
                         dl_timeout=dl_timeout, bind_ip=bind_ip, case_insensitive=platform.startswith('Win'),
@@ -2303,6 +2229,9 @@ class HeirloomCore:
         else:
             path = path or str(Path(self.get_default_install_dir(), '.overlay'))
 
+        # only downloads need the downloader, which every command would otherwise wait for
+        from heirloom.downloader.mp.manager import DLManager
+
         dlm = DLManager(path, base_urls[0], manifest_secrets)
         analysis_result = dlm.run_analysis(manifest=manifest)
 
@@ -2332,69 +2261,6 @@ class HeirloomCore:
         if Path(igame.install_path).exists():
             delete_folder(igame.install_path, recursive=True)
         self.lgd.remove_overlay_install_info()
-
-    def get_available_bottles(self):
-        self.check_for_updates(force=True)
-        lgd_version_data = self.lgd.get_cached_version()
-        return lgd_version_data.get('data', {}).get('cx_bottles', [])
-
-    def prepare_bottle_download(self, bottle_name, manifest_url, base_url=None):
-        r = self.egs.unauth_session.get(manifest_url)
-        r.raise_for_status()
-        manifest = self.load_manifest(r.content)
-
-        if not base_url:
-            base_url = manifest_url.rpartition('/')[0]
-
-        path = mac_get_bottle_path(bottle_name)
-        if Path(path).exists():
-            raise FileExistsError(f'Bottle {bottle_name} already exists')
-
-        dlm = DLManager(path, base_url, dict())
-        analysis_result = dlm.run_analysis(manifest=manifest)
-
-        install_size = analysis_result.install_size
-
-        parent_dir = next(p for p in (Path(path), *Path(path).parents) if p.exists())
-
-        _, _, free = shutil.disk_usage(parent_dir)
-        if free < install_size:
-            raise ValueError(f'Not enough space to setup bottle: {free / 1024 / 1024:.02f} '
-                             f'MiB < {install_size / 1024 / 1024:.02f} MiB')
-
-        return dlm, analysis_result, path
-
-    def finish_bottle_setup(self, bottle_name):
-        path = mac_get_bottle_path(bottle_name)
-
-        self.log.info('Creating bottle symlinks...')
-        symlinks = [
-            ('dosdevices/c:', '../drive_c'),
-            ('dosdevices/y:', str(Path.home())),
-            ('dosdevices/z:', '/'),
-            ('drive_c/users/crossover/Desktop/My Mac Desktop', str(Path.home() / 'Desktop')),
-            ('drive_c/users/crossover/Downloads', str(Path.home() / 'Downloads')),
-            ('drive_c/users/crossover/My Documents', str(Path.home() / 'Documents')),
-            ('drive_c/users/crossover/My Music', str(Path.home() / 'Music')),
-            ('drive_c/users/crossover/My Pictures', str(Path.home() / 'Pictures')),
-            ('drive_c/users/crossover/My Videos', str(Path.home() / 'Movies')),
-            ('drive_c/users/crossover/Templates', str(Path(path, 'dosdevices/c:/users/crossover/My Documents'))),
-        ]
-
-        for link, target in symlinks:
-            _link = Path(path, link)
-            _link.parent.mkdir(parents=True, exist_ok=True)
-
-            try:
-                _link.symlink_to(target)
-            except Exception as e:
-                self.log.error(f'Failed to create symlink {_link} -> {target}: {e!r}')
-
-    @staticmethod
-    def remove_bottle(bottle_name):
-        path = mac_get_bottle_path(bottle_name)
-        if Path(path).exists():
-            delete_folder(path, recursive=True)
 
     def exit(self):
         """

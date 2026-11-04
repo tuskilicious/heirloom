@@ -49,7 +49,7 @@ jobs:
 
       - name: Copy binaries
         run: |
-          oses=("Linux" "macOS" "Windows")
+          oses=("Linux" "Windows")
           arches=("X64" "ARM64")
           for os in ${oses[@]}; do
             for arch in ${arches[@]}; do
@@ -69,10 +69,6 @@ jobs:
 
       - name: Copy installer
         run: cp ./Windows-X64-installer/*.exe ./dist/
-
-      - name: Package macOS zip
-        working-directory: dist
-        run: 7z a heirloom_macOS.zip heirloom_macOS_*
 
       - name: Create draft release
         env:

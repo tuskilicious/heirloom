@@ -30,6 +30,15 @@ from heirloom.models.downloading import (
 )
 from heirloom.models.manifest import CDL, Manifest, ManifestComparison
 
+# how many updates the download speed is averaged over
+SPEED_UPDATES = 5
+
+
+def recent_speeds(updates):
+    """The raw and decompressed speeds over recent updates, each (seconds, raw bytes, decompressed bytes)"""
+    seconds = sum(update[0] for update in updates)
+    return sum(update[1] for update in updates) / seconds, sum(update[2] for update in updates) / seconds
+
 
 class DLManager(Process):
     def __init__(self, download_dir, base_url, manifest_secrets: dict, cache_dir=None, status_q=None,
@@ -739,6 +748,8 @@ class DLManager(Process):
             t.start()
 
         last_update = time.time()
+        # a chunk only counts once it has all arrived, so on a slow connection many updates see none finish
+        recent_dl: deque[tuple[float, int, int]] = deque(maxlen=SPEED_UPDATES)
 
         while processed_tasks < num_tasks:
             delta = time.time() - last_update
@@ -753,8 +764,8 @@ class DLManager(Process):
             total_dl += self.bytes_downloaded_since_last
             total_write += self.bytes_written_since_last
 
-            dl_speed = self.bytes_downloaded_since_last / delta
-            dl_unc_speed = self.bytes_decompressed_since_last / delta
+            recent_dl.append((delta, self.bytes_downloaded_since_last, self.bytes_decompressed_since_last))
+            dl_speed, dl_unc_speed = recent_speeds(recent_dl)
             w_speed = self.bytes_written_since_last / delta
             r_speed = self.bytes_read_since_last / delta
             # c_speed = self.num_processed_since_last / delta
