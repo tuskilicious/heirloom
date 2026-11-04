@@ -98,9 +98,13 @@ jobs:
         # the window, from the installed copy: each screen in each theme, closing to the tray, and coming back
         $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=9222'
         $env:HEIRLOOM_CONFIG_PATH = Join-Path $env:RUNNER_TEMP 'window-config'
-        Start-Process "$dir\heirloom-gui.exe"
+        Start-Process "$dir\heirloom.exe" -ArgumentList 'gui' -RedirectStandardOutput window.out -RedirectStandardError window.err
         uv run --no-project --with websocket-client python tests/window_probe.py 9222 shots-windows
-        if ($LASTEXITCODE) { throw 'the window did not pass' }
+        if ($LASTEXITCODE) {
+          Get-Process heirloom, msedgewebview2 -ErrorAction SilentlyContinue | Format-Table Id, ProcessName, MainWindowHandle
+          Get-Content window.out, window.err -Tail 30
+          throw 'the window did not pass'
+        }
         $window = Get-Process heirloom | Where-Object { $_.Path -eq "$dir\heirloom.exe" -and $_.MainWindowHandle -ne 0 } | Select-Object -First 1
         if (-not $window) { throw 'no window to close' }
         $window.CloseMainWindow() | Out-Null

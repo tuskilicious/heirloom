@@ -84,16 +84,19 @@ SCREENS = {
 
 def page_socket(port: int, wait: float) -> str:
     deadline = time.monotonic() + wait
+    targets = []
     while True:
         try:
             with urllib.request.urlopen(f'http://127.0.0.1:{port}/json/list', timeout=5) as response:
-                pages = [t for t in json.load(response) if t.get('type') == 'page' and 'index.html' in t.get('url', '')]
+                targets = json.load(response)
+            # WebView2 calls its pages webviews
+            pages = [t for t in targets if t.get('type') in ('page', 'webview') and 'index.html' in t.get('url', '')]
             if pages:
                 return pages[0]['webSocketDebuggerUrl']
         except OSError:
             pass
         if time.monotonic() > deadline:
-            raise SystemExit(f'No window on port {port} after {wait} s')
+            raise SystemExit(f'No window on port {port} after {wait} s. Its targets: {targets}')
         time.sleep(1)
 
 
