@@ -459,8 +459,9 @@ class Jobs:
             job.speed = match[1]
         else:
             text = match[1] if (match := LOG_LINE.match(line)) else line
-            # skip the download statistics and traceback lines, keep what a person would read
-            if text and not text.startswith((' ', '- ', '+ ')):
+            # skip the download statistics and traceback lines, keep what a person would read: the error itself, not
+            # the packaged program's "failed to execute script" after it
+            if text and not text.startswith((' ', '- ', '+ ', '[PYI-')):
                 job.message = text
 
 

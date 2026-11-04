@@ -1524,6 +1524,7 @@ class HeirloomCLI:
                            f'If it continues to fail please open an issue on GitHub.')
             exit(1)
         else:
+            self._require_finished_download(dlm)
             end_t = time.time()
             if not args.no_install:
                 # Allow setting savegame directory at install time so sync-saves will work immediately
@@ -2707,6 +2708,14 @@ class HeirloomCLI:
             return
         logger.info(f'Exchange code: {token["code"]}')
 
+    @staticmethod
+    def _require_finished_download(dlm):
+        """Stops here if the download process crashed, which join() doesn't say, rather than call it installed"""
+        if dlm.exitcode:
+            logger.error(f'The download stopped with exit code {dlm.exitcode}. Try again: it continues where it '
+                         f'stopped.')
+            exit(1)
+
     def manage_eos_overlay(self, args):
         prefix = None
         if os.name != 'nt':
@@ -2848,6 +2857,11 @@ class HeirloomCLI:
 
             if old_install := self.core.lgd.get_overlay_install_info():
                 if old_install.version == igame.version:
+                    # an install that stopped after downloading never got as far as turning the overlay on
+                    if (os.name == 'nt' or prefix) and not query_registry_entries(prefix)['overlay_path']:
+                        add_registry_entries(os.path.normpath(old_install.install_path), prefix)
+                        logger.info('Installed version is up to date, and is now turned on.')
+                        return
                     logger.info('Installed version is up to date, nothing to do.')
                     return
 
@@ -2869,6 +2883,7 @@ class HeirloomCLI:
                 logger.error(f'The following exception occurred while waiting for the downloader to finish: {e!r}. '
                              f'Try restarting the process, if it continues to fail please open an issue on GitHub.')
             else:
+                self._require_finished_download(dlm)
                 self.core.finish_overlay_install(igame)
 
                 if os.name == 'nt' or prefix:
@@ -3044,6 +3059,10 @@ class HeirloomCLI:
                     self.core.remove_bottle(bottle_name)
                     return
                 else:
+                    if dlm.exitcode:
+                        logger.error(f'The download stopped with exit code {dlm.exitcode}.')
+                        self.core.remove_bottle(bottle_name)
+                        return
                     logger.info('Finished downloading, finalising bottle setup...')
                     self.core.finish_bottle_setup(bottle_name)
                     forced_selection = bottle_name

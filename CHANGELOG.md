@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.39.1 "Daybreak" (2026-11-04)
+
+Steadier download speeds, clearer errors, and crashed downloads caught.
+
+### Fixed
+- **Download speeds are steady.** They're averaged over a few seconds, as a slow connection could show 0.00 MiB/s while
+  downloading normally.
+- **A failed job says what went wrong,** rather than only "failed to execute script".
+- **Installing the Epic overlay again turns it on** if an earlier install stopped before doing so.
+- **A download that crashes is no longer recorded as installed,** for games and the overlay. It shows as failed, and
+  trying again continues where it stopped.
+
 ## 0.39.0 "Daybreak" (2026-11-04)
 
 A light and dark toggle, your own currency, and more character in every theme.

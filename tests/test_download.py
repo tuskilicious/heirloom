@@ -3,14 +3,16 @@ import subprocess
 import sys
 import threading
 import time
+from collections import deque
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from logging.handlers import QueueListener
-from multiprocessing import Queue
+from multiprocessing import Process, Queue
 
 import pytest
 
-from heirloom.downloader.mp.manager import DLManager
+from heirloom.cli import HeirloomCLI
+from heirloom.downloader.mp.manager import SPEED_UPDATES, DLManager, recent_speeds
 from heirloom.downloader.throttle import SpeedLimits
 from heirloom.models.manifest import Manifest
 from heirloom.utils.savegame_helper import SaveGameHelper
@@ -141,3 +143,32 @@ def test_lower_limit_applies_while_a_game_is_running(cdn, tmp_path):
         game.wait(timeout=30)
     assert playing >= THROTTLED_SECONDS - 0.5, f'took {playing:.1f}s while playing'
     assert no_game < playing - 2, f'took {no_game:.1f}s without a game vs {playing:.1f}s while playing'
+
+
+def test_a_slow_download_shows_its_speed_rather_than_zero():
+    # a 1 MiB chunk finishing every few seconds, with updates each second
+    updates = deque([(1.0, 0, 0), (1.0, 3 * 1024 ** 2, 6 * 1024 ** 2), (1.0, 0, 0)], maxlen=SPEED_UPDATES)
+    updates.append((1.0, 0, 0))
+    assert recent_speeds(updates) == (0.75 * 1024 ** 2, 1.5 * 1024 ** 2), 'not 0.00 in the seconds no chunk finished'
+
+
+def crash():
+    raise RuntimeError('the download crashed')
+
+
+def finish():
+    pass
+
+
+def test_a_crashed_download_is_not_called_finished(capfd):
+    crashed = Process(target=crash)
+    crashed.start()
+    crashed.join()
+    with pytest.raises(SystemExit) as stopped:
+        HeirloomCLI._require_finished_download(crashed)
+    assert stopped.value.code == 1
+
+    finished = Process(target=finish)
+    finished.start()
+    finished.join()
+    HeirloomCLI._require_finished_download(finished)
