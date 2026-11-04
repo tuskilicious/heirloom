@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- **A game's page keeps its text off the art,** so it's easy to read, and shows more of the top of the art, where the
+  logo usually is. It no longer shows the last game's art while the new one loads.
+- **The Manage menu opens along the edge of a cover** rather than over the sidebar, and keeps clear of the window's
+  bottom edge.
+- **Customize:** a plugin's buttons move under its description when they don't fit beside it.
+- **Retro arcade:** the dialogs are wider, so no button, time or plugin name is cut off.
+- **Big picture:** a whole row of covers stays in view on smaller windows, and long collection names are shortened.
+- **Showcase:** the banner's text and buttons stand out from the art.
+
 ## 0.37.2 "Caretaker" (2026-11-04)
 
 Refresh finds a new Heirloom straight away.

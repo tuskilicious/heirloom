@@ -655,6 +655,10 @@ kbd {
   white-space: pre-wrap; }
 .switch:disabled { opacity: .45; cursor: default; }
 
+/* a plugin's buttons go under its text when both don't fit beside each other */
+#plugin-list .row { flex-wrap: wrap; justify-content: flex-end; }
+#plugin-list .row-text { flex: 1 1 340px; }
+
 /* the install dialog: three sizes side by side, then where it goes */
 .install-dialog { width: min(480px, calc(100vw - 40px)); }
 .sizes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 14px; }
@@ -698,8 +702,10 @@ kbd {
 .game-page[open] { animation: game-page-in .22s var(--ease); }
 .game-page.no-art .game-body { margin-top: 0; padding-top: 72px; }
 #game-close { position: fixed; top: 16px; left: 16px; z-index: 1; width: 40px; height: 40px; border-radius: 50%; background: color-mix(in srgb, var(--surface-raised) 85%, transparent); color: var(--text); backdrop-filter: blur(8px); }
-.game-art { display: block; width: 100%; height: min(46vh, 520px); object-fit: cover; mask-image: linear-gradient(#000 50%, transparent); }
-.game-body { position: relative; max-width: 920px; margin: -96px auto 0; padding: 0 40px 56px; }
+/* the upper part of the art, where a game's logo usually is, with the page's text below it rather than over it */
+.game-art { display: block; width: 100%; height: min(46vh, 520px); object-fit: cover; object-position: center 20%; mask-image: linear-gradient(#000 45%, transparent); transition: opacity .2s ease; }
+.game-art.loading { opacity: 0; }
+.game-body { position: relative; max-width: 920px; margin: -20px auto 0; padding: 0 40px 56px; }
 .game-body h2 { margin: 0; font-size: clamp(28px, 4vw, 44px); line-height: 1.1; letter-spacing: -.02em; }
 .game-by { margin: 8px 0 0; color: var(--muted); font-size: 14px; }
 .game-by:empty { display: none; }

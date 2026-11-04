@@ -30,9 +30,10 @@
 .hero-art { animation: ken-burns 46s ease-in-out infinite alternate; transform-origin: 65% 35%; }
 .hero::after {
   background:
-    linear-gradient(0deg, var(--bg) 0%, color-mix(in srgb, var(--bg) 70%, transparent) 30%, transparent 70%),
-    linear-gradient(90deg, color-mix(in srgb, var(--bg) 70%, transparent), transparent 60%);
+    linear-gradient(0deg, var(--bg) 0%, color-mix(in srgb, var(--bg) 88%, transparent) 34%, transparent 78%),
+    linear-gradient(90deg, color-mix(in srgb, var(--bg) 82%, transparent), transparent 62%);
 }
+.hero .actions .icon-button { background: color-mix(in srgb, var(--surface-raised) 80%, transparent); color: var(--text); }
 .hero-body { max-width: 900px; padding: 64px 64px 56px; gap: 12px; }
 .hero-note { font-size: 12px; letter-spacing: .32em; text-transform: uppercase; }
 .hero-title {
