@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Heirloom
+Comment=Play your Epic Games library
+Exec=heirloom
+Icon=heirloom
+Categories=Game;
+Terminal=false

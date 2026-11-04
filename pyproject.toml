@@ -37,6 +37,8 @@ webview = [
     "pythonnet>=3.2; sys_platform == 'win32' and python_version >= '3.11'",
 ]
 webview_gtk = ["pywebview>=3.4", "PyGObject"]
+# the window on Linux and Mac in the prebuilt programs: Chromium, the same kind of engine as WebView2 on Windows
+webview_qt = ["pywebview>=3.4", "qtpy", "PySide6-Essentials", "PySide6-Addons", "PySide6-WebEngine"]
 pyinstaller_build = ["pyinstaller"]
 
 [project.scripts]
