@@ -72,7 +72,11 @@ jobs:
 
       - name: Package macOS zip
         working-directory: dist
-        run: 7z a heirloom_macOS.zip heirloom_macOS_*
+        # downloading the builds as artifacts loses their permission to run, which the zip then keeps
+        run: |
+          chmod +x heirloom_macOS_*
+          7z a heirloom_macOS.zip heirloom_macOS_*
+          test "$(7z l -slt heirloom_macOS.zip | grep -c -- '-rwx')" = 2
 
       - name: Create draft release
         env:

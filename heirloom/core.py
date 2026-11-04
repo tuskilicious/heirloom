@@ -16,7 +16,7 @@ from multiprocessing import Queue
 from pathlib import Path
 from platform import system
 from sys import platform as sys_platform
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qsl, urlencode, urlparse
 from uuid import uuid4
 
@@ -26,7 +26,6 @@ from requests.exceptions import ConnectionError, HTTPError
 from heirloom import __version__
 from heirloom.api.egs import EPCAPI
 from heirloom.api.lgd import LGDAPI, is_newer
-from heirloom.downloader.mp.manager import DLManager
 from heirloom.downloader.throttle import SpeedLimits, parse_speed
 from heirloom.lfs.crossover import (
     mac_find_crossover_apps,
@@ -73,6 +72,9 @@ from heirloom.utils.game_workarounds import (
 )
 from heirloom.utils.savegame_helper import SaveGameHelper
 from heirloom.utils.selective_dl import games as sdl_games
+
+if TYPE_CHECKING:
+    from heirloom.downloader.mp.manager import DLManager
 
 # ToDo: instead of true/false return values for success/failure actually raise an exception that the CLI/GUI
 #  can handle to give the user more details. (Not required yet since there's no GUI so log output is fine)
@@ -1384,15 +1386,6 @@ class HeirloomCore:
     def is_noupdate_game(self, app_name: str) -> bool:
         return self.lgd.config.getboolean(app_name, 'skip_update_check', fallback=False)
 
-    def is_latest(self, app_name: str) -> bool:
-        installed = self.lgd.get_installed_game(app_name)
-
-        for ass in self.get_assets(True):
-            if ass.app_name == app_name:
-                return ass.build_version == installed.version
-        # if we get here something is very wrong
-        raise ValueError(f'Could not find {app_name} in asset list!')
-
     def is_installed(self, app_name: str) -> bool:
         return self.get_installed_game(app_name) is not None
 
@@ -1682,6 +1675,9 @@ class HeirloomCore:
             max_speed_while_playing=self._speed_setting(max_speed_while_playing, 'max_download_speed_while_playing'),
             running_games_dir=str(self.lgd.running_games_dir),
         )
+        # only downloads need the downloader, which every command would otherwise wait for
+        from heirloom.downloader.mp.manager import DLManager
+
         dlm = DLManager(install_path, base_url, manifest_secrets, resume_file=resume_file, status_q=status_q,
                         max_shared_memory=max_shm * 1024 * 1024, max_workers=max_workers,
                         dl_timeout=dl_timeout, bind_ip=bind_ip, case_insensitive=platform.startswith('Win'),
@@ -2303,6 +2299,9 @@ class HeirloomCore:
         else:
             path = path or str(Path(self.get_default_install_dir(), '.overlay'))
 
+        # only downloads need the downloader, which every command would otherwise wait for
+        from heirloom.downloader.mp.manager import DLManager
+
         dlm = DLManager(path, base_urls[0], manifest_secrets)
         analysis_result = dlm.run_analysis(manifest=manifest)
 
@@ -2349,6 +2348,9 @@ class HeirloomCore:
         path = mac_get_bottle_path(bottle_name)
         if Path(path).exists():
             raise FileExistsError(f'Bottle {bottle_name} already exists')
+
+        # only downloads need the downloader, which every command would otherwise wait for
+        from heirloom.downloader.mp.manager import DLManager
 
         dlm = DLManager(path, base_url, dict())
         analysis_result = dlm.run_analysis(manifest=manifest)

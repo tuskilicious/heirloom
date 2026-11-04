@@ -53,6 +53,10 @@ jobs:
       env:
         PYTHONOPTIMIZE: 1
 
+    - name: Test the build
+      if: runner.os == 'macOS'
+      run: heirloom/dist/heirloom --version
+
     - uses: actions/upload-artifact@v7
       with:
         name: ${{ runner.os }}-${{ runner.arch }}-package

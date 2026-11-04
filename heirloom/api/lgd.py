@@ -1,7 +1,7 @@
 # !/usr/bin/env python
 
 import logging
-from platform import system
+import sys
 
 import requests
 
@@ -45,7 +45,8 @@ def is_newer(version: str, than: str) -> bool:
 
 
 class LGDAPI:
-    _user_agent = f'Heirloom/{__version__} ({system()})'
+    # platform.system() can take tens of milliseconds on Windows, at every start
+    _user_agent = f'Heirloom/{__version__} ({ {"win32": "Windows", "darwin": "Darwin"}.get(sys.platform, "Linux")})'
     _api_host = 'api.legendary.gl'
 
     def __init__(self):

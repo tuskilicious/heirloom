@@ -10,8 +10,6 @@ import zlib
 from base64 import b64encode
 from io import BytesIO
 
-from Cryptodome.Cipher import AES
-
 logger = logging.getLogger('Manifest')
 
 
@@ -102,6 +100,9 @@ class Manifest:
         secret = secrets.get(secret_str)
         if secret is None:
             return False
+        # slow to import, and only encrypted manifests need it
+        from Cryptodome.Cipher import AES
+
         cipher = AES.new(bytes.fromhex(secret), AES.MODE_GCM, nonce=self.encrypted_data.encrypted_header.iv)
         decrypted = cipher.decrypt_and_verify(self.encrypted_data.ciphertext, self.encryption_tag)
         if self.encrypted_data.encrypted_header.compressed:
@@ -398,17 +399,6 @@ class CDL:
         self._guid_map = None
         self._guid_int_map = None
         self._path_map = None
-
-    def get_chunk_by_path(self, path):
-        if not self._path_map:
-            self._path_map = dict()
-            for index, chunk in enumerate(self.elements):
-                self._path_map[chunk.path] = index
-
-        index = self._path_map.get(path, None)
-        if index is None:
-            raise ValueError(f'Invalid path! "{path}"')
-        return self.elements[index]
 
     def get_chunk_by_guid(self, guid):
         """

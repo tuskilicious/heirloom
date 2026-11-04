@@ -51,3 +51,10 @@ def test_move_a_game_and_fail_when_its_folder_is_taken(fake_game, tmp_path):
     result = run('move', 'Fish', str(tmp_path / 'Taken'))
     assert result.returncode == 1, 'the window shows it failed'
     assert (games / 'FishGame').is_dir(), 'left where it was'
+
+
+def test_commands_dont_wait_for_what_only_downloads_need():
+    code = ('import sys; import heirloom.cli; '
+            'print([m for m in ("Cryptodome", "heirloom.downloader.mp.manager") if m in sys.modules])')
+    result = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True, timeout=60)
+    assert result.stdout.strip() == '[]', result.stderr

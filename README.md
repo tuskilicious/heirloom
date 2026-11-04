@@ -59,6 +59,18 @@ Running a newer installer updates Heirloom; uninstalling it (Settings > Apps) ke
 When a newer Heirloom is out, the window's sidebar links to it and commands that log in mention it when they finish (checked once a day).
 Windows may warn about an unrecognized app the first time, because the installer isn't code-signed: choose "More info" and "Run anyway".
 
+### macOS
+
+Download `heirloom_macOS_arm64` for Apple silicon (M1 or later) or `heirloom_macOS_x64` for Intel from the [releases page](https://github.com/tuskilicious/heirloom/releases/latest); `heirloom_macOS.zip` has both.
+On macOS, Heirloom is a command line program with no window, so run it in Terminal. It isn't signed by Apple, so macOS blocks it at first:
+```bash
+cd ~/Downloads
+chmod +x heirloom_macOS_arm64
+xattr -d com.apple.quarantine heirloom_macOS_arm64
+./heirloom_macOS_arm64 --help
+```
+A file from the zip doesn't need `chmod` in Heirloom 0.39.2 or later. Instead of `xattr`, you can run it once, then choose "Open Anyway" in System Settings > Privacy & Security.
+
 ### With pip
 
 ```bash

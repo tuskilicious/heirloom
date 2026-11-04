@@ -5,8 +5,6 @@ from hashlib import sha1
 from io import BytesIO
 from uuid import uuid4
 
-from Cryptodome.Cipher import AES
-
 from heirloom.utils.rolling_hash import get_hash
 
 
@@ -42,6 +40,9 @@ class Chunk:
         
         data = self._bio.read()
         if self.encrypted:
+            # slow to import, and only encrypted chunks need it
+            from Cryptodome.Cipher import AES
+
             cipher = AES.new(bytes.fromhex(self.secret_key), AES.MODE_GCM, nonce=self.sha_hash[:12])
             data = cipher.decrypt_and_verify(data, self.encryption_tag)
         if self.compressed:
