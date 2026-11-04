@@ -81,10 +81,19 @@ jobs:
             pid=$(pgrep -f 'MacOS/heirloom gui' | head -1)
             sample "$pid" 3 -file sample.txt > /dev/null 2>&1
             sed -n '/(<lambda>)/,/ThreadPoolServiceThread/p' sample.txt | grep -vE '_PyEval|PyObject_|cfunction|method_vectorcall|_PyFunction|slot_tp' | cut -c1-120 | head -40
-            echo "--- the same build from its own folder, with its own config"
-            HEIRLOOM_CONFIG_PATH="$RUNNER_TEMP/config2" QTWEBENGINE_REMOTE_DEBUGGING=9223 installer/build/Heirloom.app/Contents/MacOS/heirloom gui > window2.log 2>&1 &
-            uv run --no-project --with websocket-client python tests/window_probe.py 9223 || echo "ALSO FAILS FROM THE BUILD FOLDER"
-            tail -8 window2.log
+            pkill -f 'MacOS/heirloom gui' || true
+            sleep 3
+            echo "--- experiment 1: without creating Qt's application early, or the tray"
+            HL_DEBUG_NO_TRAY=1 HEIRLOOM_CONFIG_PATH="$RUNNER_TEMP/config2" QTWEBENGINE_REMOTE_DEBUGGING=9223 installer/build/Heirloom.app/Contents/MacOS/heirloom gui > window2.log 2>&1 &
+            uv run --no-project --with websocket-client python tests/window_probe.py 9223 | grep -E '"url"|What the window|ERR_' || true
+            pkill -f 'MacOS/heirloom gui' || true
+            sleep 3
+            echo "--- experiment 2: all of Qt, untrimmed, with the tray"
+            HL_DEBUG_NO_TRIM=1 uv run --module PyInstaller --distpath untrimmed --workpath build/untrimmed installer/heirloom.spec > /dev/null 2>&1
+            du -sh untrimmed/Heirloom.app
+            HEIRLOOM_CONFIG_PATH="$RUNNER_TEMP/config3" QTWEBENGINE_REMOTE_DEBUGGING=9224 untrimmed/Heirloom.app/Contents/MacOS/heirloom gui > window3.log 2>&1 &
+            uv run --no-project --with websocket-client python tests/window_probe.py 9224 | grep -E '"url"|What the window|ERR_' || true
+            pkill -f 'MacOS/heirloom gui' || true
             exit 1
           }
 

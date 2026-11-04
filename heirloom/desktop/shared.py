@@ -56,6 +56,8 @@ def qt_app():
 
 @functools.cache
 def _tray_available() -> bool:
+    if os.environ.get('HL_DEBUG_NO_TRAY'):
+        return False
     try:
         qt_app()
         from PySide6.QtWidgets import QSystemTrayIcon
