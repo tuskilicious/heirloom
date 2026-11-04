@@ -70,7 +70,11 @@
 #heading, .hero-title, .panel-head h2 { letter-spacing: -.01em; font-weight: 700; }
 
 /* accent text in ink rather than amber */
-.status.lit, .hero-note, .rail-item.update, .ring .percent { color: var(--ink); }
+.status.lit, .hero-note, .ring .percent { color: var(--ink); }
+/* the lantern is cream for the sidebar, and would vanish on the cream page */
+.empty { --logo: var(--ink); }
+/* the sidebar is burnt orange itself */
+.rail-item.update { color: var(--text); font-weight: 600; }
 
 /* no glows: tinted shadows and hairlines instead */
 .brand, .empty .mark { animation: none; }

@@ -107,6 +107,7 @@ button { border-radius: var(--radius-control); text-transform: uppercase; letter
 
 /* the pixel font is wide, so the dialogs and time fields are too */
 .panel { width: min(740px, calc(100vw - 40px)); border: 3px solid var(--accent); box-shadow: 0 0 40px -6px var(--accent); }
+.speed { width: 108px; }
 .speed.time { width: 136px; }
 .panel-head h2 { font-size: 15px; color: var(--accent); text-transform: uppercase; }
 .panel h3 { color: var(--cyan); font-size: 10px; }

@@ -156,7 +156,8 @@ button:disabled { opacity: .55; cursor: default; }
 .count:empty { display: none; }
 
 .shelves { position: relative; display: flex; flex-direction: column; gap: 2px; }
-.shelves .rail-item { z-index: 1; }
+/* they scroll in a short window rather than squash together */
+.shelves .rail-item { flex: none; z-index: 1; }
 .shelves .rail-item[aria-pressed="true"] { color: var(--text); background: transparent; }
 .shelves .rail-item[aria-pressed="true"] .icon {
   color: var(--accent);
@@ -246,6 +247,8 @@ button:disabled { opacity: .55; cursor: default; }
 }
 
 #heading { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -.015em; line-height: 1.15; }
+/* with no summary the heading stays where it would be centred, and the bar keeps its height */
+#heading:has(+ .summary:empty) { position: relative; top: 11px; }
 .summary { margin: 4px 0 0; min-height: 1.45em; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
 
 .tools { display: flex; align-items: center; gap: 8px; width: min(480px, 60%); }
@@ -839,7 +842,7 @@ kbd {
 .detail { display: -webkit-box; overflow: hidden; color: var(--muted); font-size: 12px; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .job.failed .detail { color: var(--danger); }
 .job-controls { display: flex; align-items: center; gap: 4px; }
-.job-end { display: grid; place-items: center; width: 32px; }
+.job-end { display: grid; place-items: center; width: 38px; }
 .job-end .state { width: 20px; height: 20px; }
 .job.done .state { color: var(--accent); }
 .job.failed .state { color: var(--danger); }
