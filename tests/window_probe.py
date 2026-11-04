@@ -30,12 +30,14 @@ FEATURES = """({
   size: [innerWidth, innerHeight],
 })"""
 
-INTERNET = """new Promise((done) => {
+# real covers come from Epic's servers, and the made-up library's are inline, so this is what proves they can load.
+# GitHub's, as Epic's refuse scripts
+REMOTE_IMAGE = """new Promise((done) => {
   const art = new Image();
-  art.onload = () => done(`reached Epic, ${art.naturalWidth} px wide`);
-  art.onerror = () => done('could not reach Epic');
-  setTimeout(() => done('nothing from Epic after 25 s'), 25000);
-  art.src = 'https://store.epicgames.com/favicon.ico';
+  art.onload = () => done(`loaded, ${art.naturalWidth} px wide`);
+  art.onerror = () => done('blocked or failed');
+  setTimeout(() => done('nothing after 25 s'), 25000);
+  art.src = 'https://github.githubassets.com/favicons/favicon.png';
 })"""
 
 # light, dark and busy art, long names, and games in every state, as bugs have come from each
@@ -160,7 +162,7 @@ def main() -> None:
             break
         time.sleep(1)
     print(json.dumps(features, indent=1))
-    print('The internet from the page:', page.evaluate(INTERNET))
+    print('A remote image in the page:', page.evaluate(REMOTE_IMAGE))
     if not features.get('library'):
         print('What the window shows:', page.evaluate('document.body?.innerText'))
         print('It went to:', [entry['url'] for entry in page.call('Page.getNavigationHistory')['entries']])
