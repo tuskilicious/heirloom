@@ -7,12 +7,34 @@ import sys
 
 root = os.path.dirname(SPECPATH)
 icon = os.path.join(root, 'assets', 'windows_icon.ico')
-
 datas = [(os.path.join(root, 'heirloom', 'gui', 'web'), 'heirloom/gui/web')]
+excludes = []
+
 if sys.platform != 'win32':
-    # for the tray, and on Linux the app menu
+    # the tray's icon, which on Linux the app menu uses too
     datas.append((icon, 'heirloom/desktop'))
-cli = Analysis([os.path.join(root, 'heirloom', 'cli.py')], datas=datas)
+    # QtPy mentions every part of Qt, and PyInstaller would take them all
+    import PySide6
+    qt_modules = {'QtCore', 'QtGui', 'QtNetwork', 'QtPrintSupport', 'QtWebChannel', 'QtWebEngineCore',
+                  'QtWebEngineWidgets', 'QtWidgets'}
+    excludes = [f'PySide6.{name}' for name in {file.split('.')[0] for file in os.listdir(os.path.dirname(PySide6.__file__))
+                                               if file.startswith('Qt')} - qt_modules]
+
+
+def needed(entry):
+    """Without the parts of Qt the window doesn't use. GTK's theme plugin would also bring this machine's GTK along"""
+    path = entry[0].replace(os.sep, '/')
+    if '/qtwebengine_locales/' in path:
+        return path.endswith('en-US.pak')
+    return not any(part in path for part in ('PySide6/Qt/qml/', 'PySide6/Qt/translations/', 'plugins/qmltooling/',
+                                             'plugins/platformthemes/libqgtk3', 'plugins/position/',
+                                             'plugins/printsupport/', 'plugins/egldeviceintegrations/'))
+
+
+cli = Analysis([os.path.join(root, 'heirloom', 'cli.py')], datas=datas, excludes=excludes)
+if sys.platform != 'win32':
+    cli.datas = [entry for entry in cli.datas if needed(entry)]
+    cli.binaries = [entry for entry in cli.binaries if needed(entry)]
 cli_exe = EXE(PYZ(cli.pure), cli.scripts, [], exclude_binaries=True, name='heirloom', icon=icon, console=True)
 
 if sys.platform == 'win32':
