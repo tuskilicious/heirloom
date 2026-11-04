@@ -5,6 +5,7 @@ a screenshot of each screen in each theme and mode, over a made-up library, and 
     python tests/window_probe.py <port> [folder for screenshots]
 """
 import base64
+import contextlib
 import itertools
 import json
 import sys
@@ -144,15 +145,16 @@ def main() -> None:
     page = Page(page_socket(int(sys.argv[1]), 120))
     features = {}
     for _ in range(60):
-        try:
+        # while still loading there is no <body> yet
+        with contextlib.suppress(RuntimeError):
             features = page.evaluate(FEATURES)
-        except RuntimeError:
-            # still loading: there is no <body> yet
-            pass
         if features.get('api') and features.get('library'):
             break
         time.sleep(1)
     print(json.dumps(features, indent=1))
+    if not features.get('library'):
+        print('What the window shows:', page.evaluate('document.body?.innerText'))
+        print('It went to:', [entry['url'] for entry in page.call('Page.getNavigationHistory')['entries']])
     assert features.get('api') and features.get('library'), 'the page never loaded, or pywebview.api never appeared'
     state = page.evaluate('pywebview.api.state(-1)')
     assert 'jobs' in state, 'the API answered without jobs'

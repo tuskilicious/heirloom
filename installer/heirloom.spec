@@ -41,7 +41,7 @@ def needed(entry):
     if sys.platform == 'linux' and os.path.basename(path).split('.so')[0] in SYSTEM_LIBRARIES:
         return False
     if '/qtwebengine_locales/' in path:
-        return path.endswith('en-US.pak')
+        return 'en-US' in path
     return not any(part in path for part in ('PySide6/Qt/qml/', 'PySide6/Qt/translations/', 'plugins/qmltooling/',
                                              'plugins/platformthemes/libqgtk3', 'plugins/position/',
                                              'plugins/printsupport/', 'plugins/egldeviceintegrations/'))

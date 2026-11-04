@@ -192,6 +192,8 @@ jobs:
         sudo chmod 666 /dev/uinput || true
         (sleep 3; sudo chmod -R a+rw /dev/input || true) &
         uv run --no-project --with websocket-client --with evdev python tests/virtual_pad.py 9222 || echo "No controller here: see above"
+        # Chromium's sandbox, which Ubuntu limits: are the page's processes in one?
+        for pid in $(pgrep -f QtWebEngineProcess || true); do tr '\0' ' ' < /proc/$pid/cmdline | cut -c1-110; echo; grep -E 'Seccomp:|NoNewPrivs' /proc/$pid/status; done
 
     - name: Closing the window keeps it in the tray
       run: |
@@ -236,8 +238,6 @@ jobs:
         printf '[default]\nwine_executable=%s\n' "$RUNNER_TEMP/fake-wine" > "$config/config.ini"
         echo '{"app_name":"Fish","app_title":"Fish Game","metadata":{},"asset_infos":{}}' > "$config/metadata/Fish.json"
         printf '{"Fish":{"app_name":"Fish","title":"Fish Game","version":"1","install_path":"%s","executable":"game.exe","platform":"Windows","can_run_offline":true,"install_size":1}}' "$RUNNER_TEMP/game" > "$config/installed.json"
-        # Chromium's sandbox, which Ubuntu limits: is the page's process in one?
-        for pid in $(pgrep -f QtWebEngineProcess || true); do tr '\0' ' ' < /proc/$pid/cmdline | cut -c1-90; grep -E 'Seccomp:|NoNewPrivs' /proc/$pid/status; done
         HEIRLOOM_CONFIG_PATH=$config ./heirloom_linux_x64.AppImage launch Fish --offline
         for attempt in 1 2 3 4 5 6 7 8 9 10; do [ -s "$RUNNER_TEMP/wine.env" ] && break; sleep 1; done
         grep -c . "$RUNNER_TEMP/wine.env"
