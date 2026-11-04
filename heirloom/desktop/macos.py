@@ -11,10 +11,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-from heirloom.desktop.shared import Tray, choose_qt_window, host_env, run_after_quitting
+from heirloom.desktop.shared import Tray, choose_qt_window, host_env, prepare_window, run_after_quitting
 
 __all__ = ['SERVE_PAGE', 'STARTUP_NAME', 'UPDATE_FILE', 'WINDOW_ICON', 'Tray', 'add_to_menu', 'can_update_itself', 'choose_window_engine',
-           'game_runners', 'host_env', 'open_folder', 'opens_window_by_default', 'other_heirlooms_running', 'start_at_login',
+           'game_runners', 'host_env', 'open_folder', 'opens_window_by_default', 'other_heirlooms_running', 'prepare_window', 'start_at_login',
            'start_install', 'starts_at_login', 'startup_command', 'update_blocker']
 
 # Apple silicon only: there is no build for Intel Macs

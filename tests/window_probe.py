@@ -162,7 +162,9 @@ def main() -> None:
             break
         time.sleep(1)
     print(json.dumps(features, indent=1))
-    print('A remote image in the page:', page.evaluate(REMOTE_IMAGE))
+    remote_image = page.evaluate(REMOTE_IMAGE)
+    print('A remote image in the page:', remote_image)
+    assert remote_image.startswith('loaded'), 'covers from Epic would not show'
     if not features.get('library'):
         print('What the window shows:', page.evaluate('document.body?.innerText'))
         print('It went to:', [entry['url'] for entry in page.call('Page.getNavigationHistory')['entries']])

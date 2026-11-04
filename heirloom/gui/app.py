@@ -1218,6 +1218,7 @@ def run(config_file: str | None, load_themes: Callable[[], dict[str, Theme]], ba
                                    width=1280, height=820,
                                    min_size=(760, 560), background_color='#01211a', hidden=background and tray)
     assert window is not None
+    desktop.prepare_window(window)
     opened.append(window)
     quitting = threading.Event()
 
