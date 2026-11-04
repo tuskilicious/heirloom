@@ -95,6 +95,26 @@ jobs:
         if ((Get-ItemProperty $run).PSObject.Properties.Name -contains 'Heirloom') { throw 'the update turned starting with Windows back on' }
         'updated itself'
 
+        # the window, from the installed copy: each screen in each theme, closing to the tray, and coming back
+        $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=9222'
+        $env:HEIRLOOM_CONFIG_PATH = Join-Path $env:RUNNER_TEMP 'window-config'
+        Start-Process "$dir\heirloom-gui.exe"
+        uv run --no-project --with websocket-client python tests/window_probe.py 9222 shots-windows
+        if ($LASTEXITCODE) { throw 'the window did not pass' }
+        $window = Get-Process heirloom | Where-Object { $_.Path -eq "$dir\heirloom.exe" -and $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+        if (-not $window) { throw 'no window to close' }
+        $window.CloseMainWindow() | Out-Null
+        Start-Sleep 4
+        if (-not (Get-Process -Id $window.Id -ErrorAction SilentlyContinue)) { throw 'closing the window quit Heirloom' }
+        if ((Get-Process -Id $window.Id).MainWindowHandle -ne 0) { throw 'closing the window left it open' }
+        Start-Process "$dir\heirloom-gui.exe"
+        Start-Sleep 6
+        if ((Get-Process -Id $window.Id).MainWindowHandle -eq 0) { throw 'opening Heirloom again did not bring the window back' }
+        Get-Process heirloom -ErrorAction SilentlyContinue | Where-Object Path -eq "$dir\heirloom.exe" | Stop-Process -Force
+        Start-Sleep 2
+        Remove-Item Env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS, Env:HEIRLOOM_CONFIG_PATH
+        'the window works'
+
         Start-Process "$dir\unins000.exe" -ArgumentList $silent -Wait
         # the uninstaller finishes from a copy of itself
         for ($i = 0; $i -lt 60 -and (Test-Path "$dir\heirloom.exe"); $i++) { Start-Sleep 1 }
@@ -109,6 +129,12 @@ jobs:
       with:
         name: Windows-X64-installer
         path: installer/Output/*.exe
+
+    - uses: actions/upload-artifact@v7
+      if: always() && runner.os == 'Windows' && runner.arch == 'X64'
+      with:
+        name: windows-shots
+        path: shots-*
 
   appimage:
     # it runs on this system's C library and anything newer, so the oldest system on offer
@@ -194,6 +220,11 @@ jobs:
         uv run --no-project --with websocket-client --with evdev python tests/virtual_pad.py 9222 || echo "No controller here: see above"
         # Chromium's sandbox, which Ubuntu limits: are the page's processes in one?
         for pid in $(pgrep -f QtWebEngineProcess || true); do tr '\0' ' ' < /proc/$pid/cmdline | cut -c1-110; echo; grep -E 'Seccomp:|NoNewPrivs' /proc/$pid/status; done
+
+    - name: It added itself to the app menu
+      run: |
+        grep -n '^Exec=' ~/.local/share/applications/heirloom.desktop
+        test -s ~/.local/share/icons/hicolor/256x256/apps/heirloom.png
 
     - name: Closing the window keeps it in the tray
       run: |

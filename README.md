@@ -66,7 +66,7 @@ Download `heirloom_linux_x64.AppImage` from the [releases page](https://github.c
 chmod +x heirloom_linux_x64.AppImage
 ./heirloom_linux_x64.AppImage
 ```
-It needs nothing else installed, apart from what runs Windows games, on Ubuntu 22.04, Debian 12, Fedora 36, SteamOS or anything newer (glibc 2.35 or later).
+It needs nothing else installed apart from what runs Windows games, and glibc 2.35 or later. It's tested on Ubuntu 22.04 and 24.04, Debian 12, Fedora and Arch.
 It adds itself to your app menu the first time it opens. Keep it somewhere you can write to, as it replaces its own file when a new version is out.
 With arguments it's the normal command line: `./heirloom_linux_x64.AppImage list`. If it can't start because of FUSE, add `--appimage-extract-and-run`.
 
