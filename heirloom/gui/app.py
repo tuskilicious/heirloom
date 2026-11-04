@@ -76,7 +76,10 @@ STORE_PAGE = 'https://store.epicgames.com/p/'
 # folder dialogs, in pywebview's numbering (webview.FileDialog.FOLDER in newer ones)
 FOLDER_DIALOG = 20
 # how the window shows the library, kept between runs in window.json: the first of each is the default
-VIEW_CHOICES = {'filter': ('all', 'installed', 'updates'), 'sort': ('title', 'recent', 'played', 'size')}
+VIEW_CHOICES = {'filter': ('all', 'installed', 'updates'), 'sort': ('title', 'recent', 'added', 'played', 'size'),
+                'covers': ('medium', 'small', 'large'),
+                # the sidebar's toggle: nothing for the theme as it comes
+                'mode': ('', 'dark', 'light')}
 # below the range Windows hands out to programs by itself
 PAGE_PORTS = range(42002, 49000)
 # the shelf of a collection, as window.json and the page name it: this and the collection's name

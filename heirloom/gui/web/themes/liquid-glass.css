@@ -1,6 +1,6 @@
 /*
-  Liquid glass: everything floats. Clear, bright-edged panes over a deep, colourful wallpaper, a sidebar that hovers
-  off the window's edge, soft pill-shaped controls, and light catching the top of each surface.
+  Liquid glass: everything floats. Clear, bright-edged panes over a colourful wallpaper, a sidebar that hovers off the
+  window's edge, soft pill-shaped controls, and light catching the top of each surface.
   A window theme that comes with Heirloom.
 */
 :root {
@@ -12,6 +12,7 @@
   --muted: #cfd7f0;
   --accent: #8fe3ff;
   --accent-text: #03202c;
+  --accent-light: #d5f6ff;
   --logo: #ffffff;
   --danger: #ffa3ad;
   --progress: var(--accent);
@@ -27,6 +28,14 @@
   --glass-shine: inset 0 1px 0 rgb(255 255 255 / 48%), inset 0 -1px 0 rgb(255 255 255 / 10%);
   /* light catching one corner of a pane */
   --glass-sheen: linear-gradient(135deg, rgb(255 255 255 / 14%), transparent 42%, transparent 70%, rgb(255 255 255 / 5%));
+  /* controls of clear glass, the plates on covers and the banner's pane, and what dims art and dialogs' backgrounds */
+  --clear: rgb(255 255 255 / 9%);
+  --clear-hover: rgb(255 255 255 / 18%);
+  --plate: rgb(14 20 52 / 62%);
+  --pane: rgb(14 20 52 / 38%);
+  --dim: rgb(6 9 28 / 42%);
+  --hero-fade: rgb(6 9 28 / 34%);
+  --bead: rgb(255 255 255 / 16%);
   --wallpaper:
     radial-gradient(60vw 60vh at 12% 8%, #2453b8 0%, transparent 70%),
     radial-gradient(55vw 70vh at 92% 18%, #7a2bb5 0%, transparent 70%),
@@ -34,6 +43,43 @@
     radial-gradient(50vw 55vh at 10% 92%, #0f7486 0%, transparent 70%),
     var(--bg);
   color-scheme: dark;
+}
+
+:root[data-mode="light"] {
+  --bg: #e9effb;
+  --surface: #ffffff;
+  --surface-raised: #eef2fb;
+  --border: #b4c0da;
+  --text: #0d1430;
+  --muted: #3c4869;
+  --accent: #0a68ad;
+  --accent-text: #ffffff;
+  --accent-light: #2f8fd6;
+  --logo: #0d1430;
+  --danger: #b3261e;
+  --progress: var(--accent);
+  --unlit: grayscale(1) contrast(.9) brightness(1.05);
+  --shadow: 0 18px 44px -18px rgb(50 70 130 / 40%);
+  --glass: rgb(255 255 255 / 46%);
+  --glass-strong: rgb(255 255 255 / 76%);
+  --glass-blur: blur(28px) saturate(1.5);
+  --glass-edge: rgb(255 255 255 / 80%);
+  --glass-shine: inset 0 1px 0 rgb(255 255 255 / 90%), inset 0 -1px 0 rgb(255 255 255 / 30%), 0 0 0 1px rgb(60 80 140 / 10%);
+  --glass-sheen: linear-gradient(135deg, rgb(255 255 255 / 50%), transparent 42%, transparent 70%, rgb(255 255 255 / 20%));
+  --clear: rgb(255 255 255 / 50%);
+  --clear-hover: rgb(255 255 255 / 80%);
+  --plate: rgb(255 255 255 / 80%);
+  --pane: rgb(255 255 255 / 66%);
+  --dim: rgb(210 220 240 / 42%);
+  --hero-fade: rgb(255 255 255 / 20%);
+  --bead: rgb(255 255 255 / 72%);
+  --wallpaper:
+    radial-gradient(60vw 60vh at 12% 8%, #a8c6ff 0%, transparent 70%),
+    radial-gradient(55vw 70vh at 92% 18%, #dcbcff 0%, transparent 70%),
+    radial-gradient(60vw 60vh at 78% 96%, #ffc4dd 0%, transparent 70%),
+    radial-gradient(50vw 55vh at 10% 92%, #a9ecec 0%, transparent 70%),
+    var(--bg);
+  color-scheme: light;
 }
 
 /* the wallpaper stays still while the panes scroll over it */
@@ -47,7 +93,7 @@ body::before { content: ""; position: fixed; inset: 0; z-index: -1; background: 
   box-shadow: var(--glass-shine), var(--shadow);
 }
 .menu, .dock, .panel { background-color: var(--glass-strong); backdrop-filter: var(--glass-blur); }
-.panel::backdrop { background: rgb(6 9 28 / 42%); backdrop-filter: blur(10px) saturate(1.3); }
+.panel::backdrop { background: var(--dim); backdrop-filter: blur(10px) saturate(1.3); }
 /* a dialog's title stays clear of what scrolls under it, without a band across the glass */
 .panel-head { margin-inline: -24px; padding-inline: 24px; background: transparent; backdrop-filter: blur(16px); mask-image: linear-gradient(#000 72%, transparent); }
 .notice { background-color: var(--glass); backdrop-filter: var(--glass-blur); }
@@ -63,53 +109,61 @@ body::before { content: ""; position: fixed; inset: 0; z-index: -1; background: 
 }
 
 /* the shelf you're on: a bright bead of glass */
-.shelf-marker { border-color: rgb(255 255 255 / 30%); border-radius: 999px; background: rgb(255 255 255 / 16%); box-shadow: inset 0 1px 0 rgb(255 255 255 / 55%), 0 4px 14px -6px rgb(2 4 20 / 60%); }
+.shelf-marker { border-color: var(--glass-edge); border-radius: 999px; background: var(--bead); box-shadow: var(--glass-shine), 0 4px 14px -6px rgb(2 4 20 / 40%); }
 .shelf-marker::before { display: none; }
 .rail-item { border-radius: 999px; }
-.rail-item:hover:not(:disabled) { background: rgb(255 255 255 / 10%); }
+.rail-item:hover:not(:disabled) { background: var(--clear-hover); }
 .shelves .rail-item[aria-pressed="true"] .icon { filter: none; }
-.count { background: rgb(255 255 255 / 16%); color: var(--text); }
+.count { background: var(--clear-hover); color: var(--text); }
 .brand, .empty .mark { animation: none; }
 
 /* controls: pills of clear glass */
 button { border-radius: 999px; }
 .ghost, .sort, .actions .icon-button {
   border-color: var(--glass-edge);
-  background: rgb(255 255 255 / 9%);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 32%);
+  background: var(--clear);
+  box-shadow: var(--glass-shine);
 }
-.ghost:hover:not(:disabled), .sort:hover:not(:disabled), .actions .icon-button:hover:not(:disabled) { background: rgb(255 255 255 / 18%); }
-.primary { background: linear-gradient(180deg, #d5f6ff, var(--accent)); box-shadow: inset 0 1px 0 rgb(255 255 255 / 85%), 0 8px 20px -8px var(--accent); }
-.primary:hover:not(:disabled) { filter: brightness(1.05); box-shadow: inset 0 1px 0 rgb(255 255 255 / 85%), 0 10px 26px -6px var(--accent); }
-.switch { background: rgb(255 255 255 / 16%); box-shadow: inset 0 1px 2px rgb(2 4 20 / 40%); }
+.ghost:hover:not(:disabled), .sort:hover:not(:disabled), .actions .icon-button:hover:not(:disabled) { background: var(--clear-hover); }
+.primary { background: linear-gradient(180deg, var(--accent-light), var(--accent)); box-shadow: inset 0 1px 0 rgb(255 255 255 / 70%), 0 8px 20px -8px var(--accent); }
+.primary:hover:not(:disabled) { filter: brightness(1.05); box-shadow: inset 0 1px 0 rgb(255 255 255 / 70%), 0 10px 26px -6px var(--accent); }
+.switch { background: var(--clear-hover); box-shadow: inset 0 1px 2px rgb(2 4 20 / 30%); }
 .switch:checked { box-shadow: inset 0 1px 0 rgb(255 255 255 / 60%), 0 0 12px -2px var(--accent); }
-:focus-visible { outline-color: #ffffff; }
+:focus-visible { outline-color: var(--text); }
 
 /* the banner: its text on a pane of its own, floating over the art */
+/* its own pane keeps the text clear, so the art can fill the banner */
+.hero-art { width: 100%; mask-image: none; }
 .hero { border: 1px solid var(--glass-edge); border-radius: 30px; box-shadow: var(--glass-shine), var(--shadow); }
-.hero::after { background: linear-gradient(0deg, rgb(6 9 28 / 34%), transparent 60%); }
+.hero::after { background: linear-gradient(0deg, var(--hero-fade), transparent 60%); }
 .hero-body {
   margin: 18px;
   padding: 20px 26px 22px;
   border: 1px solid var(--glass-edge);
   border-radius: 24px;
-  background: rgb(14 20 52 / 38%) var(--glass-sheen);
+  background: var(--pane) var(--glass-sheen);
   backdrop-filter: blur(22px) saturate(1.8);
   box-shadow: var(--glass-shine);
 }
 
 /* covers: rounded, with a plate of glass; only those near the screen blur what's behind them */
-.cover { border-radius: 22px; box-shadow: inset 0 0 0 1px rgb(255 255 255 / 18%), 0 12px 26px -14px rgb(2 4 20 / 80%); }
-.info { border-color: rgb(255 255 255 / 22%); border-radius: 16px; background: rgb(14 20 52 / 62%); box-shadow: inset 0 1px 0 rgb(255 255 255 / 30%); }
+.cover { border-radius: 22px; box-shadow: inset 0 0 0 1px rgb(255 255 255 / 18%), 0 12px 26px -14px rgb(2 4 20 / 60%); }
+.info { border-color: var(--glass-edge); border-radius: 16px; background: var(--plate); box-shadow: inset 0 1px 0 rgb(255 255 255 / 30%); }
 .card.near .info { backdrop-filter: blur(12px) saturate(1.6); }
-.card:hover .cover { box-shadow: inset 0 0 0 1px rgb(255 255 255 / 40%), 0 18px 34px -14px rgb(2 4 20 / 90%); }
+.card:hover .cover { box-shadow: inset 0 0 0 1px rgb(255 255 255 / 40%), 0 18px 34px -14px rgb(2 4 20 / 70%); }
 
 /* a game's page has the wallpaper too */
 .game-page { background: var(--wallpaper); }
-#game-close { border: 1px solid var(--glass-edge); background: rgb(255 255 255 / 12%); backdrop-filter: blur(18px) saturate(1.6); box-shadow: var(--glass-shine); }
+#game-close { border: 1px solid var(--glass-edge); background: var(--clear-hover); backdrop-filter: blur(18px) saturate(1.6); box-shadow: var(--glass-shine); }
 
 /* for anyone who asked Windows for less transparency */
 @media (prefers-reduced-transparency: reduce) {
-  :root { --glass: var(--surface); --glass-strong: var(--surface); }
-  .hero-body, .info { background: var(--surface); }
+  :root, :root[data-mode="light"] { --glass: var(--surface); --glass-strong: var(--surface); --plate: var(--surface); --pane: var(--surface); }
 }
+
+/* the wallpaper drifts very slowly, and light sweeps across a pane when the pointer reaches it */
+body::before { inset: -12%; animation: wallpaper-drift 70s ease-in-out infinite alternate; will-change: transform; }
+@keyframes wallpaper-drift { to { transform: translate(5%, -4%) scale(1.06); } }
+.cover::after { content: ""; position: absolute; inset: 0; z-index: 1; background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 26%) 50%, transparent 65%); transform: translateX(-110%); pointer-events: none; }
+.card:hover .cover::after { transform: translateX(110%); transition: transform .7s var(--ease); }
+@media (prefers-reduced-motion: reduce) { body::before { animation: none; } }

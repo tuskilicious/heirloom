@@ -454,10 +454,11 @@ def test_settings_read_and_write_the_config(lgd_home, tmp_path):
 
 def test_the_window_opens_as_it_was_left(lgd_home):
     api = GuiApi(None, lambda: {})
-    assert api.view() == {'filter': 'all', 'sort': 'title', 'rail_collapsed': False}
-    api.set_view({'filter': 'installed', 'sort': 'recent', 'rail_collapsed': True})
+    assert api.view() == {'filter': 'all', 'sort': 'title', 'covers': 'medium', 'mode': '', 'rail_collapsed': False}
+    api.set_view({'filter': 'installed', 'sort': 'added', 'covers': 'large', 'mode': 'light', 'rail_collapsed': True})
     api.set_view({'sort': 'nonsense', 'filter': None, 'colour': 'red'})
-    assert GuiApi(None, lambda: {}).view() == {'filter': 'installed', 'sort': 'recent', 'rail_collapsed': True}, \
+    assert GuiApi(None, lambda: {}).view() == {'filter': 'installed', 'sort': 'added', 'covers': 'large', 'mode': 'light',
+                                               'rail_collapsed': True}, \
         'kept between runs, and anything unknown left out'
     (lgd_home / 'window.json').write_text('not json')
     assert api.view()['sort'] == 'title'
@@ -573,7 +574,7 @@ def test_theme_css_for_the_window(lgd_home, tmp_path):
     assert (found['active'], found['css']) == ('heirloom', '')
     assert [(theme['name'], theme['title']) for theme in found['themes']] == [
         ('heirloom', 'Heirloom'), ('big-picture', 'Big picture'), ('compact-list', 'Compact list'),
-        ('fluent', 'Fluent'), ('impeccable', 'Impeccable'), ('impeccable-dark', 'Impeccable dark'), ('liquid-glass', 'Liquid glass'),
+        ('fluent', 'Fluent'), ('impeccable', 'Impeccable'), ('liquid-glass', 'Liquid glass'),
         ('retro-arcade', 'Retro arcade'),
         ('showcase', 'Showcase'), ('neon', 'neon'), ('paper_white', 'Paper white')], \
         "its own look and the ones that come with it, then themes with CSS and CSS files, " \

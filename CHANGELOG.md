@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased
+
+### New
+- **A light and dark toggle in the sidebar,** for every theme that comes with Heirloom. Your choice is remembered.
+
+- **Cover sizes.** Small, medium or large, from the sort menu.
+- **Surprise me.** The die in the top bar opens a random installed game's page.
+- **Newest on Epic** sorts by when a game reached the store.
+- **Search:** Ctrl+F jumps to it, and Enter opens the first match.
+- **Back to the top** appears once you've scrolled a window's height.
+- The library's summary now adds up your time played.
+- **More character in each theme:** the new colours spread out from the toggle, banner art fades in, Liquid glass's
+  wallpaper drifts, Showcase's headline catches the light, Impeccable's covers lift off a print shadow, Compact list's
+  rows get an accent bar, and Retro arcade asks you to insert a coin.
+
+### Changed
+- **Impeccable dark is now part of Impeccable,** through the toggle, rather than a theme of its own. If you were using
+  it, the window goes back to Heirloom's own look until you choose Impeccable and dark mode.
+
+### Fixed
+- **Prices and free games follow your Windows location.** The country came from your date format, so British dates in
+  India meant British pounds. Library worth now shows your local currency; "locale" in the config still overrides it.
+- **Showcase** no longer cuts off the bottom of letters like "g" in its headline.
+- **Covers' title plates no longer draw over the top bar** when you scroll, in any theme.
+- **Showcase:** a game's own logo no longer runs into the banner's huge title, as the art now sits to the right of it.
+
 ## 0.38.0 "Vitrine" (2026-11-04)
 
 Two new themes, and every screen looked over again.

@@ -8,6 +8,7 @@ import warnings
 import pytest
 
 from heirloom.lfs.utils import clean_filename
+from heirloom.utils import env
 from heirloom.utils.aliasing import generate_aliases
 from heirloom.utils.cli import (
     get_boolean_choice,
@@ -42,7 +43,15 @@ def test_system_locale_posix(monkeypatch, env, expected):
 def test_system_locale_matches_getdefaultlocale_on_windows():
     with warnings.catch_warnings():
         warnings.simplefilter('ignore', DeprecationWarning)
-        assert get_system_locale() == locale.getdefaultlocale()[0]
+        assert get_system_locale().split('_')[0] == locale.getdefaultlocale()[0].split('_')[0]
+
+
+@pytest.mark.skipif(sys.platform != 'win32', reason='Windows settings')
+def test_the_country_is_where_you_are_not_how_you_write_dates(monkeypatch):
+    monkeypatch.setattr(env, 'windows_home_country', lambda: 'IN')
+    assert get_system_locale().endswith('_IN')
+    monkeypatch.setattr(env, 'windows_home_country', lambda: '')
+    assert '_' in get_system_locale(), "the format's own country when Windows has no location"
 
 
 def test_aliases_include_initialisms_and_roman_numerals():
