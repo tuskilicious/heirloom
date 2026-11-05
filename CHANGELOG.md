@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.40.1 "Passport" (2026-11-06)
+
+A cloud save that fails to download can no longer cost you the save on your disk.
 
 ### Fixed
 - **A cloud save that fails to download no longer deletes the save on your disk.** Syncing saves from the window
