@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- **A cloud save that fails to download no longer deletes the save on your disk.** Syncing saves from the window
+  removed the local files before fetching the cloud copy, so a server error, a dropped connection or a missing piece
+  of the save left none at all. The cloud save is now fetched in full first, and the local one is kept if it can't be.
+
 ## 0.40.0 "Passport" (2026-11-06)
 
 Heirloom now has its window on Linux and on Apple silicon Macs, in one download that needs nothing else installed and

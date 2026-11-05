@@ -1238,13 +1238,6 @@ class HeirloomCore:
                 _save_dir = save_path / f_parts[2] / f_parts[4].rpartition('.')[0]
                 _save_dir.mkdir(parents=True, exist_ok=True)
 
-            if app_name and clean_dir:
-                # Make sure to only delete files that match the include/exclude filters.
-                # This is particularly import for games that store save games in their install dir...
-                save_files = SaveGameHelper().get_deletion_list(_save_dir, *self.get_save_filters(app_name))
-                self.log.info('Deleting old save files...')
-                delete_filelist(_save_dir, save_files, silent=True)
-
             self.log.info(f'Downloading "{fname.split("/", 2)[2]}"...')
             # download manifest
             r = self.egs.unauth_session.get(f['readLink'])
@@ -1285,6 +1278,18 @@ class HeirloomCore:
                     self.log.error('No chunks were available, skipping. You can run "heirloom clean-saves" '
                                    'to remove this broken save from your account.')
                     continue
+
+            # the old save goes only once all of the new one is here: a failed download would otherwise leave none
+            if app_name and clean_dir:
+                if len(chunks) < m.chunk_data_list.count:
+                    self.log.error('Part of the cloud save could not be downloaded, so the save on the disk is left '
+                                   'as it was.')
+                    continue
+                # Make sure to only delete files that match the include/exclude filters.
+                # This is particularly import for games that store save games in their install dir...
+                save_files = SaveGameHelper().get_deletion_list(_save_dir, *self.get_save_filters(app_name))
+                self.log.info('Deleting old save files...')
+                delete_filelist(_save_dir, save_files, silent=True)
 
             for fm in m.file_manifest_list.elements:
                 fpath = _save_dir / fm.filename
