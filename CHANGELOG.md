@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.40.0 "Passport" (2026-11-06)
 
 Heirloom now has its window on Linux and on Apple silicon Macs, in one download that needs nothing else installed and
 updates itself.
