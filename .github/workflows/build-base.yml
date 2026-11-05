@@ -36,6 +36,9 @@ jobs:
       working-directory: heirloom
       run: uv run --module PyInstaller
         --onefile
+        --exclude-module setuptools
+        --exclude-module pkg_resources
+        --exclude-module _distutils_hack
         --name heirloom
         --add-data gui/web:heirloom/gui/web
         -i ../assets/windows_icon.ico
@@ -86,7 +89,7 @@ jobs:
         $update = Join-Path $env:RUNNER_TEMP 'self_update'
         New-Item -ItemType Directory $update | Out-Null
         Copy-Item installer\Output\heirloom_windows_x64_setup.exe "$update\setup.exe"
-        uv run python -c "import sys; from pathlib import Path; from heirloom.gui.self_update import start_install; sys.executable = sys.argv[1]; start_install(Path(sys.argv[2]))" "$dir\heirloom.exe" "$update\setup.exe"
+        uv run python -c "import sys; from pathlib import Path; from heirloom.desktop import start_install; sys.executable = sys.argv[1]; start_install(Path(sys.argv[2]))" "$dir\heirloom.exe" "$update\setup.exe"
         for ($i = 0; $i -lt 120 -and -not (Get-Process heirloom -ErrorAction SilentlyContinue | Where-Object Path -eq "$dir\heirloom.exe"); $i++) { Start-Sleep 1 }
         Get-Content "$update\setup.log" -Tail 5
         if (-not (Get-Process heirloom -ErrorAction SilentlyContinue | Where-Object Path -eq "$dir\heirloom.exe")) { throw 'Heirloom did not reopen after updating itself' }
@@ -94,6 +97,30 @@ jobs:
         if (Test-Path "$dir\_internal\stale") { throw 'the update did not replace the old files' }
         if ((Get-ItemProperty $run).PSObject.Properties.Name -contains 'Heirloom') { throw 'the update turned starting with Windows back on' }
         'updated itself'
+
+        # the window, from the installed copy: each screen in each theme, closing to the tray, and coming back
+        $env:HEIRLOOM_REMOTE_DEBUGGING = '9222'
+        $env:HEIRLOOM_CONFIG_PATH = Join-Path $env:RUNNER_TEMP 'window-config'
+        Start-Process "$dir\heirloom.exe" -ArgumentList 'gui' -RedirectStandardOutput window.out -RedirectStandardError window.err
+        uv run --no-project --with websocket-client python tests/window_probe.py 9222 shots-windows
+        if ($LASTEXITCODE) {
+          Get-Process heirloom, msedgewebview2 -ErrorAction SilentlyContinue | Format-Table Id, ProcessName, MainWindowHandle
+          Get-Content window.out, window.err -Tail 30
+          throw 'the window did not pass'
+        }
+        $window = Get-Process heirloom | Where-Object { $_.Path -eq "$dir\heirloom.exe" -and $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+        if (-not $window) { throw 'no window to close' }
+        $window.CloseMainWindow() | Out-Null
+        Start-Sleep 4
+        if (-not (Get-Process -Id $window.Id -ErrorAction SilentlyContinue)) { throw 'closing the window quit Heirloom' }
+        if ((Get-Process -Id $window.Id).MainWindowHandle -ne 0) { throw 'closing the window left it open' }
+        Start-Process "$dir\heirloom-gui.exe"
+        Start-Sleep 6
+        if ((Get-Process -Id $window.Id).MainWindowHandle -eq 0) { throw 'opening Heirloom again did not bring the window back' }
+        Get-Process heirloom -ErrorAction SilentlyContinue | Where-Object Path -eq "$dir\heirloom.exe" | Stop-Process -Force
+        Start-Sleep 2
+        Remove-Item Env:HEIRLOOM_REMOTE_DEBUGGING, Env:HEIRLOOM_CONFIG_PATH
+        'the window works'
 
         Start-Process "$dir\unins000.exe" -ArgumentList $silent -Wait
         # the uninstaller finishes from a copy of itself
@@ -109,6 +136,203 @@ jobs:
       with:
         name: Windows-X64-installer
         path: installer/Output/*.exe
+
+    - uses: actions/upload-artifact@v7
+      if: always() && runner.os == 'Windows' && runner.arch == 'X64'
+      with:
+        name: windows-shots
+        path: shots-*
+
+  appimage:
+    # it runs on this system's C library and anything newer, so the oldest system on offer
+    # ponytail: ubuntu-22.04 leaves GitHub around April 2027; build in a container of the same age then
+    runs-on: ubuntu-22.04
+    env:
+      UV_SYSTEM_PYTHON: 1
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - uses: actions/setup-python@v6
+      with:
+        python-version: "3.14"
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        enable-cache: true
+
+    - name: What goes in the AppImage for Qt's window
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libdbus-1-3 libnss3 libnspr4 \
+          libxcomposite1 libxdamage1 libxrandr2 libxtst6 libasound2 libxkbfile1 libxcb-cursor0 libxcb-icccm4 \
+          libxcb-keysyms1 libxcb-shape0 libxcb-xkb1 libxcb-image0 libxcb-render-util0 libxcb-xinerama0 fontconfig
+
+    - name: Build
+      run: |
+        uv sync --extra pyinstaller_build --extra webview_qt --no-install-local
+        uv pip install --python .venv pillow
+        uv run --module PyInstaller --distpath installer/build --workpath build/onedir installer/heirloom.spec
+        du -sh installer/build/heirloom
+        # logins go in the system's keyring only if these made it into the program
+        uv run pyi-archive_viewer --list --recursive installer/build/heirloom/heirloom > modules.txt
+        grep -q 'keyring.backends.SecretService' modules.txt && grep -q 'secretstorage' modules.txt && grep -q 'jeepney' modules.txt
+        uv run sh installer/build_appimage.sh
+        ls -l installer/Output
+      env:
+        PYTHONOPTIMIZE: 1
+
+    - uses: actions/upload-artifact@v7
+      with:
+        name: Linux-X64-appimage
+        path: installer/Output/*.AppImage
+        compression-level: 0
+
+  test-appimage:
+    needs: [appimage]
+    runs-on: ubuntu-24.04
+    env:
+      HEIRLOOM_CONFIG_PATH: ${{ github.workspace }}/../config
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - uses: actions/download-artifact@v8
+      with:
+        name: Linux-X64-appimage
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+
+    - name: Run it on a clean system
+      run: |
+        chmod +x heirloom_linux_x64.AppImage
+        ./heirloom_linux_x64.AppImage -V
+        sudo apt-get update
+        # any desktop has the graphics libraries, which have to come from the system; this server doesn't
+        sudo apt-get install -y xvfb libegl1 libgl1
+
+    - name: The window, each screen in each theme
+      run: |
+        QTWEBENGINE_REMOTE_DEBUGGING=9222 xvfb-run -a -s "-screen 0 1280x820x24" ./heirloom_linux_x64.AppImage gui > window.log 2>&1 &
+        uv run --no-project --with websocket-client python tests/window_probe.py 9222 shots-linux
+
+    - name: Does a controller reach the page?
+      run: |
+        sudo modprobe uinput || true
+        sudo modprobe joydev || true
+        sudo chmod 666 /dev/uinput || true
+        (sleep 3; sudo chmod -R a+rw /dev/input || true) &
+        uv run --no-project --with websocket-client --with evdev python tests/virtual_pad.py 9222 || echo "No controller here: see above"
+        # Chromium's sandbox, which Ubuntu limits: are the page's processes in one?
+        for pid in $(pgrep -f QtWebEngineProcess || true); do tr '\0' ' ' < /proc/$pid/cmdline | cut -c1-110; echo; grep -E 'Seccomp:|NoNewPrivs' /proc/$pid/status; done
+
+    - name: It added itself to the app menu
+      run: |
+        grep -n '^Exec=' ~/.local/share/applications/heirloom.desktop
+        test -s ~/.local/share/icons/hicolor/256x256/apps/heirloom.png
+
+    - name: Closing the window keeps it in the tray
+      run: |
+        sudo apt-get install -y openbox stalonetray wmctrl
+        pkill -f heirloom || true
+        sleep 2
+        Xvfb :77 -screen 0 1280x820x24 &
+        export DISPLAY=:77 QTWEBENGINE_REMOTE_DEBUGGING=9333
+        sleep 2
+        openbox &
+        stalonetray &
+        sleep 2
+        ./heirloom_linux_x64.AppImage gui > tray.log 2>&1 &
+        uv run --no-project --with websocket-client python tests/window_probe.py 9333
+        wmctrl -l
+        wmctrl -l | grep -q Heirloom
+        wmctrl -c Heirloom
+        sleep 4
+        wmctrl -l
+        if wmctrl -l | grep -q Heirloom; then echo "still open"; exit 1; fi
+        pgrep -f heirloom > /dev/null
+        ./heirloom_linux_x64.AppImage gui
+        sleep 3
+        wmctrl -l
+        wmctrl -l | grep -q Heirloom
+        pkill -f heirloom || true
+        tail -15 tray.log
+
+    - name: What the window said
+      if: always()
+      run: |
+        pkill -f heirloom || true
+        tail -30 window.log
+
+    - name: A game doesn't inherit the bundled files
+      run: |
+        config=$RUNNER_TEMP/game-config
+        mkdir -p "$config/metadata" "$RUNNER_TEMP/game"
+        touch "$RUNNER_TEMP/game/game.exe"
+        printf '#!/bin/sh\nenv > "%s/wine.env"\n' "$RUNNER_TEMP" > "$RUNNER_TEMP/fake-wine"
+        chmod +x "$RUNNER_TEMP/fake-wine"
+        printf '[default]\nwine_executable=%s\n' "$RUNNER_TEMP/fake-wine" > "$config/config.ini"
+        echo '{"app_name":"Fish","app_title":"Fish Game","metadata":{},"asset_infos":{}}' > "$config/metadata/Fish.json"
+        printf '{"Fish":{"app_name":"Fish","title":"Fish Game","version":"1","install_path":"%s","executable":"game.exe","platform":"Windows","can_run_offline":true,"install_size":1}}' "$RUNNER_TEMP/game" > "$config/installed.json"
+        HEIRLOOM_CONFIG_PATH=$config ./heirloom_linux_x64.AppImage launch Fish --offline
+        for attempt in 1 2 3 4 5 6 7 8 9 10; do [ -s "$RUNNER_TEMP/wine.env" ] && break; sleep 1; done
+        grep -c . "$RUNNER_TEMP/wine.env"
+        if grep -n '_internal' "$RUNNER_TEMP/wine.env"; then exit 1; fi
+
+    - name: Updating itself
+      run: |
+        cp heirloom_linux_x64.AppImage new.AppImage
+        printf 'old' > old.AppImage
+        APPIMAGE=$PWD/old.AppImage uv run --no-project --with . python -c "import sys; from pathlib import Path; from heirloom.desktop import linux; linux.start_install(Path(sys.argv[1]))" "$PWD/new.AppImage"
+        for attempt in $(seq 1 60); do [ "$(stat -c %s old.AppImage)" != 3 ] && [ ! -e old.AppImage.new ] && break; sleep 1; done
+        ./old.AppImage -V
+
+    - uses: actions/upload-artifact@v7
+      if: always()
+      with:
+        name: linux-shots
+        path: shots-*
+
+  appimage-on-other-systems:
+    needs: [appimage]
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        include:
+          - image: fedora:latest
+            needs: dnf install -y xorg-x11-server-Xvfb xorg-x11-xauth mesa-libEGL mesa-libGL dejavu-sans-fonts alsa-lib glib2 fontconfig
+          - image: archlinux:latest
+            needs: pacman -Sy --noconfirm xorg-server-xvfb xorg-xauth mesa ttf-dejavu alsa-lib glib2 fontconfig
+          - image: debian:12
+            needs: apt-get update && apt-get install -y xvfb xauth libegl1 libgl1 fonts-dejavu-core libasound2 libglib2.0-0 libfontconfig1
+          - image: ubuntu:22.04
+            needs: apt-get update && apt-get install -y xvfb xauth libegl1 libgl1 fonts-dejavu-core libasound2 libglib2.0-0 libfontconfig1
+      fail-fast: false
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - uses: actions/download-artifact@v8
+      with:
+        name: Linux-X64-appimage
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+
+    - name: The window
+      run: |
+        chmod +x heirloom_linux_x64.AppImage
+        docker run -d --name app --network host -v "$PWD:/work" -w /work \
+          -e APPIMAGE_EXTRACT_AND_RUN=1 -e QTWEBENGINE_REMOTE_DEBUGGING=9222 -e HEIRLOOM_CONFIG_PATH=/tmp/config \
+          -e QTWEBENGINE_DISABLE_SANDBOX=1 \
+          "${{ matrix.image }}" sh -c '${{ matrix.needs }} > /dev/null && ./heirloom_linux_x64.AppImage -V && xvfb-run -a -s "-screen 0 1280x820x24" ./heirloom_linux_x64.AppImage gui'
+        uv run --no-project --with websocket-client python tests/window_probe.py 9222
+
+    - name: What the window said
+      if: always()
+      run: docker logs app 2>&1 | tail -30
 
   zipapp:
     runs-on: ${{ matrix.os }}

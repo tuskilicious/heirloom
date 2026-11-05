@@ -4,12 +4,13 @@ import os
 import webbrowser
 from urllib.parse import parse_qs, urlsplit
 
-from heirloom import __version__
+from heirloom import __version__, desktop
 
 logger = logging.getLogger('WebViewHelper')
 webview_available = True
 
 try:
+    desktop.choose_window_engine()
     import webview
 
     # silence logger

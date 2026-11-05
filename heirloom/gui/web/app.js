@@ -962,8 +962,15 @@ function showSettings(settings) {
   $('#install-dir').textContent = settings.install_dir;
   $('#install-dir').title = settings.install_dir;
   for (const name of ['max_download_speed', 'max_download_speed_while_playing', 'max_workers', 'max_memory',
-    'preferred_cdn']) {
-    if (document.activeElement !== $(`#${name}`)) $(`#${name}`).value = settings[name];
+    'preferred_cdn', 'game_runner']) {
+    if (document.activeElement !== $(`#${name}`)) $(`#${name}`).value = settings[name] ?? '';
+  }
+  $('#runner-row').hidden = !settings.game_runners;
+  if (settings.game_runners) {
+    $('#runners').replaceChildren(...settings.game_runners.map((runner) => new Option(runner, runner)));
+    $('#runner-detail').textContent = settings.game_runners.length
+      ? 'Wine, or umu-run for Proton. Empty means the wine program'
+      : 'Install Wine or umu-launcher first. Heirloom found neither';
   }
   // not while one end is being set, before the other
   if (![$('#window-start'), $('#window-end')].includes(document.activeElement)) {
@@ -971,15 +978,17 @@ function showSettings(settings) {
     $('#window-start').value = start;
     $('#window-end').value = end;
   }
-  for (const name of ['auto_updates', 'cloud_saves', 'update_notice', 'self_update', 'starts_with_windows']) {
+  for (const name of ['auto_updates', 'cloud_saves', 'update_notice', 'self_update', 'start_at_login']) {
     $(`#${name}`).checked = settings[name];
   }
   $('#startup-row').hidden = !settings.tray;
+  $('#no-tray-row').hidden = settings.tray;
   $('#self-update-row').hidden = !settings.self_update_possible;
-  $('#starts_with_windows').disabled = !settings.startup_possible;
+  $('#startup-name').textContent = settings.startup_name;
+  $('#start_at_login').disabled = !settings.startup_possible;
   $('#startup-detail').textContent = settings.startup_possible
     ? 'In the tray, so games update before you play. Closing the window keeps Heirloom there; Quit is in its menu.'
-    : 'Install Heirloom with its installer to start it with Windows. Closing the window keeps it in the tray.';
+    : 'Only the installed Heirloom can do this. Closing the window keeps it in the tray.';
 }
 
 async function saveSetting(name, value) {
@@ -1577,7 +1586,7 @@ async function start() {
   };
   $('#install-dir-change').onclick = async () => showSettings(await api.choose_install_dir());
   for (const name of ['max_download_speed', 'max_download_speed_while_playing', 'max_workers', 'max_memory',
-    'preferred_cdn']) {
+    'preferred_cdn', 'game_runner']) {
     $(`#${name}`).onchange = (event) => saveSetting(name, event.target.value);
   }
   // saved once both ends are set, or both emptied
@@ -1587,7 +1596,7 @@ async function start() {
       if (Boolean(start) === Boolean(until)) saveSetting('update_window', start ? `${start}-${until}` : '');
     };
   }
-  for (const name of ['auto_updates', 'cloud_saves', 'update_notice', 'self_update', 'starts_with_windows']) {
+  for (const name of ['auto_updates', 'cloud_saves', 'update_notice', 'self_update', 'start_at_login']) {
     $(`#${name}`).onchange = (event) => saveSetting(name, event.target.checked);
   }
   for (const folder of document.querySelectorAll('[data-folder]')) {

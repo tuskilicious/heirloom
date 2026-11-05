@@ -15,6 +15,7 @@ _optimize_default = {
 # Some games use launchers that don't work with Heirloom, these are overriden here
 _exe_overrides = {
     'kinglet':  {
+        'darwin': 'Base/Binaries/Win64EOS/CivilizationVI.exe',
         'linux': 'Base/Binaries/Win64EOS/CivilizationVI.exe',
         'win32': 'LaunchPad/LaunchPad.exe'
     }

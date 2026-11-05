@@ -67,8 +67,8 @@ jobs:
             done
           done
 
-      - name: Copy installer
-        run: cp ./Windows-X64-installer/*.exe ./dist/
+      - name: Copy installer and AppImage
+        run: cp ./Windows-X64-installer/*.exe ./Linux-X64-appimage/*.AppImage ./dist/
 
       - name: Create draft release
         env:

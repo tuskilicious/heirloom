@@ -1,10 +1,11 @@
-"""Keeping "heirloom gui" going in the background: one window at a time, and starting with Windows."""
+"""Keeping "heirloom gui" to one window at a time, and starting at login."""
 import threading
 import time
 
 import pytest
 
-from heirloom.gui.background import claim_window, start_with_windows, startup_command
+from heirloom import desktop
+from heirloom.gui.background import claim_window
 
 
 def test_a_second_window_brings_back_the_first(tmp_path):
@@ -25,7 +26,7 @@ def test_a_stale_port_file_is_taken_over(tmp_path):
     assert port_file.read_text() != '1'
 
 
-def test_starting_with_windows_needs_the_installer():
-    assert startup_command() is None, 'not frozen, so there is no heirloom-gui.exe to start'
+def test_starting_at_login_needs_an_installed_copy():
+    assert desktop.startup_command() is None, 'not frozen, so there is no installed program to start'
     with pytest.raises(ValueError):
-        start_with_windows(True)
+        desktop.start_at_login(True)

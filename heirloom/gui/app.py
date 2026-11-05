@@ -27,22 +27,11 @@ from urllib.parse import urlparse
 
 import requests
 
-from heirloom import plugin_store
+from heirloom import desktop, plugin_store
 from heirloom.downloader.queue import TimeWindow, heirloom_command, start_job, stop_job
 from heirloom.downloader.throttle import parse_speed
-from heirloom.gui.background import (
-    Tray,
-    claim_window,
-    start_with_windows,
-    starts_with_windows,
-    startup_command,
-)
-from heirloom.gui.self_update import (
-    fetch_setup,
-    installed_by_setup,
-    other_heirlooms_running,
-    start_install,
-)
+from heirloom.gui.background import claim_window
+from heirloom.gui.self_update import fetch_setup
 from heirloom.lfs.eos import (
     add_registry_entries,
     query_registry_entries,
@@ -52,7 +41,7 @@ from heirloom.lfs.lgndry import LGDLFS
 from heirloom.models.game import Game
 from heirloom.plugins import PluginManager
 from heirloom.themes import Theme
-from heirloom.utils.env import is_windows_or_pyi
+from heirloom.utils.env import is_windows_mac_or_pyi
 
 if TYPE_CHECKING:
     from heirloom.core import HeirloomCore
@@ -149,13 +138,6 @@ def image_url(game: Game | None, kinds: tuple[str, ...], size: tuple[int, int] |
         width, height = size
         url += f'{"&" if "?" in url else "?"}h={height}&quality=medium&resize=1&w={width}'
     return url
-
-
-def open_in_file_manager(path: str | Path) -> None:
-    if sys.platform == 'win32':
-        os.startfile(path)
-    else:
-        subprocess.Popen(['xdg-open', str(path)])
 
 
 def free_games(country: str, locale: str, owned: set[str]) -> list[dict[str, Any]]:
@@ -684,7 +666,7 @@ class GuiApi:
             with self._lock:
                 self._notice = notice
             return
-        open_in_file_manager(igame.install_path)
+        desktop.open_folder(igame.install_path)
 
     def open_config_folder(self, name: str) -> None:
         """Opens the themes or plugins folder, made if there is none yet, to add or remove them"""
@@ -692,7 +674,7 @@ class GuiApi:
             raise ValueError(f'No folder named "{name}"')
         folder = self._lgd().path / name
         folder.mkdir(parents=True, exist_ok=True)
-        open_in_file_manager(folder)
+        desktop.open_folder(folder)
 
     def plugins(self) -> dict[str, Any]:
         """
@@ -793,7 +775,7 @@ class GuiApi:
             except ValueError:
                 speeds[option] = 0
         # the update notice is off by default where Heirloom comes from a package manager, which updates it
-        defaults = {'update_notice': not is_windows_or_pyi()}
+        defaults = {'update_notice': not is_windows_mac_or_pyi()}
         return {
             'install_dir': str(Path(config.get('Heirloom', 'install_dir', fallback='~/Games')).expanduser()),
             **speeds,
@@ -803,6 +785,8 @@ class GuiApi:
                for name in COUNTS},
             # a download server to use when Epic offers it, as part of its hostname
             'preferred_cdn': config.get('Heirloom', 'preferred_cdn', fallback=''),
+            'game_runners': desktop.game_runners(),
+            'game_runner': self._game_runner(config),
             **{name: not config.getboolean('Heirloom', option, fallback=defaults.get(name, False))
                for name, option in SWITCHES.items()},
             **self.background(),
@@ -810,8 +794,8 @@ class GuiApi:
 
     def set_setting(self, name: str, value: Any) -> dict[str, Any]:
         """Changes one option of Settings in the config file; a value that makes no sense is refused"""
-        if name == 'starts_with_windows':
-            start_with_windows(value is True)
+        if name == 'start_at_login':
+            desktop.start_at_login(value is True)
             return self.settings()
         # a fresh read of the config, so changes heirloom made to it meanwhile are kept
         lgd = self._lgd()
@@ -838,12 +822,37 @@ class GuiApi:
             if not re.fullmatch(r'[a-z0-9.-]*', host):
                 raise ValueError('Use a server name, such as fastly-download.epicgames.com')
             self._set_option(lgd, 'preferred_cdn', host)
+        elif name == 'game_runner':
+            self._set_game_runner(lgd, str(value).strip())
         elif name in SWITCHES and isinstance(value, bool):
             lgd.config.set('Heirloom', SWITCHES[name], str(not value).lower())
         else:
             raise ValueError(f'No setting named "{name}"')
         lgd.save_config()
         return self.settings()
+
+    @staticmethod
+    def _game_runner(config: Any) -> str:
+        """What runs Windows games, unless a game has its own: umu-run for Proton, or a Wine program; empty for wine"""
+        wrapper = config.get('default', 'wrapper', fallback='')
+        return wrapper if Path(wrapper).name == 'umu-run' else config.get('default', 'wine_executable', fallback='')
+
+    @staticmethod
+    def _set_game_runner(lgd: LGDLFS, runner: str) -> None:
+        if runner and not shutil.which(runner):
+            raise ValueError(f'Can\'t find {runner}')
+        if not lgd.config.has_section('default'):
+            lgd.config.add_section('default')
+        # a wrapper of their own, like gamemoderun, stays unless it has to make way for umu-run
+        if Path(lgd.config.get('default', 'wrapper', fallback='')).name == 'umu-run':
+            lgd.config.remove_option('default', 'wrapper')
+            lgd.config.remove_option('default', 'no_wine')
+        lgd.config.remove_option('default', 'wine_executable')
+        if Path(runner).name == 'umu-run':
+            lgd.config.set('default', 'wrapper', runner)
+            lgd.config.set('default', 'no_wine', 'true')
+        elif runner:
+            lgd.config.set('default', 'wine_executable', runner)
 
     @staticmethod
     def _set_option(lgd: LGDLFS, option: str, value: str) -> None:
@@ -860,9 +869,10 @@ class GuiApi:
         return self.set_setting('install_dir', chosen['folder']) if chosen else self.settings()
 
     def background(self) -> dict[str, Any]:
-        """Whether Heirloom keeps going in the tray, and whether it starts with Windows (only from the installer)"""
-        return {'tray': Tray.available(), 'startup_possible': startup_command() is not None,
-                'starts_with_windows': starts_with_windows(), 'self_update_possible': installed_by_setup()}
+        """Whether Heirloom keeps going in the tray, whether it starts at login, and whether it updates itself"""
+        return {'tray': desktop.Tray.available(), 'startup_name': desktop.STARTUP_NAME,
+                'startup_possible': desktop.startup_command() is not None, 'start_at_login': desktop.starts_at_login(),
+                'self_update_possible': desktop.can_update_itself()}
 
     def overlay(self) -> dict[str, Any] | None:
         """
@@ -986,11 +996,11 @@ class GuiApi:
         return index, ''
 
     def _self_update_on(self) -> bool:
-        return installed_by_setup() and not self._lgd().config.getboolean('Heirloom', 'disable_self_update',
-                                                                          fallback=False)
+        return desktop.can_update_itself() and not self._lgd().config.getboolean('Heirloom', 'disable_self_update',
+                                                                                 fallback=False)
 
     def _setup_path(self, version: str) -> Path:
-        return self._lgd().path / 'self_update' / f'heirloom_{version}_setup.exe'
+        return self._lgd().path / 'self_update' / f'heirloom_{version}{Path(desktop.UPDATE_FILE).suffix}'
 
     def _fetch_setup(self, release: dict[str, Any]) -> None:
         path = self._setup_path(release['version'])
@@ -1012,7 +1022,7 @@ class GuiApi:
             shutil.rmtree(self._lgd().path / 'self_update', ignore_errors=True)
             return ''
         if not self._self_update_on() or not release.get('setup'):
-            return ''
+            return desktop.update_blocker()
         # one try for each release, as an installer that fails would otherwise quit and reopen Heirloom over and over
         if self._setup_path(release['version']).with_suffix('.tried').exists():
             with self._lock:
@@ -1034,10 +1044,10 @@ class GuiApi:
         if any(job['status'] in ('queued', 'running') for job in self._jobs.snapshot()):
             return False
         try:
-            if other_heirlooms_running():
+            if desktop.other_heirlooms_running():
                 return False
             setup.with_suffix('.tried').touch()
-            start_install(setup)
+            desktop.start_install(setup)
         except (OSError, subprocess.SubprocessError) as e:
             log.warning(f'Could not start installing {setup.name}: {e!r}')
             return False
@@ -1176,14 +1186,15 @@ class GuiApi:
 
 def run(config_file: str | None, load_themes: Callable[[], dict[str, Theme]], background: bool = False) -> None:
     """
-    Opens the window, or brings back the one already open. With the tray (Windows), closing the window hides it
-    and Heirloom keeps going, downloads and updates included, until Quit in the tray's menu; background starts it
-    hidden there.
+    Opens the window, or brings back the one already open. With a tray, closing the window hides it and Heirloom keeps
+    going, downloads and updates included, until Quit in the tray's menu; background starts it hidden there. Without
+    one, as on GNOME with no extension, closing the window is quitting.
     """
+    desktop.choose_window_engine()
     import webview
 
     api = GuiApi(config_file, load_themes)
-    tray = Tray.available()
+    tray = desktop.Tray.available()
     # the window, once there is one: a second "heirloom gui" may ask for it before
     opened: list[webview.Window] = []
     # nobody is using the window, so a new release can install without taking it away from them
@@ -1201,9 +1212,13 @@ def run(config_file: str | None, load_themes: Callable[[], dict[str, Theme]], ba
     port_file = config_dir / 'window.port'
     if not claim_window(port_file, show):
         return
-    window = webview.create_window('Heirloom', url=str(WEB / 'index.html'), js_api=api, width=1280, height=820,
+    desktop.add_to_menu()
+    page = WEB / 'index.html'
+    window = webview.create_window('Heirloom', url=str(page) if desktop.SERVE_PAGE else page.as_uri(), js_api=api,
+                                   width=1280, height=820,
                                    min_size=(760, 560), background_color='#01211a', hidden=background and tray)
     assert window is not None
+    desktop.prepare_window(window)
     opened.append(window)
     quitting = threading.Event()
 
@@ -1219,7 +1234,7 @@ def run(config_file: str | None, load_themes: Callable[[], dict[str, Theme]], ba
         window.destroy()
 
     window.events.closing += closing
-    icon = Tray(show, quit_heirloom) if tray else None
+    icon = desktop.Tray(show, quit_heirloom) if tray else None
     if icon:
         icon.start()
 
@@ -1241,9 +1256,13 @@ def run(config_file: str | None, load_themes: Callable[[], dict[str, Theme]], ba
     threading.Thread(target=install_when_hidden, daemon=True).start()
     try:
         # a profile of its own that is kept, so covers come from the disk cache rather than Epic each time
-        webview.start(private_mode=False, storage_path=str(config_dir / 'webview'), http_port=page_port())
+        webview.start(private_mode=False, storage_path=str(config_dir / 'webview'),
+                      http_port=page_port() if desktop.SERVE_PAGE else None, icon=desktop.WINDOW_ICON)
     finally:
         quitting.set()
+        if not tray:
+            # nothing else gets the chance to install a waiting release, and nothing is using the window now
+            api._install_update()
         api._close()
         # the next "heirloom gui" need not ask a window that is gone
         port_file.unlink(missing_ok=True)

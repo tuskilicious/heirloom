@@ -601,3 +601,38 @@ def test_a_crashed_job_shows_the_error_and_not_the_packaged_programs_last_words(
                  "[PYI-23504:ERROR] Failed to execute script 'cli' due to unhandled exception!"):
         Jobs._read(job, line)
     assert job.message == 'PermissionError: [WinError 5] Access is denied'
+
+
+def test_the_program_that_runs_windows_games_is_kept_where_launching_reads_it(lgd_home, monkeypatch):
+    monkeypatch.setattr('heirloom.gui.app.shutil.which', lambda name: name if name.startswith('/usr') else None)
+    api = GuiApi(None, lambda: {})
+    settings = api.set_setting('game_runner', '/usr/bin/wine-staging')
+    assert settings['game_runner'] == '/usr/bin/wine-staging'
+    config = LGDLFS().config
+    assert config.get('default', 'wine_executable') == '/usr/bin/wine-staging'
+
+    settings = api.set_setting('game_runner', '/usr/bin/umu-run')
+    assert settings['game_runner'] == '/usr/bin/umu-run'
+    config = LGDLFS().config
+    assert config.get('default', 'wrapper') == '/usr/bin/umu-run' and config.get('default', 'no_wine') == 'true'
+    assert not config.has_option('default', 'wine_executable')
+
+    with pytest.raises(ValueError):
+        api.set_setting('game_runner', 'not-installed')
+    assert api.settings()['game_runner'] == '/usr/bin/umu-run', 'one it can\'t find is refused'
+
+    assert api.set_setting('game_runner', '')['game_runner'] == ''
+    config = LGDLFS().config
+    assert not config.has_option('default', 'wrapper') and not config.has_option('default', 'no_wine')
+
+
+def test_choosing_wine_keeps_a_wrapper_of_their_own(lgd_home, monkeypatch):
+    monkeypatch.setattr('heirloom.gui.app.shutil.which', lambda name: name)
+    lgd = LGDLFS()
+    lgd.config.add_section('default')
+    lgd.config.set('default', 'wrapper', 'gamemoderun')
+    lgd.save_config()
+    api = GuiApi(None, lambda: {})
+    assert api.settings()['game_runner'] == '', 'gamemoderun does not run Windows games'
+    api.set_setting('game_runner', 'wine')
+    assert LGDLFS().config.get('default', 'wrapper') == 'gamemoderun'

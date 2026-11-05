@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.40.0 "Passport" (2026-11-06)
+
+Heirloom now has its window on Linux and on Apple silicon Macs, in one download that needs nothing else installed and
+updates itself.
+
+### New
+- **The window on Linux.** `heirloom_linux_x64.AppImage` opens the window with nothing else to install. It adds itself
+  to the app menu and replaces itself when a new version is out. It's tested on Ubuntu 22.04 and 24.04, Debian 12,
+  Fedora and Arch.
+- **A real Mac app, for Apple silicon.** `heirloom_macos_arm64.dmg` has the window, which Mac builds never had, and needs
+  macOS 14 or later. It isn't signed by a paid Apple account, so macOS asks once: the README has the steps. There is no
+  build for Intel Macs. The CrossOver support and `crossover` command are back.
+- **"Run Windows games with" in Settings on Linux,** to choose Wine or umu-run for Proton. If neither is found, Play says
+  so plainly.
+- **The tray and starting at login on Linux and Mac.** Closing the window keeps downloads going. On a desktop with no
+  tray, as GNOME can be, closing the window quits, and Settings says so.
+
+### Changed
+- **Every command starts about a fifth faster** in the prebuilt programs, so Play and Install get going sooner from the
+  window too: about 85 ms of the 390 a command took went on loading a build tool that nothing uses once Heirloom runs.
+- **The Linux and Mac downloads are much bigger,** at about 180 MB and 160 MB, as they bring their own Chromium so that
+  nothing has to be installed. The small Linux command line builds are still there for servers.
+
+### Fixed
+- **Pressing Play with no login works** for games that run offline, rather than crashing.
+
 ## 0.39.2 "Daybreak" (2026-11-04)
 
 Heirloom is now for Windows and Linux, with steadier download speeds, clearer errors, and crashed downloads caught.

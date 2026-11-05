@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "heirloom-gl"
-version = "0.39.2"
+version = "0.40.0"
 dependencies = [
     "requests",
     "filelock",
@@ -37,6 +37,8 @@ webview = [
     "pythonnet>=3.2; sys_platform == 'win32' and python_version >= '3.11'",
 ]
 webview_gtk = ["pywebview>=3.4", "PyGObject"]
+# the window on Linux and Mac in the prebuilt programs: Chromium, the same kind of engine as WebView2 on Windows
+webview_qt = ["pywebview>=3.4", "qtpy", "PySide6-Essentials", "PySide6-Addons", "PySide6-WebEngine"]
 pyinstaller_build = ["pyinstaller"]
 
 [project.scripts]
@@ -90,9 +92,14 @@ warn_redundant_casts = true
 module = ["webview", "webview.*"]
 ignore_missing_imports = true
 
-# .NET, through pythonnet, for the Windows tray (heirloom/gui/background.py)
+# .NET, through pythonnet, for the Windows tray (heirloom/desktop/windows.py)
 [[tool.mypy.overrides]]
 module = ["clr", "System", "System.*"]
+ignore_missing_imports = true
+
+# only in the prebuilt programs for Linux and Mac (heirloom/desktop/shared.py)
+[[tool.mypy.overrides]]
+module = ["PySide6", "PySide6.*"]
 ignore_missing_imports = true
 
 # Ratchet: these still set attributes to None and fill them in later, which mypy can't
