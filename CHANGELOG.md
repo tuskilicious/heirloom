@@ -18,6 +18,8 @@ updates itself.
   tray, as GNOME can be, closing the window quits, and Settings says so.
 
 ### Changed
+- **Every command starts about a fifth faster** in the prebuilt programs, so Play and Install get going sooner from the
+  window too: about 85 ms of the 390 a command took went on loading a build tool that nothing uses once Heirloom runs.
 - **The Linux and Mac downloads are much bigger,** at about 180 MB and 160 MB, as they bring their own Chromium so that
   nothing has to be installed. The small Linux command line builds are still there for servers.
 

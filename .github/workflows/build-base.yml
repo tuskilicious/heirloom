@@ -36,6 +36,9 @@ jobs:
       working-directory: heirloom
       run: uv run --module PyInstaller
         --onefile
+        --exclude-module setuptools
+        --exclude-module pkg_resources
+        --exclude-module _distutils_hack
         --name heirloom
         --add-data gui/web:heirloom/gui/web
         -i ../assets/windows_icon.ico

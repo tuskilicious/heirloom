@@ -8,7 +8,9 @@ import sys
 root = os.path.dirname(SPECPATH)
 icon = os.path.join(root, 'assets', 'windows_icon.ico')
 datas = [(os.path.join(root, 'heirloom', 'gui', 'web'), 'heirloom/gui/web')]
-excludes = []
+# PyInstaller needs setuptools, so it's there when building, and its start-up hook then loads it in every command:
+# about 150 ms of the 400 a command took. Nothing uses it while running; only cffi does, to compile, which Heirloom doesn't
+excludes = ['setuptools', 'pkg_resources', '_distutils_hack']
 
 if sys.platform != 'win32':
     # the tray's icon, which on Linux the app menu uses too
@@ -17,7 +19,7 @@ if sys.platform != 'win32':
     import PySide6
     qt_modules = {'QtCore', 'QtGui', 'QtNetwork', 'QtPrintSupport', 'QtWebChannel', 'QtWebEngineCore',
                   'QtWebEngineWidgets', 'QtWidgets'}
-    excludes = [f'PySide6.{name}' for name in {file.split('.')[0] for file in os.listdir(os.path.dirname(PySide6.__file__))
+    excludes += [f'PySide6.{name}' for name in {file.split('.')[0] for file in os.listdir(os.path.dirname(PySide6.__file__))
                                                if file.startswith('Qt')} - qt_modules]
 
 

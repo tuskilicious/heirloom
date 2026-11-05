@@ -5,7 +5,7 @@ name: Mac
 on:
   push:
     tags: [ '*.*.*' ]
-    branches: [ 'claude/linux-mac' ]
+    branches: [ 'claude/linux-mac', 'claude/faster-start' ]
   workflow_dispatch:
 
 jobs:
