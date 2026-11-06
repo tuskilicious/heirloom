@@ -519,7 +519,7 @@ kbd {
 }
 
 .info .status { font-size: 12px; }
-/* size, time played and last played: columns in Compact list, hidden otherwise */
+/* size, time played and last played: columns in Ledger, hidden otherwise */
 .meta { display: none; margin: 0; }
 .library-head { display: none; }
 /* with a gamepad, what it's on always shows: the browser hides the ring when focus was moved by the page */

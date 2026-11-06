@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.41.0 "Wardrobe" (2026-11-07)
+
+The window's themes have new names and more character, and the one you chose stays chosen.
+
+### Changed
+- **The window's themes have new names and more character.** A theme you chose under its old name stays chosen.
+  - **Couch**, which was Big picture: an evening room lit by an amber lamp, and when you pick up a gamepad, what its
+    buttons do along the bottom of the screen.
+  - **Ledger**, which was Compact list: an account book, with ruled lines, a red double margin, serif names, figures
+    in a monospaced font and a highlighter on the row you're on.
+  - **Frost**, which was Fluent: the same calm layout in icier blue-greys, with frosted panes and an ice-blue accent.
+  - **Marmalade**, which was Impeccable: the cream and burnt-orange poster, now with a paper grain, a label for the
+    banner's kicker and a rule under the heading.
+  - **Prism**, which was Liquid glass: panes edged cyan on one side and rose on the other, shimmering buttons, and a
+    band of spectrum over the cover under the pointer.
+  - **Insert coin**, which was Retro arcade: the same arcade, with its small text in a monospaced font you can read,
+    keeping the pixel font for headings, the sidebar and buttons.
+  - **Cover story**, which was Showcase: a magazine's serif headlines, a red kicker label and crisper covers.
+
 ## 0.40.2 "Passport" (2026-11-07)
 
 An install or update that can't write a file now fails, and trying again finishes it, rather than leave a broken game

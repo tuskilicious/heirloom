@@ -1,0 +1,187 @@
+/*
+  Ledger: the library kept like an account book. One ruled line per game with a small cover, its status, size, time
+  played and when it was last played, under serif column headings with a double rule. The figures are in a typewriter
+  monospace, a red double margin runs down the page, and the row you're on gets a highlighter's stroke. The headings
+  sort by their column, and with no banner or free games row about forty games fit on screen.
+  JetBrains Mono is in fonts/, under the SIL Open Font License (OFL-JetBrainsMono.txt).
+  A window theme that comes with Heirloom.
+*/
+@font-face { font-family: "JetBrains Mono"; font-weight: 500; font-display: swap; src: url("themes/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2"); }
+
+/* the book by lamplight: green-black pages and cream ink */
+:root {
+  --bg: #0f1612;
+  --surface: #16201a;
+  --surface-raised: #1f2c24;
+  --border: #2d3e33;
+  --text: #ece7d6;
+  --muted: #a9ae9d;
+  --accent: #9ec3ff;
+  --accent-text: #0b1a33;
+  --logo: #ece7d6;
+  --danger: #ff8a7a;
+  --rule: rgb(160 196 168 / 15%);
+  --margin: rgb(232 98 82 / 60%);
+  --highlight: rgb(240 214 110 / 16%);
+  --radius: 6px;
+  --radius-control: 4px;
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --serif: Georgia, "Iowan Old Style", "Palatino Linotype", "DejaVu Serif", serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  --glass: var(--surface);
+  --glass-strong: var(--surface);
+  --card-width: none;
+  --columns: 30px minmax(0, 1fr) minmax(110px, 170px) 84px 96px 112px 116px;
+}
+
+.ambient, .hero, .free { display: none !important; }
+.top { margin-bottom: 0; border-radius: var(--radius) var(--radius) 0 0; }
+.brand, .empty .mark { animation: none; }
+
+/* the book's title page: a serif heading over the totals */
+#heading { font-family: var(--serif); font-size: 30px; font-weight: 400; font-style: italic; letter-spacing: 0; }
+.summary { font-family: var(--mono); font-size: 12px; }
+.panel-head h2, .menu-title { font-family: var(--serif); font-weight: 400; }
+/* a game's page: its entry in the book, the figures in monospace */
+.game-body h2 { font-family: var(--serif); font-weight: 400; font-style: italic; letter-spacing: 0; }
+.game-facts dt { font-family: var(--serif); font-size: 14px; font-variant: small-caps; letter-spacing: .06em; }
+.game-facts dd { font-family: var(--mono); font-weight: 500; }
+
+.library-head,
+.card .cover {
+  display: grid;
+  grid-template-columns: var(--columns);
+  align-items: center;
+  gap: 16px;
+}
+
+/* the column headings, staying under the top bar, over a double rule */
+.library-head {
+  position: sticky;
+  top: 80px;
+  z-index: 1;
+  margin: 0;
+  padding: 12px 14px 8px;
+  border-bottom: 3px double color-mix(in srgb, var(--muted) 55%, transparent);
+  border-left: 3px double var(--margin);
+  background: var(--bg);
+  color: var(--muted);
+  font-family: var(--serif);
+  font-size: 14px;
+  font-variant: small-caps;
+  letter-spacing: .06em;
+}
+.library-head > :first-child { grid-column: 1 / 3; }
+.library-head button {
+  justify-self: start;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-variant: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+.library-head button:hover { color: var(--text); }
+.library-head button[aria-pressed="true"] { color: var(--accent); }
+.library-head button[aria-pressed="true"]::after { content: " ↓"; }
+
+/* the page: ruled lines down to the bottom, behind a red double margin */
+.grid { display: flex; flex-direction: column; gap: 0; border-left: 3px double var(--margin); }
+.card { gap: 0; }
+.card.rising { animation: none; }
+/* while the library loads: plain rows, and no column headings over nothing */
+.skeleton .cover { display: block; height: 44px; border-radius: 0; }
+.skeleton .line { display: none; }
+.library-head:has(~ #empty:not([hidden])) { display: none; }
+
+/* a game's line */
+.card .cover {
+  position: relative;
+  aspect-ratio: auto;
+  height: 48px;
+  padding: 0 14px;
+  place-items: center start;
+  overflow: visible;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+  background: transparent;
+  transition: background-color .12s;
+}
+/* the row you're on: a highlighter's stroke, softer at its ends */
+.card:is(:hover, :focus-within) .cover {
+  background: linear-gradient(90deg, transparent, var(--highlight) 1.5% 98.5%, transparent);
+  transform: none;
+  translate: none;
+  box-shadow: none;
+}
+.card:focus-visible .cover,
+[data-input="pad"] .card:focus .cover { translate: none; box-shadow: inset 0 -2px 0 var(--accent); }
+.cover::before, .cover::after, .tiles { display: none; }
+/* the cover: a small print tucked into the line */
+.cover img,
+.cover .initials {
+  position: static;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 40px;
+  border-radius: 2px;
+  background: var(--surface-raised);
+  box-shadow: 0 0 0 1px var(--rule), 0 2px 4px rgb(0 0 0 / 25%);
+  font-size: 11px;
+  object-fit: cover;
+}
+
+/* the title, status and columns become cells of the row: titles in the book's serif, figures in monospace */
+.info, .meta { display: contents; }
+.title { -webkit-line-clamp: 1; font-family: var(--serif); font-size: 15px; font-weight: 400; }
+.info .status { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trophies { display: none !important; }
+.meta span { color: var(--muted); font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+
+/* Update or Playing, as a dot of ink in the margin */
+.badge { top: 50%; left: 3px; width: 7px; height: 7px; padding: 0; font-size: 0; translate: 0 -50%; }
+
+.cover .actions {
+  position: static;
+  justify-content: flex-end;
+  justify-self: end;
+  padding: 0;
+  background: none;
+  opacity: 0;
+  transform: none;
+}
+.card:is(:hover, :focus-within) .cover .actions { opacity: 1; }
+.cover .actions > button { flex: none; height: 30px; padding: 0 12px; font-size: 13px; }
+.cover .actions .icon-button { width: 30px; padding: 0; }
+
+@media (max-width: 1000px) {
+  :root { --columns: 30px minmax(0, 1fr) minmax(110px, 150px) 84px 116px; }
+  .library-head > :nth-child(4), .library-head > :nth-child(5), .meta-played, .meta-last { display: none; }
+  /* with the top bar on two lines in a small window, the headings scroll away rather than hide under it */
+  .library-head { position: static; }
+}
+
+/* the book by day: pale green ledger paper, blue ink, red margins and a yellow highlighter */
+:root[data-mode="light"] {
+  --bg: #f2efdf;
+  --surface: #faf8ee;
+  --surface-raised: #e6e8d2;
+  --border: #c9cfb4;
+  --text: #1d2620;
+  --muted: #535b4b;
+  --accent: #1f4f9f;
+  --accent-text: #ffffff;
+  --logo: #1d2620;
+  --danger: #b3261e;
+  --unlit: grayscale(1) contrast(.92) brightness(1.03) sepia(.12);
+  --rule: rgb(70 120 90 / 22%);
+  --margin: rgb(204 52 40 / 60%);
+  --highlight: rgb(255 226 70 / 50%);
+  --glass: var(--surface);
+  --glass-strong: var(--surface);
+}
+[data-mode="light"] .cover img, [data-mode="light"] .cover .initials { box-shadow: 0 0 0 1px var(--rule), 0 1px 3px rgb(60 50 20 / 20%); }

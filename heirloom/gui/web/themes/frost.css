@@ -1,0 +1,113 @@
+/*
+  Frost: a still winter morning. Blue-grey stone under the navigation, the library on a frosted layer with light
+  gathering in its corner, panes of frosted glass with a fine rime, and an ice-blue accent. Calm motion that settles
+  into place rather than springing. The type is Segoe UI Variable, which Windows 11 has; elsewhere Segoe UI or the
+  system font stands in. A window theme that comes with Heirloom.
+*/
+:root {
+  --bg: #171c23;
+  --surface: #20262f;
+  --surface-raised: #29313b;
+  --border: #36404c;
+  --text: #f2f7fb;
+  --muted: #b9c5d0;
+  --accent: #8fd8ff;
+  --accent-text: #00202e;
+  --logo: #e6f6ff;
+  --danger: #ff9aa5;
+  --progress: var(--accent);
+  --unlit: grayscale(1) brightness(.6) contrast(.95);
+  --radius: 8px;
+  --radius-control: 4px;
+  --font: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --shadow: 0 8px 18px rgb(0 8 20 / 30%);
+  /* settling into place, without overshoot */
+  --ease: cubic-bezier(0, 0, 0, 1);
+  --spring: cubic-bezier(0, 0, 0, 1);
+  /* frosted glass: a cold tint, a strong blur, and a fine rime so it reads as ice rather than smoke */
+  --glass: color-mix(in srgb, #222a34 74%, transparent);
+  --glass-strong: color-mix(in srgb, #222a34 88%, transparent);
+  --glass-blur: blur(30px) saturate(1.2);
+  --glass-edge: rgb(200 230 255 / 10%);
+  --glass-shine: inset 0 1px 0 rgb(210 238 255 / 9%);
+  --rime: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .85 0 0 0 0 .94 0 0 0 0 1 0 0 0 .045 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  /* the morning light gathering in the frosted layer's corner */
+  --frost-light: radial-gradient(520px 300px at 0 0, rgb(170 222 255 / 8%), transparent 70%);
+  --layer: rgb(64 78 96 / 28%);
+  color-scheme: dark;
+}
+
+/* the navigation sits on the stone; the library is a frosted layer above it, with a rounded top-left corner */
+.rail { background: transparent; border-right: 0; }
+.main {
+  margin-top: 8px;
+  border: 1px solid var(--glass-edge);
+  border-width: 1px 0 0 1px;
+  border-top-left-radius: var(--radius);
+  background: var(--frost-light), var(--layer);
+  box-shadow: inset 0 1px 0 rgb(210 238 255 / 6%);
+}
+
+/* the selected item: a cold fill and a short ice-blue pill */
+.shelf-marker { border-color: transparent; background: rgb(190 225 255 / 7%); box-shadow: none; }
+.shelf-marker::before { top: 12px; bottom: 12px; box-shadow: 0 0 8px rgb(143 216 255 / 45%); }
+.shelves .rail-item[aria-pressed="true"] .icon { filter: none; color: var(--accent); }
+.shelves .rail-item[aria-pressed="true"] .count { background: rgb(190 225 255 / 10%); color: var(--text); }
+.rail-item:hover:not(:disabled) { background: rgb(190 225 255 / 5%); }
+
+/* the frosted panes carry the rime */
+.top, .menu, .dock, .panel { background-image: var(--rime); }
+
+/* buttons: a pale fill with a darker bottom edge, like ice on a sill */
+.ghost, .sort, .icon-button.ghost {
+  border-color: rgb(210 238 255 / 8%);
+  border-bottom-color: rgb(210 238 255 / 3%);
+  background-color: rgb(210 238 255 / 6%);
+}
+.ghost:hover:not(:disabled), .sort:hover:not(:disabled) { background-color: rgb(210 238 255 / 9%); }
+.primary { border-color: rgb(255 255 255 / 10%); border-bottom-color: rgb(0 20 40 / 18%); }
+.primary:hover:not(:disabled) { filter: brightness(1.06); box-shadow: 0 0 18px -6px var(--accent); }
+button:active:not(:disabled) { transform: none; opacity: .8; }
+
+/* focus: a clear ring of ice */
+:focus-visible { outline: 2px solid #e6f6ff; outline-offset: 1px; }
+
+.brand, .empty .mark { animation: none; }
+.card:hover .cover { box-shadow: var(--shadow), 0 0 0 1px rgb(200 235 255 / 22%); }
+.switch:checked { box-shadow: none; }
+.ambient { opacity: .18; filter: blur(60px) saturate(.8); }
+.dock-progress { box-shadow: none; }
+
+/* the same morning on snow: white light, cold shadows and a deep ice-blue accent */
+:root[data-mode="light"] {
+  --bg: #edf2f6;
+  --surface: #f8fbfd;
+  --surface-raised: #ffffff;
+  --border: #d5dfe7;
+  --text: #142029;
+  --muted: #4c5c6a;
+  --accent: #0a5ea6;
+  --accent-text: #ffffff;
+  --logo: #142029;
+  --danger: #c42b1c;
+  --unlit: grayscale(1) contrast(.92) brightness(1.04);
+  --shadow: 0 8px 18px rgb(30 60 90 / 14%);
+  --glass: color-mix(in srgb, #fbfdff 74%, transparent);
+  --glass-strong: color-mix(in srgb, #fbfdff 90%, transparent);
+  --glass-edge: rgb(20 50 80 / 9%);
+  --glass-shine: inset 0 1px 0 rgb(255 255 255 / 70%);
+  --frost-light: radial-gradient(520px 300px at 0 0, rgb(255 255 255 / 70%), transparent 70%);
+  --layer: rgb(255 255 255 / 50%);
+}
+[data-mode="light"] .shelf-marker { background: rgb(10 94 166 / 7%); }
+[data-mode="light"] .shelf-marker::before { box-shadow: none; }
+[data-mode="light"] .shelves .rail-item[aria-pressed="true"] .count { background: rgb(10 94 166 / 9%); }
+[data-mode="light"] .rail-item:hover:not(:disabled) { background: rgb(20 50 80 / 4%); }
+[data-mode="light"] :is(.ghost, .sort, .icon-button.ghost) { border-color: rgb(20 50 80 / 9%); border-bottom-color: rgb(20 50 80 / 16%); background-color: rgb(255 255 255 / 72%); }
+[data-mode="light"] :is(.ghost, .sort):hover:not(:disabled) { background-color: rgb(255 255 255 / 96%); }
+[data-mode="light"] :focus-visible { outline-color: #142029; }
+[data-mode="light"] .card:hover .cover { box-shadow: var(--shadow), 0 0 0 1px rgb(10 94 166 / 22%); }
+
+/* frost creeping up through the cover under the pointer */
+.cover::after { content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit; background: linear-gradient(0deg, rgb(205 236 255 / 18%), rgb(205 236 255 / 4%) 40%, transparent 60%); opacity: 0; transition: opacity .3s var(--ease); pointer-events: none; }
+.card:hover .cover::after { opacity: 1; }

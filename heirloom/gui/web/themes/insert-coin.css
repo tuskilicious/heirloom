@@ -1,10 +1,12 @@
 /*
-  Retro arcade: neon on black behind a CRT's scanlines and curved-glass shading. The sidebar is a cabinet's lit
-  marquee, the type a pixel font, installed games glow cyan, and the cover under the pointer flashes PRESS START.
-  The pixel font is Press Start 2P, in fonts/ under the SIL Open Font License (OFL-PressStart2P.txt); without it a
-  monospace font stands in. A window theme that comes with Heirloom.
+  Insert coin: a coin-op arcade after dark. Neon on black behind a CRT's scanlines and curved-glass shading; the
+  sidebar is a cabinet's lit marquee, installed games glow cyan, the cover under the pointer flashes PRESS START and an
+  empty shelf asks for a coin. Headings, the sidebar and buttons are in a pixel font, Press Start 2P, and the rest in
+  JetBrains Mono so it reads at small sizes. Both are in fonts/, under the SIL Open Font License (OFL-*.txt); without
+  them a monospace font stands in. A window theme that comes with Heirloom.
 */
 @font-face { font-family: "Press Start 2P"; font-display: swap; src: url("themes/fonts/press-start-2p-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 500; font-display: swap; src: url("themes/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2"); }
 
 :root {
   --bg: #07010f;
@@ -23,7 +25,8 @@
   --unlit: grayscale(1) brightness(.42) contrast(1.25);
   --radius: 3px;
   --radius-control: 2px;
-  --font: "Press Start 2P", "Cascadia Mono", Consolas, ui-monospace, monospace;
+  --font: "JetBrains Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
+  --pixel: "Press Start 2P", "Cascadia Mono", Consolas, ui-monospace, monospace;
   --shadow: 0 0 0 transparent;
   --glass: color-mix(in srgb, var(--bg) 90%, transparent);
   --glass-strong: var(--bg);
@@ -31,7 +34,10 @@
   --glass-shine: none;
 }
 
-body { font-size: 11px; line-height: 1.8; }
+body { font-size: 13px; line-height: 1.55; }
+/* the pixel font for what an arcade would print in it */
+button, .rail-item, .collections-head, #heading, .hero-note, .hero-title, .badge, .panel-head h2, .panel h3,
+.menu-title, .free-title, #dock-title { font-family: var(--pixel); }
 
 /* the screen: scanlines, and the dark corners of curved glass, over everything but dialogs */
 body::after {
@@ -66,13 +72,15 @@ button { border-radius: var(--radius-control); text-transform: uppercase; letter
 
 .top { border: 2px solid var(--border); box-shadow: 0 0 0 1px var(--bg), 0 0 22px -4px color-mix(in srgb, var(--cyan) 50%, transparent); }
 #heading { font-size: 20px; color: var(--accent); text-shadow: 0 0 10px var(--accent), 3px 3px 0 #3d1a7c; text-transform: uppercase; }
-.summary, #search { font-size: 10px; }
+.summary, #search { font-size: 12px; }
 
 .hero { border: 3px solid var(--cyan); box-shadow: 0 0 34px -4px var(--cyan); }
 .hero-art { image-rendering: pixelated; }
 .hero-note { color: var(--gold); font-size: 10px; text-shadow: 0 0 8px var(--gold); text-transform: uppercase; }
 .hero-title { font-size: clamp(18px, 2.6vw, 32px); line-height: 1.35; text-shadow: 0 0 14px var(--accent), 4px 4px 0 #3d1a7c; text-transform: uppercase; }
-.hero-meta { font-size: 10px; }
+.hero-meta { font-size: 13px; }
+/* a game's page: its name up in lights, as on the banner */
+.game-body h2 { font-family: var(--pixel); font-size: clamp(20px, 3vw, 34px); line-height: 1.35; text-shadow: 0 0 14px var(--accent), 4px 4px 0 #3d1a7c; text-transform: uppercase; }
 
 /* covers in glowing frames: cyan when installed, magenta under the pointer */
 .cover { border: 3px solid var(--border); border-radius: var(--radius); }
@@ -87,8 +95,8 @@ button { border-radius: var(--radius-control); text-transform: uppercase; letter
   box-shadow: 0 0 22px var(--accent), inset 0 0 24px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 .info { border: 2px solid var(--border); border-radius: 0; background: rgb(7 1 15 / 90%); }
-.title { font-size: 9.5px; line-height: 1.7; text-transform: uppercase; }
-.info .status, .status { font-size: 8.5px; }
+.title { font-size: 12.5px; line-height: 1.35; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; }
+.info .status, .status { font-size: 11.5px; }
 .badge { border-radius: 0; font-size: 8px; box-shadow: 0 0 10px var(--accent); }
 
 /* PRESS START, blinking over the cover under the pointer */
@@ -96,6 +104,7 @@ button { border-radius: var(--radius-control); text-transform: uppercase; letter
 .cover .actions::before {
   content: "PRESS START";
   position: absolute;
+  font-family: var(--pixel);
   inset: 14px 0 auto;
   color: var(--gold);
   font-size: 10px;
@@ -117,7 +126,7 @@ button { border-radius: var(--radius-control); text-transform: uppercase; letter
 @keyframes crt-flicker { 0%, 100% { opacity: 1; } 97% { opacity: .82; } }
 
 /* room for the whole of the search box's hint in a small window */
-@media (max-width: 900px) { #search { font-size: 8px; } }
+@media (max-width: 900px) { #search { font-size: 11px; } }
 
 @media (prefers-reduced-motion: reduce) {
   body::after, .cover .actions::before { animation: none; }
@@ -154,11 +163,11 @@ button { border-radius: var(--radius-control); text-transform: uppercase; letter
 [data-mode="light"] .rail { background: linear-gradient(180deg, #e4d2ff 0%, var(--surface) 40%, var(--bg)); }
 [data-mode="light"] .rail-item { color: #3f2380; }
 [data-mode="light"] #heading { text-shadow: 2px 2px 0 #e0ccff; }
-[data-mode="light"] .hero-title { text-shadow: 3px 3px 0 #e0ccff; }
+[data-mode="light"] :is(.hero-title, .game-body h2) { text-shadow: 3px 3px 0 #e0ccff; }
 [data-mode="light"] .info { background: rgb(255 250 255 / 92%); }
 [data-mode="light"] .cover .actions { background: linear-gradient(transparent, rgb(255 250 255 / 94%) 55%); }
 
 /* a coin-op's insert coin, and covers that hop in pixel steps */
-.empty::after { content: "INSERT COIN"; display: block; margin-top: 18px; color: var(--gold); font-size: 11px; animation: blink 1.2s steps(1) infinite; }
+.empty::after { content: "INSERT COIN"; display: block; margin-top: 18px; color: var(--gold); font-family: var(--pixel); font-size: 11px; animation: blink 1.2s steps(1) infinite; }
 .card:hover .cover { transition: translate .18s steps(3), border-color .1s, box-shadow .1s; }
 @media (prefers-reduced-motion: reduce) { .empty::after { animation: none; } }

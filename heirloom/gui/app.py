@@ -50,6 +50,9 @@ WEB = Path(__file__).parent / 'web'
 # the window's own look, Keeper Light, in web/style.css, and its main colours
 WINDOW_THEME = 'heirloom'
 WINDOW_COLORS = {'bg': '#01211a', 'surface': '#0b3028', 'accent': '#f3fb88', 'text': '#f7faf2'}
+# the themes that come with Heirloom, by the names they had before, so a theme chosen under one stays chosen
+RENAMED_THEMES = {'big-picture': 'couch', 'compact-list': 'ledger', 'fluent': 'frost', 'impeccable': 'marmalade',
+                  'liquid-glass': 'prism', 'retro-arcade': 'insert-coin', 'showcase': 'cover-story'}
 # switches in Settings, and the config options they turn the other way: each is on unless disabled
 SWITCHES = {'cloud_saves': 'disable_cloud_save_sync', 'auto_updates': 'disable_auto_updates',
             'update_notice': 'disable_update_notice', 'self_update': 'disable_self_update'}
@@ -941,6 +944,8 @@ class GuiApi:
         lgd = self._lgd()
         themes = window_themes(self._load_themes(), lgd.path / 'themes')
         name = lgd.config.get('Heirloom', 'window_theme', fallback=WINDOW_THEME)
+        # an old name, unless a theme of the user's has it now
+        name = name if name in themes else RENAMED_THEMES.get(name, name)
         active = name if name in themes else WINDOW_THEME
         return {'active': active, 'css': themes[active][1],
                 'themes': [{'name': name, 'title': title, 'colors': theme_colors(css)}
