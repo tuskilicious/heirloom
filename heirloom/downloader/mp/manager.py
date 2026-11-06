@@ -89,6 +89,8 @@ class DLManager(Process):
         # Resume file stuff
         self.resume_file = resume_file
         self.hash_map: dict[str, str] = dict()
+        # files the writer reported failing, so the download doesn't end as if it had installed them
+        self.failed_files: set[str] = set()
 
         # cross-thread runtime information
         self.running = True
@@ -597,18 +599,17 @@ class DLManager(Process):
 
                 self.num_tasks_processed_since_last += 1
 
-                if res.flags & TaskFlags.CLOSE_FILE and self.resume_file and res.success:
-                    if res.filename.endswith('.tmp'):
-                        res.filename = res.filename[:-4]
-
-                    file_hash = self.hash_map[res.filename]
-                    # write last completed file to super simple resume file
-                    with Path(self.resume_file).open('a', encoding='utf-8') as rf:
-                        rf.write(f'{file_hash}:{res.filename}\n')
-
                 if not res.success:
-                    # todo make this kill the installation process or at least skip the file and mark it as failed
-                    self.log.fatal(f'Writing for {res.filename} failed!')
+                    self.log.error(f'Writing {res.filename} failed!')
+                    self.failed_files.add(res.filename)
+
+                # a file is done once closed, or once its patched copy (not a game file itself) replaces it
+                done = res.flags & TaskFlags.RENAME_FILE or (res.flags & TaskFlags.CLOSE_FILE
+                                                             and res.filename in self.hash_map)
+                if done and self.resume_file and res.success and res.filename not in self.failed_files:
+                    with Path(self.resume_file).open('a', encoding='utf-8') as rf:
+                        rf.write(f'{self.hash_map[res.filename]}:{res.filename}\n')
+
                 if res.flags & TaskFlags.RELEASE_MEMORY:
                     self.sms.appendleft(res.shared_memory)
                     with shm_cond:
@@ -841,8 +842,12 @@ class DLManager(Process):
             if t.is_alive():
                 self.log.warning(f'Thread did not terminate! {repr(t)}')
 
-        # clean up resume file
-        if self.resume_file:
+        # the resume file stays after a failure, so trying again fetches only the files that didn't make it
+        if failed := sorted(self.failed_files & self.hash_map.keys()):
+            more = f' and {len(failed) - 5} more' if len(failed) > 5 else ''
+            self.log.error(f'{len(failed)} file(s) could not be written: {", ".join(failed[:5])}{more}. '
+                           f'Trying again fetches only those.')
+        elif self.resume_file:
             try:
                 Path(self.resume_file).unlink()
             except OSError as e:
@@ -852,6 +857,8 @@ class DLManager(Process):
         self.shared_memory.close()
         self.shared_memory.unlink()
 
+        if self.failed_files:
+            exit(1)
         self.log.info('All done! Download manager quitting...')
         # finally, exit the process.
         exit(0)

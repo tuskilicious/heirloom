@@ -1,3 +1,4 @@
+import copy
 import logging
 import subprocess
 import sys
@@ -47,7 +48,7 @@ def cdn(tmp_path):
     server.shutdown()
 
 
-def _install(base_url, manifest, dest, resume_file, speed_limits=None, **analysis_kwargs):
+def _install(base_url, manifest, dest, resume_file, speed_limits=None, exit_code=0, **analysis_kwargs):
     log_q = Queue(-1)
     records = []
     listener = QueueListener(log_q, logging.Handler())
@@ -60,7 +61,7 @@ def _install(base_url, manifest, dest, resume_file, speed_limits=None, **analysi
         dlm.logging_queue = log_q
         dlm.start()
         dlm.join(timeout=120)
-        assert dlm.exitcode == 0
+        assert dlm.exitcode == exit_code
     finally:
         listener.stop()
     return analysis, [r.getMessage() for r in records]
@@ -94,6 +95,42 @@ def test_download_manager_fills_in_missing_files_without_resume_file(cdn, tmp_pa
     analysis, _ = _install(base_url, manifest, dest, tmp_path / 'r2', old_manifest=manifest)
     assert analysis.install_size > 0
     assert (dest / 'slots' / 'two.sav').read_bytes() == files['slots/two.sav']
+
+
+def test_a_file_that_cannot_be_written_fails_the_install_and_trying_again_finishes_it(cdn, tmp_path):
+    base_url, manifest, files = cdn
+    dest, resume = tmp_path / 'game', tmp_path / 'game.resume'
+    (dest / 'settings.ini').mkdir(parents=True)  # a folder in its place, so the file can't be written
+
+    _, log = _install(base_url, manifest, dest, resume, exit_code=1)
+    assert any('could not be written: settings.ini' in msg for msg in log), log
+    done = {line.partition(':')[2] for line in resume.read_text(encoding='utf-8').splitlines()}
+    assert done == set(files) - {'settings.ini'}, 'the files that made it are kept for trying again'
+
+    (dest / 'settings.ini').rmdir()
+    analysis, _ = _install(base_url, manifest, dest, resume)
+    assert analysis.manifest_comparison.added == {'settings.ini'}, 'only the file that failed is fetched again'
+    for name, data in files.items():
+        assert (dest / name).read_bytes() == data, name
+    assert not resume.exists()
+
+
+def test_an_update_that_cannot_write_a_patched_file_leaves_the_old_one(cdn, tmp_path):
+    base_url, manifest, files = cdn
+    dest = tmp_path / 'game'
+    _install(base_url, manifest, dest, tmp_path / 'r1')
+    # a new build of the file, made from the old one's chunks, so the update patches it from the file on the disk
+    update = copy.deepcopy(manifest)
+    update.file_manifest_list.get_file_by_path('settings.ini').hash = bytes(20)
+    (dest / 'settings.ini.tmp').mkdir()
+
+    _install(base_url, update, dest, tmp_path / 'r2', exit_code=1, old_manifest=manifest)
+    assert (dest / 'settings.ini').read_bytes() == files['settings.ini'], 'not replaced by a copy that failed'
+
+    (dest / 'settings.ini.tmp').rmdir()
+    analysis, _ = _install(base_url, update, dest, tmp_path / 'r2', old_manifest=manifest)
+    assert analysis.reuse_size == len(files['settings.ini']), 'trying again patches from the old file'
+    assert (dest / 'settings.ini').read_bytes() == files['settings.ini']
 
 
 def _timed_install(cdn, dest, speed_limits=None):
