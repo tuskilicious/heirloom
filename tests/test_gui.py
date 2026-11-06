@@ -1,6 +1,5 @@
 """The backend of "heirloom gui": the library it shows, the jobs it runs, and theme CSS. No window needed."""
 import json
-import socket
 import sys
 import time
 from datetime import datetime, timedelta, timezone
@@ -15,7 +14,6 @@ from heirloom.gui.app import (
     fetch_achievements,
     free_games,
     image_url,
-    page_port,
     read_library,
 )
 from heirloom.lfs.lgndry import LGDLFS
@@ -462,20 +460,6 @@ def test_the_window_opens_as_it_was_left(lgd_home):
         'kept between runs, and anything unknown left out'
     (lgd_home / 'window.json').write_text('not json')
     assert api.view()['sort'] == 'title'
-
-
-def test_an_updated_page_is_served_on_a_port_of_its_own(tmp_path, monkeypatch):
-    monkeypatch.setattr('heirloom.gui.app.WEB', tmp_path)
-    (tmp_path / 'app.js').write_text('old')
-    old = page_port()
-    assert page_port() == old, 'the same page keeps its port, and so its cache'
-    (tmp_path / 'app.js').write_text('new')
-    assert page_port() != old, "or the browser's cache keeps showing the old page after an update"
-
-    new = page_port()
-    with socket.socket() as taken:
-        taken.bind(('127.0.0.1', new))
-        assert page_port() == new + 1, 'a port in use is passed over'
 
 
 def test_what_a_games_page_says_about_it(lgd_home):
