@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.41.0 "Wardrobe" (2026-11-07)
+
+The window's themes have new names and more character, and the one you chose stays chosen.
 
 ### Changed
 - **The window's themes have new names and more character.** A theme you chose under its old name stays chosen.
