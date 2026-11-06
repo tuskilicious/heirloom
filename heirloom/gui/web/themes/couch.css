@@ -1,0 +1,183 @@
+/*
+  Couch: Heirloom from the sofa, on a TV with a controller. An evening room, plum-dark and lit by an amber lamp in the
+  corner. The sidebar becomes a bar along the top, the game you're on fills a tall banner with its art glowing behind
+  the page, and the library is one row of large covers that scrolls sideways. Move with the arrow keys or a gamepad's
+  D-pad or stick; Enter or A chooses, B goes back, X opens the game's page and Y opens Manage. Picking up a gamepad
+  shows those buttons along the bottom of the screen. A window theme that comes with Heirloom.
+*/
+:root {
+  --bg: #120c17;
+  --surface: #1d1525;
+  --surface-raised: #2a2034;
+  --border: #3d3049;
+  --text: #fff5e8;
+  --muted: #cbb9c6;
+  --accent: #ffb547;
+  --accent-text: #2b1700;
+  --logo: #ffd9a3;
+  --danger: #ff8f8f;
+  --unlit: grayscale(1) brightness(.5) sepia(.25);
+  --radius: 18px;
+  --radius-control: 12px;
+  --card-width: 216px;
+  --theme-card-width: 216px;
+  --font: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --shadow: 0 24px 50px -24px rgb(0 0 0 / 80%);
+  --glass: color-mix(in srgb, var(--surface) 70%, transparent);
+  --glass-strong: color-mix(in srgb, var(--surface) 88%, transparent);
+  /* the lamp's warm light, and the cool of the evening across the room */
+  --lamp: rgb(255 168 66 / 18%);
+  --dusk: rgb(118 64 168 / 20%);
+  --halo: rgb(255 181 71 / 62%);
+  /* the banner shows the game the keyboard or gamepad is on (see heroFollowsFocus in app.js) */
+  --hero: focus;
+}
+
+body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; font-size: 16px; }
+
+/* the lamp in the corner, and the evening light from the far side of the room */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(64vw 58vh at 4% -8%, var(--lamp), transparent 72%),
+    radial-gradient(56vw 50vh at 104% 108%, var(--dusk), transparent 70%);
+}
+
+/* the sidebar, as a bar along the top */
+.rail,
+.rail.collapsed {
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  height: 68px;
+  transition: none;
+  padding: 0 28px;
+  border-right: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  backdrop-filter: blur(24px) saturate(1.4);
+}
+.brand { margin: 0 22px 0 0; padding: 0; }
+.rail.collapsed .logo { display: block; }
+.rail.collapsed .mark { display: none; }
+.rail.collapsed :is(.label, .count) { opacity: 1; }
+/* fading out on the right, where more shelves are to scroll to */
+.shelves { flex-direction: row; gap: 6px; align-items: center; overflow: auto hidden; mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent); }
+.collections { display: contents; }
+.collections-head { margin: 0; padding: 0; }
+.collections-head .label { display: none; }
+.collections-head .icon-button { width: 48px; height: 48px; }
+.rail-item { flex: none; }
+.game-body h2 { font-size: clamp(36px, 5vw, 64px); }
+.game-actions button { height: 54px; font-size: 17px; }
+.shelf-marker, #rail-toggle { display: none; }
+.rail-item { width: auto; height: 48px; padding: 0 18px; border-radius: 999px; font-size: 15px; font-weight: 600; }
+.rail-item .label { flex: none; }
+.rail-item[data-filter^="collection:"] .label { max-width: 180px; white-space: nowrap; }
+/* the shelf you're on: a lit pill, like a remote's button */
+.shelves .rail-item[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); box-shadow: 0 6px 22px -8px var(--halo); }
+.shelves .rail-item[aria-pressed="true"] .icon { color: var(--accent-text); filter: none; }
+.shelves .rail-item[aria-pressed="true"] .count { background: color-mix(in srgb, var(--accent-text) 16%, transparent); color: var(--accent-text); }
+.rail-foot { flex-direction: row; gap: 4px; margin: 0 0 0 auto; padding: 0; border: 0; }
+.rail-foot .rail-item .label { display: none; }
+.rail-foot .rail-item { width: 48px; padding: 0; justify-content: center; }
+.brand, .empty .mark { animation: none; }
+
+.main { --gutter: 52px; padding-bottom: 48px; }
+.top { position: static; margin: 26px 0 6px; padding: 0; border: 0; background: none; backdrop-filter: none; box-shadow: none; }
+#heading { font-size: 32px; font-weight: 700; letter-spacing: -.02em; }
+
+/* the game you're on, large; its art spills behind the whole page */
+.ambient { inset: 0; width: 100vw; height: 100vh; filter: blur(80px) saturate(1.4); opacity: .42; mask-image: none; }
+/* tall as the window allows with a whole row of covers still in view */
+.hero { min-height: clamp(220px, calc(100vh - 560px), 50vh); margin: 14px 0 26px; border-radius: 26px; box-shadow: 0 40px 80px -40px rgb(0 0 0 / 85%); }
+.hero-body { max-width: 780px; padding: clamp(20px, 4vh, 46px) 52px; }
+.hero-note { color: var(--accent); font-size: 14px; letter-spacing: .04em; }
+.hero-title { font-size: clamp(36px, 4.6vw, 66px); letter-spacing: -.03em; }
+.hero-meta { font-size: 17px; }
+.hero .actions > button { height: 56px; padding: 0 34px; font-size: 18px; border-radius: 999px; }
+.hero .actions .icon-button { width: 56px; }
+.primary { box-shadow: 0 10px 30px -12px var(--halo); }
+.free { display: none; }
+
+/* the library: one row of covers, scrolling sideways */
+.grid {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: var(--card-width);
+  gap: 26px;
+  margin: 0 calc(-1 * var(--gutter));
+  padding: 22px var(--gutter) 40px;
+  overflow-x: auto;
+  scroll-padding-inline: var(--gutter);
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  /* the row's edges fade, as on a TV's shelf */
+  mask-image: linear-gradient(90deg, transparent, #000 var(--gutter), #000 calc(100% - var(--gutter)), transparent);
+}
+.card { scroll-snap-align: start; }
+.cover { border-radius: 18px; transition: transform .35s var(--spring), translate .35s var(--spring), box-shadow .3s var(--ease); }
+.title { font-size: 16px; font-weight: 650; }
+.info .status { font-size: 13px; }
+/* the cover you're on rises into the lamplight */
+.card:focus-visible .cover,
+[data-input="pad"] .card:focus .cover {
+  transform: scale(1.1);
+  translate: 0 -4px;
+  box-shadow: 0 0 0 4px var(--accent), 0 0 80px -4px var(--halo);
+}
+/* the cover you're on shows its buttons; the rest stay covers */
+.card:focus-within .cover .actions { opacity: 1; transform: none; }
+
+.panel { font-size: 15px; }
+
+/* picking up a gamepad shows what its buttons do, in the bar before its icons, until the pointer moves */
+:root[data-input="pad"] .rail::after {
+  content: "Ⓐ Choose   Ⓑ Back   Ⓧ Game page   Ⓨ Manage";
+  order: 1;
+  /* in a narrow window the hints give way before the shelves do */
+  flex: 0 50 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: auto;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: pre;
+}
+:root[data-input="pad"] .rail-foot { order: 2; margin-left: 12px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cover { transition: none; }
+}
+
+/* the same room by day: linen, warm wood and sunlight */
+:root[data-mode="light"] {
+  --bg: #f6efe6;
+  --surface: #fffaf3;
+  --surface-raised: #ecdfcf;
+  --border: #d8c6b0;
+  --text: #2a1a12;
+  --muted: #65503f;
+  --accent: #a8500d;
+  --accent-text: #ffffff;
+  --logo: #a8500d;
+  --danger: #b3261e;
+  --unlit: grayscale(1) contrast(.9) brightness(1.04) sepia(.15);
+  --shadow: 0 18px 40px -22px rgb(90 50 20 / 40%);
+  --lamp: rgb(255 196 120 / 40%);
+  --dusk: rgb(214 170 140 / 30%);
+  --halo: rgb(168 80 13 / 45%);
+}
+[data-mode="light"] .ambient { opacity: .2; }
+[data-mode="light"] .shelves .rail-item[aria-pressed="true"] .count { background: rgb(0 0 0 / 20%); }
+[data-mode="light"] .hero { box-shadow: 0 40px 80px -46px rgb(90 50 20 / 50%); }

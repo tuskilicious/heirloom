@@ -628,7 +628,7 @@ function card(game) {
       title: el('h3', {className: 'title'}),
       status: el('p', {className: 'status'}),
       trophies: el('p', {className: 'status trophies', hidden: true}),
-      // size, time played and last played, which Compact list shows as columns
+      // size, time played and last played, which Ledger shows as columns
       meta: el('p', {className: 'meta'}),
       buttons: el('div', {className: 'actions'}),
       key: '',

@@ -1,6 +1,7 @@
 /*
-  Impeccable: a graphic, editorial-poster look, warm and confident. Cream pages beside a burnt-orange sidebar, an
-  amber accent, Chakra Petch type with JetBrains Mono labels. A window theme that comes with Heirloom.
+  Marmalade: a jar of it on a breakfast table, as a poster. Cream paper with a fine grain beside a burnt-orange
+  sidebar, an amber accent, Chakra Petch type with JetBrains Mono labels, kickers set like a jar's label and a thick
+  rule under the heading. Covers lift off a hard offset shadow, as if printed. A window theme that comes with Heirloom.
 
   Amber (#CC8800) fills buttons, badges and the marker; as text on cream it fails WCAG AA (2.5:1), so accent text
   uses a burnt-orange ink (5.1:1). No glows: shadows are tinted to the page and edges are hairlines.
@@ -56,7 +57,7 @@
 .shelf-marker::before { background: var(--accent); box-shadow: none; }
 .shelves .rail-item[aria-pressed="true"] .icon { filter: none; }
 .shelves .rail-item[aria-pressed="true"] .count { background: #fbf3e4; color: #93391a; }
-.count { background: rgb(251 243 228 / 16%); color: var(--text); }
+.count { background: rgb(70 22 6 / 24%); color: var(--text); }
 
 /* labels in JetBrains Mono, as the brand's label caps */
 .count, .summary, kbd, .badge, .panel h3, .menu-title, .hero-note {
@@ -136,3 +137,25 @@
 
 /* poster print: the cover under the pointer lifts off a hard offset shadow */
 .card:hover .cover { transform: none; translate: -3px -3px; box-shadow: 6px 6px 0 var(--accent); }
+
+/* the paper's grain, warm on cream and faint on the dark */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .28 0 0 0 0 .1 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E");
+}
+[data-mode="dark"] body::before { opacity: .5; }
+
+/* a poster's rule under the heading */
+#heading { text-decoration: underline 4px var(--accent); text-underline-offset: 7px; text-decoration-skip-ink: none; }
+/* the banner's kicker, set like the label on a jar */
+.hero-note {
+  align-self: flex-start;
+  width: fit-content;
+  padding: 3px 9px;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+}

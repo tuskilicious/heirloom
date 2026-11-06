@@ -557,25 +557,35 @@ def test_theme_css_for_the_window(lgd_home, tmp_path):
     found = api.themes()
     assert (found['active'], found['css']) == ('heirloom', '')
     assert [(theme['name'], theme['title']) for theme in found['themes']] == [
-        ('heirloom', 'Heirloom'), ('big-picture', 'Big picture'), ('compact-list', 'Compact list'),
-        ('fluent', 'Fluent'), ('impeccable', 'Impeccable'), ('liquid-glass', 'Liquid glass'),
-        ('retro-arcade', 'Retro arcade'),
-        ('showcase', 'Showcase'), ('neon', 'neon'), ('paper_white', 'Paper white')], \
+        ('heirloom', 'Heirloom'), ('couch', 'Couch'), ('cover-story', 'Cover story'), ('frost', 'Frost'),
+        ('insert-coin', 'Insert coin'), ('ledger', 'Ledger'), ('marmalade', 'Marmalade'), ('prism', 'Prism'),
+        ('neon', 'neon'), ('paper_white', 'Paper white')], \
         "its own look and the ones that come with it, then themes with CSS and CSS files, " \
         "not terminal themes or the same CSS twice"
     colors = {theme['name']: theme['colors'] for theme in found['themes']}
     assert colors['neon'] == colors['heirloom'] | {'accent': '#00f0ff'}, "the window's own where a theme sets none"
-    assert colors['paper_white']['bg'] == '#fff' and colors['big-picture']['accent'] == '#5ee2ff'
-    # the layout themes restyle what the page has: the hero following focus, the columns of Compact list
-    assert '--hero: focus' in api.use_theme('big-picture')['css']
-    assert '.library-head' in api.use_theme('compact-list')['css']
-    assert 'Chakra Petch' in api.use_theme('impeccable')['css']
+    assert colors['paper_white']['bg'] == '#fff' and colors['couch']['accent'] == '#ffb547'
+    # the layout themes restyle what the page has: the hero following focus, the columns of Ledger
+    assert '--hero: focus' in api.use_theme('couch')['css']
+    assert '.library-head' in api.use_theme('ledger')['css']
+    assert 'Chakra Petch' in api.use_theme('marmalade')['css']
     switched = api.use_theme('paper_white')
     assert (switched['active'], switched['css']) == ('paper_white', ':root { --bg: #fff; }')
     config = (lgd_home / 'config.ini').read_text()
     assert 'window_theme = paper_white' in config and '\ntheme =' not in config, 'the terminal keeps its theme'
     with pytest.raises(ValueError):
         api.use_theme('default')
+
+
+def test_a_theme_chosen_under_its_old_name_stays_chosen(lgd_home):
+    lgd_home.mkdir(parents=True, exist_ok=True)
+    (lgd_home / 'config.ini').write_text('[Heirloom]\nwindow_theme = fluent\n')
+    api = GuiApi(None, lambda: {})
+    assert api.themes()['active'] == 'frost'
+
+    (lgd_home / 'themes').mkdir()
+    (lgd_home / 'themes' / 'fluent.css').write_text(':root { --accent: #0078d4; }')
+    assert api.themes()['active'] == 'fluent', "a theme of the user's own by that name is theirs"
 
 
 def test_a_crashed_job_shows_the_error_and_not_the_packaged_programs_last_words():

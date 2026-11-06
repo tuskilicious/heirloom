@@ -1,0 +1,120 @@
+/*
+  Cover story: the library as a glossy magazine. The game you played last is the cover, a banner most of the window
+  high with its art drifting slowly, a red kicker label over a serif headline in huge type and a red rule beneath.
+  Big covers, two or three across, float up into place as you scroll, their names set in the same serif, and the light
+  of the cover game washes over the page. A window theme that comes with Heirloom.
+*/
+:root {
+  --bg: #0b0b0c;
+  --surface: #161617;
+  --surface-raised: #222224;
+  --border: #333336;
+  --text: #faf7f2;
+  --muted: #b9b4ab;
+  --accent: #ff4b3e;
+  --accent-text: #1a0200;
+  --logo: #faf7f2;
+  --danger: #ff8a7a;
+  --radius: 6px;
+  --radius-control: 4px;
+  --card-width: 290px;
+  --theme-card-width: 290px;
+  --font: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --display: Georgia, "Times New Roman", "Noto Serif", "DejaVu Serif", serif;
+  --shadow: 0 30px 70px -30px rgb(0 0 0 / 85%);
+}
+
+.main { --gutter: 48px; }
+.ambient { height: 100vh; opacity: .5; filter: blur(110px) saturate(1.6); }
+/* the masthead */
+#heading { font-family: var(--display); font-size: 42px; font-weight: 700; font-style: italic; letter-spacing: -.02em; }
+.panel-head h2, .free-title { font-family: var(--display); }
+/* a game's page: the feature inside, under the same serif */
+.game-body h2 { font-family: var(--display); font-weight: 700; letter-spacing: -.03em; }
+.game-facts dt { font-size: 11px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; }
+/* the shelf you're on counts its games on a red label */
+.shelves .rail-item[aria-pressed="true"] .count { background: var(--accent); color: var(--accent-text); }
+
+/* the cover: most of the window high, its headline in huge serif type */
+.hero { min-height: max(420px, 68vh); margin: 8px 0 64px; border-radius: 10px; box-shadow: var(--shadow); }
+/* the art on the right, fading in from the left, so a game's own logo doesn't run into the headline */
+.hero-art { animation: ken-burns 46s ease-in-out infinite alternate; transform-origin: 65% 35%; }
+.hero::after {
+  background:
+    linear-gradient(0deg, var(--bg) 0%, color-mix(in srgb, var(--bg) 88%, transparent) 34%, transparent 78%),
+    linear-gradient(90deg, color-mix(in srgb, var(--bg) 82%, transparent), transparent 62%);
+}
+.hero .actions .icon-button { background: color-mix(in srgb, var(--surface-raised) 80%, transparent); color: var(--text); }
+.hero-body { max-width: min(62%, 900px); padding: 64px 64px 56px; gap: 14px; }
+/* the kicker: a red label over the headline */
+.hero-note {
+  align-self: flex-start;
+  width: fit-content;
+  padding: 5px 10px 4px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .24em;
+  text-transform: uppercase;
+}
+.hero-title {
+  font-family: var(--display);
+  font-size: clamp(30px, 5.6vw, 92px);
+  font-weight: 700;
+  letter-spacing: -.03em;
+  line-height: 1.02;
+}
+/* and a red rule under it */
+.hero-title::after { content: ""; display: block; width: 72px; height: 5px; margin-top: 22px; background: var(--accent); }
+.hero-meta { font-size: 16px; }
+.hero .actions > button { height: 52px; padding: 0 30px; font-size: 16px; font-weight: 700; letter-spacing: .02em; }
+.hero .actions .icon-button { width: 52px; }
+
+.free-title { font-size: 22px; font-style: italic; letter-spacing: 0; }
+
+/* big covers, which float up into place as they scroll into view */
+.grid { gap: 52px 34px; }
+.cover { border-radius: var(--radius); box-shadow: var(--shadow); }
+.info { inset: auto 12px 12px; padding: 12px 14px; border-radius: 4px; }
+.title { font-family: var(--display); font-size: 20px; font-weight: 700; letter-spacing: -.01em; line-height: 1.15; }
+.info .status { font-size: 13px; }
+.card:hover .cover { translate: 0 -10px; }
+.card:hover .title { color: var(--accent); }
+.title { transition: color .2s ease; }
+
+@supports (animation-timeline: view()) {
+  /* only the cards near the screen: on all of a large library this costs two thirds of the frame rate */
+  .card.near:not(.rising) { animation: float-in linear both; animation-timeline: view(); animation-range: entry 0% cover 30%; }
+  /* the middle of each row trails a little behind, so the rows move like layers */
+  .card.near:nth-child(3n + 2):not(.rising) { animation-range: entry 8% cover 38%; }
+  .hero-body { animation: hero-lift linear both; animation-timeline: scroll(root); animation-range: 0 70vh; }
+}
+
+.menu, .output, .choice:has(.theme-preview) { border-radius: 8px; }
+.menu button { border-radius: 4px; }
+
+@keyframes ken-burns { from { transform: scale(1.04); } to { transform: scale(1.2) translate(-3%, 2%); } }
+@keyframes float-in { from { opacity: 0; transform: translateY(70px) scale(.94); } }
+@keyframes hero-lift { to { opacity: .15; transform: translateY(-90px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-art, .card:not(.rising), .hero-body { animation: none !important; }
+}
+
+/* the print edition: white paper, black ink and the same red */
+:root[data-mode="light"] {
+  --bg: #f7f4ee;
+  --surface: #ffffff;
+  --surface-raised: #ece7de;
+  --border: #d9d2c5;
+  --text: #141210;
+  --muted: #5b554c;
+  --accent: #c8102e;
+  --accent-text: #ffffff;
+  --logo: #141210;
+  --danger: #9f1d1d;
+  --unlit: grayscale(1) contrast(.9) brightness(1.04);
+  --shadow: 0 30px 70px -34px rgb(60 40 20 / 40%);
+}
+[data-mode="light"] .ambient { opacity: .18; }
