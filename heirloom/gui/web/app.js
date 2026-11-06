@@ -1084,7 +1084,15 @@ async function showThemes(info) {
     themePreview(theme.colors),
     el('input', {
       type: 'radio', name: 'theme', value: theme.name, checked: theme.name === themes.active,
-      onchange: async () => showThemes(await api.use_theme(theme.name)),
+      onchange: async (event) => {
+        const info = await api.use_theme(theme.name);
+        spreadFrom(event.target.closest('.choice'), async () => {
+          await showThemes(info);
+          // the new theme's own fonts, which only start loading once something is laid out in them
+          document.body.getBoundingClientRect();
+          await document.fonts.ready;
+        });
+      },
     }),
     el('span', {textContent: theme.title}))));
 }
@@ -1281,6 +1289,26 @@ function nameCards() {
   });
 }
 
+// a new look for the whole window, spreading out in a circle from the control that chose it
+function spreadFrom(node, update) {
+  if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    update();
+    return;
+  }
+  const {left, top, width, height} = node.getBoundingClientRect();
+  const [x, y] = [left + width / 2, top + height / 2];
+  const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+  // one picture of the whole window: with a name of its own the banner would be drawn over an open dialog
+  const hero = $('#hero');
+  hero.style.viewTransitionName = 'none';
+  const transition = document.startViewTransition(update);
+  transition.finished.finally(() => { hero.style.viewTransitionName = ''; });
+  transition.ready.then(() => document.documentElement.animate(
+    {clipPath: [`circle(0 at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`]},
+    {duration: 520, easing: 'cubic-bezier(.23, 1, .32, 1)', pseudoElement: '::view-transition-new(root)'},
+  )).catch(() => {});
+}
+
 // a change of what the library shows, with the cards gliding to their new places
 function smoothly(update) {
   if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -1343,19 +1371,7 @@ async function start() {
   $('#mode-toggle').onclick = (event) => {
     colorMode = getComputedStyle(document.documentElement).colorScheme.includes('light') ? 'dark' : 'light';
     saveView();
-    if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      applyMode();
-      return;
-    }
-    // the new colours spread out from the button
-    const {left, top, width, height} = event.currentTarget.getBoundingClientRect();
-    const [x, y] = [left + width / 2, top + height / 2];
-    const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
-    const transition = document.startViewTransition(applyMode);
-    transition.ready.then(() => document.documentElement.animate(
-      {clipPath: [`circle(0 at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`]},
-      {duration: 520, easing: 'cubic-bezier(.23, 1, .32, 1)', pseudoElement: '::view-transition-new(root)'},
-    )).catch(() => {});
+    spreadFrom(event.currentTarget, applyMode);
   };
   $('#surprise').onclick = surprise;
   const toTop = $('#to-top');

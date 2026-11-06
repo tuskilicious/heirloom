@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.41.1 "Wardrobe" (2026-11-07)
+
+Picking a theme spreads it across the window from the tile you picked.
+
+### New
+- **Picking a theme spreads it across the window.** The new theme grows in a circle from the tile you picked, as light
+  and dark mode already did from their button, once the theme's own fonts are in. With reduced motion turned on in
+  your system's settings, the theme changes at once.
+
+### Fixed
+- **Switching between light and dark mode no longer fades the banner on its own.** The whole window now changes as
+  one.
+
 ## 0.41.0 "Wardrobe" (2026-11-07)
 
 The window's themes have new names and more character, and the one you chose stays chosen.
