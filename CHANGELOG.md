@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.40.2 "Passport" (2026-11-07)
+
+An install or update that can't write a file now fails, and trying again finishes it, rather than leave a broken game
+marked as installed.
 
 ### Changed
 - **On Windows the window shows your library a little sooner, and no longer stalls now and then.** It reads its page
