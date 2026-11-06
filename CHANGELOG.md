@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.41.1 "Wardrobe" (2026-11-07)
+
+Picking a theme spreads it across the window from the tile you picked.
 
 ### New
 - **Picking a theme spreads it across the window.** The new theme grows in a circle from the tile you picked, as light
