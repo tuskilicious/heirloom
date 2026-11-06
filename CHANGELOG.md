@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.40.2 "Passport" (2026-11-07)
+
+An install or update that can't write a file now fails, and trying again finishes it, rather than leave a broken game
+marked as installed.
+
+### Changed
+- **On Windows the window shows your library a little sooner, and no longer stalls now and then.** It reads its page
+  straight from the disk, as it already did on Linux and Mac, rather than from a server Heirloom ran on your PC. The
+  server took 0.15 to 0.2 seconds to hand the page over, and once in eleven tries here over half a second.
+
+### Fixed
+- **An install or update that can't write a file now fails instead of calling the game installed.** When a file
+  couldn't be written, because the disk filled up, a file was read-only or something held it open, the download still
+  finished as if it had worked, and the game only broke once you played it. It now ends with an error naming the files,
+  the window keeps the download queued, and trying again fetches only those files. An update no longer swaps a file for
+  a new copy it couldn't finish, so trying again can still patch from the old one. Files whose names end in `.tmp` are
+  now remembered as done when a download is interrupted, rather than fetched again.
+
 ## 0.40.1 "Passport" (2026-11-06)
 
 A cloud save that fails to download can no longer cost you the save on your disk.

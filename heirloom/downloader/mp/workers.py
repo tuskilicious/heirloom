@@ -176,6 +176,8 @@ class FileWorker(Process):
 
         last_filename = ''
         current_file = None
+        # files a write failed for, so a patched copy that is incomplete never replaces the file it was made from
+        broken: set[str] = set()
 
         while True:
             try:
@@ -252,6 +254,11 @@ class FileWorker(Process):
                         logger.warning('Trying to rename file without closing first!')
                         current_file.close()
                         current_file = None
+                    if j.old_file in broken:
+                        # the old file stays, as trying again patches from it
+                        logger.error(f'Not replacing {j.filename}, as its new copy could not be written')
+                        self.o_q.put(WriterTaskResult(success=False, **j.__dict__))
+                        continue
                     if j.flags & TaskFlags.DELETE_FILE:
                         try:
                             full_path.unlink()
@@ -316,11 +323,13 @@ class FileWorker(Process):
                             current_file.write(f.read(j.chunk_size))
                 except Exception as e:
                     logger.warning(f'Something in writing a file failed: {e!r}')
+                    broken.add(j.filename)
                     self.o_q.put(WriterTaskResult(success=False, size=j.chunk_size, **j.__dict__))
                 else:
                     self.o_q.put(WriterTaskResult(success=True, size=j.chunk_size, **j.__dict__))
             except Exception as e:
                 logger.warning(f'Job {j.filename} failed with: {e!r}, fetching next one...')
+                broken.add(j.filename)
                 self.o_q.put(WriterTaskResult(success=False, **j.__dict__))
 
                 try:

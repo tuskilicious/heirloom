@@ -11,12 +11,10 @@ import os
 import re
 import shlex
 import shutil
-import socket
 import subprocess
 import sys
 import threading
 import time
-import zlib
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
@@ -69,8 +67,6 @@ VIEW_CHOICES = {'filter': ('all', 'installed', 'updates'), 'sort': ('title', 're
                 'covers': ('medium', 'small', 'large'),
                 # the sidebar's toggle: nothing for the theme as it comes
                 'mode': ('', 'dark', 'light')}
-# below the range Windows hands out to programs by itself
-PAGE_PORTS = range(42002, 49000)
 # the shelf of a collection, as window.json and the page name it: this and the collection's name
 COLLECTION_FILTER = 'collection:'
 COLLECTION_NAME_LENGTH = 40
@@ -214,27 +210,6 @@ def theme_colors(css: str) -> dict[str, str]:
 
 def _title(css_file: Path) -> str:
     return css_file.stem.replace('-', ' ').replace('_', ' ').capitalize()
-
-
-def page_port() -> int | None:
-    """
-    The local port to serve the window's page on, which changes with the page. The browser keeps what it fetches in
-    the window's profile and pywebview's "don't cache" headers don't survive its file server, so on one port an update
-    can keep showing the old page. The first port free from there, as Windows reserves whole ranges; None if none is.
-    """
-    digest = 0
-    for path in sorted(WEB.rglob('*')):
-        if path.is_file():
-            digest = zlib.crc32(path.read_bytes(), digest)
-    first = PAGE_PORTS.start + digest % len(PAGE_PORTS)
-    for port in range(first, first + 50):
-        with socket.socket() as probe:
-            try:
-                probe.bind(('127.0.0.1', port))
-            except OSError:
-                continue
-            return port
-    return None
 
 
 def game_details(game: Game | None) -> dict[str, Any]:
@@ -1213,8 +1188,10 @@ def run(config_file: str | None, load_themes: Callable[[], dict[str, Theme]], ba
     if not claim_window(port_file, show):
         return
     desktop.add_to_menu()
+    # straight from the disk, with no server: the browser doesn't cache files there, so an update shows its new page,
+    # and a server was slow to answer on Windows and could time out in a Mac's Qt
     page = WEB / 'index.html'
-    window = webview.create_window('Heirloom', url=str(page) if desktop.SERVE_PAGE else page.as_uri(), js_api=api,
+    window = webview.create_window('Heirloom', url=page.as_uri(), js_api=api,
                                    width=1280, height=820,
                                    min_size=(760, 560), background_color='#01211a', hidden=background and tray)
     assert window is not None
@@ -1256,8 +1233,7 @@ def run(config_file: str | None, load_themes: Callable[[], dict[str, Theme]], ba
     threading.Thread(target=install_when_hidden, daemon=True).start()
     try:
         # a profile of its own that is kept, so covers come from the disk cache rather than Epic each time
-        webview.start(private_mode=False, storage_path=str(config_dir / 'webview'),
-                      http_port=page_port() if desktop.SERVE_PAGE else None, icon=desktop.WINDOW_ICON)
+        webview.start(private_mode=False, storage_path=str(config_dir / 'webview'), icon=desktop.WINDOW_ICON)
     finally:
         quitting.set()
         if not tray:
