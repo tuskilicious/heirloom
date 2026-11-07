@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.41.2 "Wardrobe" (2026-11-07)
+
+Small text in the sidebar and the downloads panel is easier to read.
 
 ### Fixed
 - **Small text in the sidebar and the downloads panel is easier to read.** The count on the shelf you're on was the
