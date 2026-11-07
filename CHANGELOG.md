@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### New
+- **Log in with your browser.** Under Log in, for when Epic's page won't take your login in Heirloom's own window,
+  for example where its captcha says every answer is wrong. Epic's login page opens in your browser, and once you've
+  logged in you paste what it shows into Heirloom. On Linux, Epic's captcha needs WebGL, which a PC without working
+  graphics drivers, or a virtual machine, may not have. The code reaches Heirloom's login on its input rather than
+  its command line, where other programs could read it, and `heirloom auth --code -` takes it the same way.
+
 ## 0.41.2 "Wardrobe" (2026-11-07)
 
 Small text in the sidebar and the downloads panel is easier to read.

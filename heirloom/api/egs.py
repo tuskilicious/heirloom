@@ -1,6 +1,8 @@
 # !/usr/bin/env python
 
+import json
 import logging
+from urllib.parse import quote
 
 import requests
 import requests.adapters
@@ -14,6 +16,15 @@ from heirloom.models.gql import (
     uplay_codes_query,
     uplay_redeem_query,
 )
+
+
+def authorization_code(text: str) -> str:
+    """The authorization code in what Epic's page shows once signed in: all of it, or the code alone"""
+    text = text.strip()
+    if '{' in text:
+        # the browser may show its own controls (e.g. "Pretty-print") around the JSON
+        text = json.loads(text[text.find('{'):text.rfind('}') + 1]).get('authorizationCode') or ''
+    return text.strip().strip('"')
 
 
 class EPCAPI:
@@ -61,6 +72,10 @@ class EPCAPI:
     def get_auth_code_url(self):
         """Gives a JSON object with an authorization code when opened by a browser signed in to Epic"""
         return f'https://www.epicgames.com/id/api/redirect?clientId={self._user_basic}&responseType=code'
+
+    def get_browser_login_url(self):
+        """Epic's login page, which shows that JSON object once you've logged in, or at once if you already are"""
+        return f'https://www.epicgames.com/id/login?redirectUrl={quote(self.get_auth_code_url())}'
 
     def update_egs_params(self, egs_params):
         # update user-agent

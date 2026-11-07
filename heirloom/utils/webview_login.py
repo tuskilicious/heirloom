@@ -5,6 +5,7 @@ import webbrowser
 from urllib.parse import parse_qs, urlsplit
 
 from heirloom import __version__, desktop
+from heirloom.api.egs import authorization_code
 
 logger = logging.getLogger('WebViewHelper')
 webview_available = True
@@ -143,8 +144,7 @@ class MockLauncher:
         self.destroy_on_load = True
         try:
             if response:
-                # the browser may show its own controls (e.g. "Pretty-print") around the JSON
-                auth_code = json.loads(response[response.find('{'):response.rfind('}') + 1]).get('authorizationCode')
+                auth_code = authorization_code(response)
             if not auth_code or not self._callback_auth_code:
                 raise ValueError('no authorization code')
             logger.debug('Got authorization code!')

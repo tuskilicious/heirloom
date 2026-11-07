@@ -1,3 +1,4 @@
+import io
 import json
 import locale
 import subprocess
@@ -64,3 +65,17 @@ def test_a_game_can_be_played_offline_without_a_login(fake_game):
     (fake_game / 'user.json').unlink()
     result = run('launch', 'Fish', '--offline', '--dry-run')
     assert result.returncode == 0, result.stderr
+
+
+def test_auth_reads_the_code_from_stdin(lgd_home, monkeypatch):
+    from heirloom.cli import HeirloomCLI
+    from heirloom.cli_args import build_parser
+    args = build_parser()[0].parse_args(['auth', '--code', '-'])
+    cli = HeirloomCLI(api_timeout=args.api_timeout)
+    codes = []
+    monkeypatch.setattr(cli.core, 'check_for_updates', lambda force=False: None)
+    monkeypatch.setattr(cli.core, 'auth_code', lambda code: codes.append(code) or False)
+    # the page as a browser shows it, pretty-printed over several lines
+    monkeypatch.setattr('sys.stdin', io.StringIO('{\n  "authorizationCode": "0123abcd",\n  "sid": null\n}\n'))
+    cli.auth(args)
+    assert codes == ['0123abcd']

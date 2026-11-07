@@ -783,6 +783,7 @@ kbd {
 /* the launch options dialog: one field */
 .launch-dialog { width: min(480px, calc(100vw - 40px)); }
 .field { display: grid; gap: 4px; }
+.field + .field { margin-top: 14px; }
 .field .detail { color: var(--muted); font-size: 13px; }
 .field code { padding: 1px 5px; border-radius: 4px; background: var(--surface-raised); font-size: 12px; }
 .text {

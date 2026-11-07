@@ -110,11 +110,12 @@ def heirloom_command() -> list[str]:
 
 
 def start_job(command: list[str], **popen_options: Any) -> subprocess.Popen:
-    # in its own process group, so it can be stopped without stopping the queue; a prompt fails instead of waiting
+    # in its own process group, so it can be stopped without stopping the queue; a prompt fails instead of waiting,
+    # unless the job is given what to answer
+    popen_options.setdefault('stdin', subprocess.DEVNULL)
     if sys.platform == 'win32':
-        return subprocess.Popen(command, stdin=subprocess.DEVNULL, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-                                **popen_options)
-    return subprocess.Popen(command, stdin=subprocess.DEVNULL, start_new_session=True, **popen_options)
+        return subprocess.Popen(command, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP, **popen_options)
+    return subprocess.Popen(command, start_new_session=True, **popen_options)
 
 
 def interrupt_job(job: subprocess.Popen) -> None:

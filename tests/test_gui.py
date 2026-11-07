@@ -224,6 +224,42 @@ def test_updates_start_by_themselves(fake_game, monkeypatch):
     assert api_starting(started)._update_games() and started == [('install', 'Fish')]
 
 
+def test_logging_in_with_the_browser_gives_the_code_on_stdin_only(lgd_home):
+    # stands in for "heirloom auth": what it was given, and whether its stdin held the code; failing, so the window
+    # doesn't refresh the library after it
+    script = 'import sys; print(sys.argv[1:], sys.stdin.read() == "0123abcd\\n"); sys.exit(1)'
+    api = GuiApi(None, lambda: {}, command=lambda: [sys.executable, '-c', script])
+    api.login_with_code('Pretty-print\n{"redirectUrl": "https://localhost/launcher/authorized?code=0123abcd", '
+                        '"authorizationCode": "0123abcd", "exchangeCode": null, "sid": null}')
+    deadline = time.monotonic() + 30
+    while (job := api.state()['jobs'][0])['status'] == 'running':
+        assert time.monotonic() < deadline, job
+        time.sleep(0.05)
+    assert job['message'] == "['auth', '--code', '-'] True"
+    assert '0123abcd' not in json.dumps(api.state()['jobs']), 'the page is never sent the code'
+
+
+def test_the_browser_opens_epics_login_page_which_then_shows_a_code(lgd_home, monkeypatch):
+    opened = []
+    monkeypatch.setattr('webbrowser.open', opened.append)
+    api = GuiApi(None, lambda: {}, command=lambda: ['heirloom'])
+    url = api.browser_login()
+    # where https://legendary.gl/epiclogin sends you, as the command line opened before
+    assert url == ('https://www.epicgames.com/id/login?redirectUrl=https%3A//www.epicgames.com/id/api/redirect'
+                   '%3FclientId%3D34a02cf8f4414e29b15921876da36f9a%26responseType%3Dcode')
+    assert opened == [url]
+
+
+def test_a_paste_without_a_login_code_starts_nothing(lgd_home):
+    api = GuiApi(None, lambda: {}, command=lambda: [sys.executable, '-c', 'import sys; sys.exit(1)'])
+    for page in ('', '  ', '{"authorizationCode": null}', '{"authorizationCode": "', 'https://www.epicgames.com/id'):
+        with pytest.raises(ValueError):
+            api.login_with_code(page)
+    assert api.state()['jobs'] == []
+    api.login_with_code(' "0123abcd"\n')
+    assert len(api.state()['jobs']) == 1, 'the code alone, as copied from the page, will do'
+
+
 @pytest.mark.skipif(sys.platform != 'win32', reason='the window offers the overlay on Windows only')
 def test_epic_overlay(lgd_home, tmp_path, monkeypatch):
     registry = {'overlay_path': None}
