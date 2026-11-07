@@ -121,7 +121,8 @@ def build_parser():
     auth_parser.add_argument('--import', dest='import_egs_auth', action='store_true',
                              help='Import Epic Games Launcher authentication data (logs out of EGL)')
     auth_parser.add_argument('--code', dest='auth_code', action='store', metavar='<authorization code>',
-                             help='Use specified authorization code instead of interactive authentication')
+                             help='Use specified authorization code instead of interactive authentication, '
+                                  '"-" to read it from stdin')
     auth_parser.add_argument('--token', dest='ex_token', action='store', metavar='<exchange token>',
                              help='Use specified exchange token instead of interactive authentication')
     auth_parser.add_argument('--sid', dest='session_id', action='store', metavar='<session id>',

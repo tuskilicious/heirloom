@@ -542,6 +542,25 @@ async function saveLaunchOptions() {
   }
 }
 
+// logging in through the browser: Epic's page opens there, and what it shows once you've logged in is pasted here
+async function openBrowserLogin() {
+  $('#browser-login-url').value = await api.browser_login();
+  $('#browser-login-page').value = '';
+  $('#browser-login-error').hidden = true;
+  $('#browser-login').showModal();
+  $('#browser-login-page').focus();
+}
+
+async function browserLogin() {
+  try {
+    await run(api.login_with_code($('#browser-login-page').value));
+    $('#browser-login').close();
+  } catch (failure) {
+    $('#browser-login-error').textContent = failure.message || failure;
+    $('#browser-login-error').hidden = false;
+  }
+}
+
 // the games Epic gives away: free now, then next, with a way to claim them on Epic's store
 let freeKey = '';
 
@@ -751,6 +770,7 @@ function renderLibrary() {
   $('#empty').hidden = loading || count > 0;
   $('#empty-text').textContent = emptyText(query);
   $('#empty-login').hidden = Boolean(state.user || state.games.length || loggingIn());
+  $('#empty-browser-login').hidden = $('#empty-login').hidden;
 }
 
 // the collections in the sidebar; a game Epic no longer lists stays in its collection, in case it comes back, but
@@ -1368,6 +1388,14 @@ async function start() {
   const login = () => run(api.login());
   $('#account').onclick = login;
   $('#empty-login').onclick = login;
+  $('#empty-browser-login').onclick = openBrowserLogin;
+  $('#browser-login-close').onclick = () => $('#browser-login').close();
+  $('#browser-login-cancel').onclick = () => $('#browser-login').close();
+  $('#browser-login-save').onclick = browserLogin;
+  $('#browser-login-page').onkeydown = (event) => {
+    if (event.key === 'Enter') browserLogin();
+  };
+  $('#browser-login-url').onfocus = (event) => event.target.select();
   $('#mode-toggle').onclick = (event) => {
     colorMode = getComputedStyle(document.documentElement).colorScheme.includes('light') ? 'dark' : 'light';
     saveView();

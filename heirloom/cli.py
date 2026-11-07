@@ -28,6 +28,7 @@ from filelock import FileLock, Timeout
 from requests.exceptions import HTTPError
 
 from heirloom import __codename__, __version__, desktop, plugin_store
+from heirloom.api.egs import authorization_code
 from heirloom.cli_args import build_parser
 from heirloom.core import HeirloomCore
 from heirloom.downloader.queue import (
@@ -225,16 +226,11 @@ class HeirloomCLI:
             if not webview_available or args.no_webview or self.core.webview_killswitch:
                 # unfortunately the captcha stuff makes a complete CLI login flow kinda impossible right now...
                 print('Please login via the epic web login!')
-                url = 'https://legendary.gl/epiclogin'
+                url = self.core.egs.get_browser_login_url()
                 webbrowser.open(url)
                 print(f'If the web page did not open automatically, please manually open the following URL: {url}')
-                auth_code = input('Please enter the "authorizationCode" value from the JSON response: ')
-                auth_code = auth_code.strip()
-                if auth_code[0] == '{':
-                    tmp = json.loads(auth_code)
-                    auth_code = tmp['authorizationCode']
-                else:
-                    auth_code = auth_code.strip('"')
+                auth_code = authorization_code(
+                    input('Please enter the "authorizationCode" value from the JSON response: '))
             else:
                 if do_webview_login(callback_code=self.core.auth_ex_token, callback_auth_code=self.core.auth_code,
                                     auth_code_url=self.core.egs.get_auth_code_url(),
@@ -246,7 +242,8 @@ class HeirloomCLI:
         elif args.session_id:
             exchange_token = self.core.auth_sid(args.session_id)
         elif args.auth_code:
-            auth_code = args.auth_code
+            # from stdin with "-", where unlike on the command line other programs can't see it
+            auth_code = authorization_code(sys.stdin.read() if args.auth_code == '-' else args.auth_code)
         elif args.ex_token:
             exchange_token = args.ex_token
 

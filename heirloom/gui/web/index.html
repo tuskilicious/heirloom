@@ -145,6 +145,7 @@
       <svg class="mark" viewBox="16 16 272 400" aria-hidden="true"><use href="#logo"/></svg>
       <p id="empty-text"></p>
       <button type="button" id="empty-login" class="primary" hidden>Log in</button>
+      <button type="button" id="empty-browser-login" class="ghost" hidden>Log in with your browser</button>
     </div>
     <button type="button" id="to-top" class="ghost" title="Back to the top" aria-label="Back to the top" hidden>
       <svg class="icon" aria-hidden="true"><use href="#i-up"/></svg>
@@ -395,6 +396,34 @@
       <div class="panel-actions">
         <button type="button" id="launch-cancel" class="ghost">Cancel</button>
         <button type="button" id="launch-save" class="primary">Save</button>
+      </div>
+    </section>
+  </dialog>
+
+  <!-- logging in through the browser, for when Epic's page can't be used in the login window -->
+  <dialog id="browser-login" class="panel launch-dialog" aria-labelledby="browser-login-title">
+    <header class="panel-head">
+      <h2 id="browser-login-title">Log in with your browser</h2>
+      <button type="button" id="browser-login-close" class="icon-button" title="Close">
+        <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>
+      </button>
+    </header>
+    <section>
+      <p class="hint">Epic's login page is open in your browser. Once you've logged in, it shows a few lines of text.</p>
+      <label class="field" for="browser-login-page">
+        <span class="what">What the page shows</span>
+        <span class="detail">Copy all of it and paste it here.</span>
+        <input type="text" id="browser-login-page" class="text" autocomplete="off" spellcheck="false">
+      </label>
+      <label class="field" for="browser-login-url">
+        <span class="what">No browser opened?</span>
+        <span class="detail">Open this address in one yourself.</span>
+        <input type="text" id="browser-login-url" class="text" readonly spellcheck="false">
+      </label>
+      <p id="browser-login-error" class="hint error" role="alert" hidden></p>
+      <div class="panel-actions">
+        <button type="button" id="browser-login-cancel" class="ghost">Cancel</button>
+        <button type="button" id="browser-login-save" class="primary">Log in</button>
       </div>
     </section>
   </dialog>

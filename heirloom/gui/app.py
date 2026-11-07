@@ -17,6 +17,7 @@ import threading
 import time
 from collections import Counter
 from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -26,6 +27,7 @@ from urllib.parse import urlparse
 import requests
 
 from heirloom import desktop, plugin_store
+from heirloom.api.egs import authorization_code
 from heirloom.downloader.queue import TimeWindow, heirloom_command, start_job, stop_job
 from heirloom.downloader.throttle import parse_speed
 from heirloom.gui.background import claim_window
@@ -333,14 +335,20 @@ class Jobs:
         self._jobs: list[Job] = []
         self._processes: dict[int, subprocess.Popen] = {}
         self._stopped: set[int] = set()
+        # what a job is given on stdin, kept out of the jobs the page is sent, as it may be a login code
+        self._stdin: dict[int, str] = {}
 
     def snapshot(self) -> list[dict[str, Any]]:
         with self._lock:
             return [asdict(job) for job in self._jobs]
 
-    def add(self, kind: str, app_name: str, title: str, options: list[str] | None = None) -> None:
+    def add(self, kind: str, app_name: str, title: str, options: list[str] | None = None,
+            stdin: str | None = None) -> None:
         with self._lock:
-            self._jobs.append(Job(len(self._jobs) + 1, kind, app_name, title, options=options or []))
+            job = Job(len(self._jobs) + 1, kind, app_name, title, options=options or [])
+            self._jobs.append(job)
+            if stdin is not None:
+                self._stdin[job.id] = stdin
         self._start_next()
 
     def download_next(self, job_id: int) -> None:
@@ -386,13 +394,22 @@ class Jobs:
             self._run(job)
 
     def _run(self, job: Job) -> None:
+        with self._lock:
+            text = self._stdin.pop(job.id, None)
         try:
-            process = start_job(self._command(job), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                                encoding='utf-8', errors='replace', env=os.environ | {'PYTHONIOENCODING': 'utf-8'})
+            process = start_job(self._command(job), stdin=subprocess.DEVNULL if text is None else subprocess.PIPE,
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8',
+                                errors='replace', env=os.environ | {'PYTHONIOENCODING': 'utf-8'})
         except OSError as e:
             with self._lock:
                 job.status, job.message = 'failed', f'Could not start heirloom: {e!r}'
             return
+        if text is not None:
+            assert process.stdin is not None
+            # a job that ended at once can't be written to, and says why itself
+            with suppress(OSError):
+                process.stdin.write(text + '\n')
+                process.stdin.close()
         with self._lock:
             self._processes[job.id] = process
         threading.Thread(target=self._follow, args=(job, process), daemon=True).start()
@@ -883,6 +900,28 @@ class GuiApi:
 
     def login(self) -> None:
         self._jobs.add('login', '', 'Epic Games account')
+
+    def browser_login(self) -> str:
+        """Opens Epic's login page in the browser, for when the login window can't be used, and gives its address"""
+        from heirloom.core import HeirloomCore
+        core = HeirloomCore(override_config=self._config_file)
+        # the client the code is for, which heirloom's feed can change
+        core.apply_lgd_config()
+        url = core.egs.get_browser_login_url()
+        import webbrowser
+        webbrowser.open(url)
+        return url
+
+    def login_with_code(self, page: str) -> None:
+        """Logs in with what Epic's page showed in the browser: all of it, or the code alone"""
+        try:
+            code = authorization_code(page)
+        except ValueError:
+            code = ''
+        if not re.fullmatch(r'\w+', code):
+            raise ValueError("That isn't what Epic's page shows once you've logged in. Copy all of it and paste it here.")
+        # on stdin, as other programs can read a command line
+        self._jobs.add('login', '', 'Epic Games account', options=['--code', '-'], stdin=code)
 
     def stop(self, job_id: int) -> None:
         self._jobs.stop(job_id)
