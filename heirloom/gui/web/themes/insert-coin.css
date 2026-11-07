@@ -110,8 +110,9 @@ button { border-radius: var(--radius-control); text-transform: uppercase; letter
   font-size: 10px;
   text-align: center;
   text-shadow: 0 0 8px var(--gold);
-  animation: blink 1s steps(1) infinite;
 }
+/* only on the cover you're on: blinking on every cover of a large library kept the window drawing every frame */
+.card:is(:hover, :focus-within) .cover .actions::before { animation: blink 1s steps(1) infinite; }
 .cover .actions > button { height: 30px; font-size: 9px; }
 
 /* the pixel font is wide, so the dialogs and time fields are too */

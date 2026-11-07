@@ -78,7 +78,7 @@
 .rail-item.update { color: var(--text); font-weight: 600; }
 
 /* no glows: tinted shadows and hairlines instead */
-.brand, .empty .mark { animation: none; }
+.brand, .empty .mark { animation: none; filter: none; }
 .primary:hover:not(:disabled) { box-shadow: 0 6px 16px -6px rgb(120 72 18 / 45%); filter: none; }
 .card:hover .cover {
   box-shadow: var(--shadow), 0 0 0 2px var(--accent);

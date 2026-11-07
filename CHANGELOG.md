@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.41.4 "Wardrobe" (2026-11-07)
+
+Animations are smoother, most of all on a fast display with a large library.
+
+### Fixed
+- **Animations are smoother, most of all on a fast display with a large library.** On a 144 Hz display with 565
+  games, switching theme went from showing about half the frames it should to over 80%, and switching between light
+  and dark from about two thirds to 90%. Scrolling in Insert coin went from 57% to all of them.
+  - The window no longer draws itself again all the time while nothing moves. The logo's flicker grew and shrank its
+    glow, which the browser can only draw on the page's own thread, so the whole window was drawn again every frame:
+    40% of that thread's time with the window idle, and 99% in Insert coin, whose PRESS START blinked on every cover
+    at once. The glow now stays and the logo dims and brightens, and PRESS START blinks on the cover you're on.
+  - Covers no longer ease their colours and shadows over to a new theme or mode while the circle reveals it.
+  - Insert coin's logo shows its cyan neon glow, which the flicker had hidden.
+
 ## 0.41.3 "Wardrobe" (2026-11-07)
 
 You can log in with your browser, for when Epic's page won't take your login in Heirloom's own window.

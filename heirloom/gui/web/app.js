@@ -1311,8 +1311,19 @@ function nameCards() {
 
 // a new look for the whole window, spreading out in a circle from the control that chose it
 function spreadFrom(node, update) {
+  // without transitions meanwhile: the circle is the animation, and every cover easing its colours and shadows over
+  // as well halved the circle's frame rate. The new look is worked out before they're back, so none start then
+  const swap = async () => {
+    document.documentElement.classList.add('swapping');
+    try {
+      await update();
+      document.body.getBoundingClientRect();
+    } finally {
+      document.documentElement.classList.remove('swapping');
+    }
+  };
   if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    update();
+    swap();
     return;
   }
   const {left, top, width, height} = node.getBoundingClientRect();
@@ -1321,7 +1332,7 @@ function spreadFrom(node, update) {
   // one picture of the whole window: with a name of its own the banner would be drawn over an open dialog
   const hero = $('#hero');
   hero.style.viewTransitionName = 'none';
-  const transition = document.startViewTransition(update);
+  const transition = document.startViewTransition(swap);
   transition.finished.finally(() => { hero.style.viewTransitionName = ''; });
   transition.ready.then(() => document.documentElement.animate(
     {clipPath: [`circle(0 at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`]},

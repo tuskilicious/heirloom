@@ -124,7 +124,7 @@ body::before { content: ""; position: fixed; inset: 0; z-index: -1; background: 
 .rail-item:hover:not(:disabled) { background: var(--clear-hover); }
 .shelves .rail-item[aria-pressed="true"] .icon { filter: none; }
 .count { background: var(--clear-hover); color: var(--text); }
-.brand, .empty .mark { animation: none; }
+.brand, .empty .mark { animation: none; filter: none; }
 
 /* controls: pills of clear glass */
 button { border-radius: 999px; }

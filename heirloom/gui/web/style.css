@@ -148,7 +148,7 @@ button:disabled { opacity: .55; cursor: default; }
   transition: width .24s var(--ease);
 }
 
-.brand { margin: 0 0 22px; padding: 0 12px; height: 32px; line-height: 0; color: var(--logo); animation: flicker 5s ease-in-out infinite; }
+.brand { margin: 0 0 22px; padding: 0 12px; height: 32px; line-height: 0; color: var(--logo); filter: drop-shadow(0 0 7px color-mix(in srgb, var(--logo) 50%, transparent)); animation: flicker 5s ease-in-out infinite; }
 .brand .logo { height: 28px; width: auto; }
 .brand .mark { display: none; height: 32px; width: auto; }
 
@@ -838,7 +838,7 @@ kbd {
 .skeleton .line + .line { width: 44%; }
 
 .empty { display: grid; justify-items: center; gap: 14px; padding: 90px 24px; color: var(--muted); text-align: center; }
-.empty .mark { height: 58px; width: auto; color: var(--logo); animation: flicker 5s ease-in-out infinite; }
+.empty .mark { height: 58px; width: auto; color: var(--logo); filter: drop-shadow(0 0 7px color-mix(in srgb, var(--logo) 50%, transparent)); animation: flicker 5s ease-in-out infinite; }
 .empty p { margin: 0; max-width: 34ch; font-size: 16px; text-wrap: balance; }
 
 /* downloads and other jobs (adapted from @suraj-xd's Google Drive Uploader Toast on 21st.dev) */
@@ -941,12 +941,9 @@ kbd {
   100% { filter: none; box-shadow: 0 0 0 0 transparent; }
 }
 @keyframes drift { from { transform: scale(1.04) translate(-1%, 0); } to { transform: scale(1.12) translate(2%, -2%); } }
-@keyframes flicker {
-  0%, 100% { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--logo) 45%, transparent)); }
-  42% { filter: drop-shadow(0 0 11px color-mix(in srgb, var(--logo) 60%, transparent)); }
-  48% { filter: drop-shadow(0 0 4px color-mix(in srgb, var(--logo) 30%, transparent)); }
-  70% { filter: drop-shadow(0 0 9px color-mix(in srgb, var(--logo) 55%, transparent)); }
-}
+/* the lantern's flicker: its glow stays put and the logo dims and brightens, as the compositor draws a change of
+   opacity on its own, while a glow growing and shrinking had the whole window drawn again every frame */
+@keyframes flicker { 0%, 100% { opacity: .92; } 42% { opacity: 1; } 48% { opacity: .8; } 70% { opacity: .97; } }
 
 @media (max-width: 860px) {
   .rail { width: 68px; }
@@ -959,6 +956,9 @@ kbd {
   .top { flex-wrap: wrap; }
   .tools { width: 100%; }
 }
+
+/* while a new theme or mode swaps in (see spreadFrom) */
+.swapping, .swapping *, .swapping *::before, .swapping *::after { transition: none !important; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
