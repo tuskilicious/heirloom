@@ -190,7 +190,8 @@ button:disabled { opacity: .55; cursor: default; }
   color: var(--accent);
   filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 45%, transparent));
 }
-.shelves .rail-item[aria-pressed="true"] .count { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+/* the accent toward the text, as the accent alone on its own tint is too faint to read in light mode */
+.shelves .rail-item[aria-pressed="true"] .count { background: color-mix(in srgb, var(--accent) 16%, transparent); color: color-mix(in srgb, var(--accent) 70%, var(--text)); }
 .shelves .rail-item .icon { transition: color .2s, filter .3s, transform .4s var(--spring); }
 .shelves .rail-item:hover .icon { transform: translateX(2px); }
 
@@ -893,8 +894,9 @@ kbd {
 .job.stopped .state { color: var(--muted); }
 .live { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: breathe 2s ease-in-out infinite; }
 
-/* the progress ring turns into a Stop button under the pointer */
-.ring { position: relative; width: 34px; height: 34px; padding: 0; border-radius: 50%; background: transparent; color: var(--text); }
+/* the progress ring turns into a Stop button under the pointer. It clips to its circle, as a queued one spins its
+   square drawing, whose corners would reach past the button */
+.ring { position: relative; width: 34px; height: 34px; padding: 0; overflow: hidden; border-radius: 50%; background: transparent; color: var(--text); }
 .ring .meter { width: 32px; height: 32px; transform: rotate(-90deg); transition: opacity .15s; }
 .ring circle { fill: none; stroke-width: 2; }
 .ring .track { stroke: color-mix(in srgb, var(--text) 12%, transparent); }
@@ -906,7 +908,7 @@ kbd {
   display: grid;
   place-items: center;
   color: var(--accent);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   transition: opacity .15s;
