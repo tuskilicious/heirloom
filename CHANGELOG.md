@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.41.3 "Wardrobe" (2026-11-07)
+
+You can log in with your browser, for when Epic's page won't take your login in Heirloom's own window.
 
 ### New
 - **Log in with your browser.** Under Log in, for when Epic's page won't take your login in Heirloom's own window,
