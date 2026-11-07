@@ -36,7 +36,7 @@
 
 .ambient, .hero, .free { display: none !important; }
 .top { margin-bottom: 0; border-radius: var(--radius) var(--radius) 0 0; }
-.brand, .empty .mark { animation: none; }
+.brand, .empty .mark { animation: none; filter: none; }
 
 /* the book's title page: a serif heading over the totals */
 #heading { font-family: var(--serif); font-size: 30px; font-weight: 400; font-style: italic; letter-spacing: 0; }

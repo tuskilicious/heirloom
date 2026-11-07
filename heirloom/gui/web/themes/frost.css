@@ -72,7 +72,7 @@ button:active:not(:disabled) { transform: none; opacity: .8; }
 /* focus: a clear ring of ice */
 :focus-visible { outline: 2px solid #e6f6ff; outline-offset: 1px; }
 
-.brand, .empty .mark { animation: none; }
+.brand, .empty .mark { animation: none; filter: none; }
 .card:hover .cover { box-shadow: var(--shadow), 0 0 0 1px rgb(200 235 255 / 22%); }
 .switch:checked { box-shadow: none; }
 .ambient { opacity: .18; filter: blur(60px) saturate(.8); }

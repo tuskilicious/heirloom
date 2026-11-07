@@ -86,7 +86,7 @@ body::before {
 .rail-foot { flex-direction: row; gap: 4px; margin: 0 0 0 auto; padding: 0; border: 0; }
 .rail-foot .rail-item .label { display: none; }
 .rail-foot .rail-item { width: 48px; padding: 0; justify-content: center; }
-.brand, .empty .mark { animation: none; }
+.brand, .empty .mark { animation: none; filter: none; }
 
 .main { --gutter: 52px; padding-bottom: 48px; }
 .top { position: static; margin: 26px 0 6px; padding: 0; border: 0; background: none; backdrop-filter: none; box-shadow: none; }
