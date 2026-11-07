@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.41.4 "Wardrobe" (2026-11-07)
+
+Animations are smoother, most of all on a fast display with a large library.
 
 ### Fixed
 - **Animations are smoother, most of all on a fast display with a large library.** On a 144 Hz display with 565
