@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- **Small text in the sidebar and the downloads panel is easier to read.** The count on the shelf you're on was the
+  accent colour on a tint of itself, too faint in light mode, and the percentage inside a download's ring is a size
+  larger.
+
 ## 0.41.1 "Wardrobe" (2026-11-07)
 
 Picking a theme spreads it across the window from the tile you picked.
